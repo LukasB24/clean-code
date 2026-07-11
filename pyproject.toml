@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cleancode"
+version = "0.1.0"
+description = "Readability enforcer for LLM-generated Python: static analysis plus an LLM feedback loop."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "Lukas Burg" }]
+keywords = ["lint", "readability", "llm", "code-quality", "static-analysis"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = ["click>=8.1"]
+
+[project.optional-dependencies]
+llm = ["anthropic>=0.40"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+cleancode = "cleancode.cli:main"
+
+[project.urls]
+Repository = "https://github.com/LukasB24/CleanCode"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cleancode"]
