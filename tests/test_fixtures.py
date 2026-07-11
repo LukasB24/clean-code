@@ -32,6 +32,7 @@ EXPECTED_DIRTY_RULES = {
     },
     "llm_style_types.py": {
         "TY501",  # payload: Any, -> Any
+        "ST106",  # validate_and_store
     },
 }
 

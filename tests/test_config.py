@@ -17,7 +17,7 @@ def write_pyproject(directory: Path, body: str) -> Path:
 class TestDefaults:
     def test_default_config_has_every_rule_enabled(self):
         config = Config.default()
-        assert len(config.rules) == 15
+        assert len(config.rules) == 16
         assert all(rule.enabled for rule in config.rules.values())
         assert config.fail_on == Severity.WARNING
 

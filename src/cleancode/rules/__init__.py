@@ -11,6 +11,7 @@ from cleancode.rules.hints import UninformativeAny
 from cleancode.rules.naming import CrypticAbbreviation, MeaninglessName, SingleLetterName
 from cleancode.rules.slicing import ChainedSubscript, ComplexSubscript
 from cleancode.rules.structure import (
+    DoOneThing,
     MaxClassLength,
     MaxComplexity,
     MaxFunctionLength,
@@ -24,6 +25,7 @@ ALL_RULES: list[type[Rule]] = [
     MaxClassLength,
     MaxParameters,
     MaxComplexity,
+    DoOneThing,
     SingleLetterName,
     MeaninglessName,
     CrypticAbbreviation,

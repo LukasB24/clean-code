@@ -6,7 +6,7 @@ import ast
 from typing import Iterable, Iterator
 
 from cleancode.models import FileContext, Severity, Violation
-from cleancode.rules.base import Rule
+from cleancode.rules.base import Rule, split_identifier
 
 FunctionNode = ast.FunctionDef | ast.AsyncFunctionDef
 
@@ -237,3 +237,50 @@ class MaxComplexity(Rule):
             elif isinstance(node, ast.comprehension):
                 complexity += len(node.ifs)
         return complexity
+
+
+def _is_dunder(name: str) -> bool:
+    return name.startswith("__") and name.endswith("__")
+
+
+class DoOneThing(Rule):
+    id = "ST106"
+    name = "do-one-thing"
+    default_severity = Severity.WARNING
+    default_options = {
+        "conjunctions": ["and", "or"],
+        "allowed_names": [],
+    }
+    description = (
+        "Flags functions whose name joins responsibilities with a conjunction "
+        "(`load_and_save`, `fetch_or_default`). Needing 'and'/'or' to name a "
+        "function is a sign it does more than one thing — split it."
+    )
+
+    def check(self, ctx: FileContext) -> Iterable[Violation]:
+        conjunctions = set(ctx.config.options["conjunctions"])
+        allowed = set(ctx.config.options["allowed_names"])
+        for function in _functions(ctx.tree):
+            word = self._conjunction(function, conjunctions, allowed)
+            if word is not None:
+                yield self.violation(
+                    ctx,
+                    f"function `{function.name}` joins responsibilities with "
+                    f"`{word}`; a function should do one thing",
+                    line=function.lineno,
+                    col=function.col_offset,
+                    suggestion=(
+                        "split into separate, single-purpose functions — one for each "
+                        "part of the name — and let the caller compose them"
+                    ),
+                    symbol=function.name,
+                )
+
+    @staticmethod
+    def _conjunction(
+        function: FunctionNode, conjunctions: set[str], allowed: set[str]
+    ) -> str | None:
+        if function.name in allowed or _is_dunder(function.name):
+            return None
+        joined = sorted(conjunctions.intersection(split_identifier(function.name)))
+        return joined[0] if joined else None

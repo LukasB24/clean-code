@@ -1,4 +1,4 @@
-"""Tests for the structural rules ST101–ST105."""
+"""Tests for the structural rules ST101–ST106."""
 
 
 def lines_of(violations):
@@ -146,3 +146,54 @@ class TestMaxComplexity:
         """
         violations = check(source, "ST105", max_complexity=2)
         assert lines_of(violations) == [("ST105", 2)]
+
+
+class TestDoOneThing:
+    def test_flags_and_joined_name(self, check):
+        violations = check("def load_and_save(record):\n    return record\n", "ST106")
+        assert lines_of(violations) == [("ST106", 1)]
+        assert "`and`" in violations[0].message
+
+    def test_flags_or_joined_name(self, check):
+        violations = check("def fetch_or_default(key):\n    return key\n", "ST106")
+        assert lines_of(violations) == [("ST106", 1)]
+
+    def test_flags_camelcase_conjunction(self, check):
+        violations = check("def loadAndSave(record):\n    return record\n", "ST106")
+        assert lines_of(violations) == [("ST106", 1)]
+
+    def test_flags_methods_too(self, check):
+        source = """
+        class Store:
+            def read_and_write(self, item):
+                return item
+        """
+        assert [v.rule_id for v in check(source, "ST106")] == ["ST106"]
+
+    def test_single_purpose_name_passes(self, check):
+        assert check("def normalize(value):\n    return value\n", "ST106") == []
+
+    def test_substring_conjunctions_do_not_false_positive(self, check):
+        # 'and'/'or' inside a single word must not trigger
+        source = (
+            "def standardize(x):\n    return x\n\n"
+            "def reorder(items):\n    return items\n\n"
+            "def command(action):\n    return action\n"
+        )
+        assert check(source, "ST106") == []
+
+    def test_dunder_methods_are_exempt(self, check):
+        source = """
+        class Node:
+            def __init_and_setup__(self):
+                pass
+        """
+        assert check(source, "ST106") == []
+
+    def test_allowed_names_config(self, check):
+        source = "def get_or_create(key):\n    return key\n"
+        assert check(source, "ST106", allowed_names=["get_or_create"]) == []
+
+    def test_conjunctions_config_can_drop_or(self, check):
+        source = "def read_or_none(key):\n    return key\n"
+        assert check(source, "ST106", conjunctions=["and"]) == []

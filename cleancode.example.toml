@@ -35,6 +35,12 @@
 # [tool.cleancode.ST105]
 # max_complexity = 10
 
+# ST106  do-one-thing  [warning]
+#   Flags functions whose name joins responsibilities with a conjunction (`load_and_save`, `fetch_or_default`). Needing 'and'/'or' to name a function is a sign it does more than one thing — split it.
+# [tool.cleancode.ST106]
+# conjunctions = ["and", "or"]
+# allowed_names = []
+
 # NM201  single-letter-name  [warning]
 #   Flags single-character names. Conventional letters (i, j, k, n, x, y) are tolerated as loop/comprehension/lambda targets and `e` for exceptions; functions, classes, and ordinary variables always need real names.
 # [tool.cleancode.NM201]
