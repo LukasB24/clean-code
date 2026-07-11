@@ -284,3 +284,90 @@ class DoOneThing(Rule):
             return None
         joined = sorted(conjunctions.intersection(split_identifier(function.name)))
         return joined[0] if joined else None
+
+
+_GUARD_EXIT_TYPES = (ast.Continue, ast.Return, ast.Raise, ast.Break)
+
+
+def _is_guard_clause(statement: ast.stmt) -> bool:
+    """An `if` with no `else` whose entire body is a single control-flow exit."""
+    return (
+        isinstance(statement, ast.If)
+        and not statement.orelse
+        and len(statement.body) == 1
+        and isinstance(statement.body[0], _GUARD_EXIT_TYPES)
+    )
+
+
+def _blocks(function: FunctionNode) -> Iterator[list[ast.stmt]]:
+    """Every statement list nested directly inside ``function``, one per scope.
+
+    A block is the function body itself, or the body/orelse/finalbody/except/
+    match-case of any statement within it. Nested function and class
+    definitions are skipped — they are examined on their own.
+    """
+
+    def walk(statements: list[ast.stmt]) -> Iterator[list[ast.stmt]]:
+        yield statements
+        for statement in statements:
+            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                continue
+            for child_block in _child_blocks(statement):
+                yield from walk(child_block)
+
+    yield from walk(function.body)
+
+
+def _child_blocks(statement: ast.stmt) -> Iterator[list[ast.stmt]]:
+    """The body/orelse/finalbody/handler/case statement-lists of one statement."""
+    for attr in ("body", "orelse", "finalbody"):
+        block = getattr(statement, attr, None)
+        if block:
+            yield block
+    for handler in getattr(statement, "handlers", []):
+        yield handler.body
+    for case in getattr(statement, "cases", []):
+        yield case.body
+
+
+class TooManyGuardClauses(Rule):
+    id = "ST107"
+    name = "too-many-guard-clauses"
+    default_severity = Severity.INFO
+    default_options = {"max_guards": 2}
+    description = (
+        "Flags a function where one block strings together more than `max_guards` "
+        "sequential guard clauses (`if cond: continue/return/raise/break`) ahead of "
+        "the real work. Filtering piled up next to a decision is a 'more than one "
+        "thing' smell (see ST106): split the eligibility checks into their own "
+        "filter/predicate function and the remaining logic into another."
+    )
+
+    def check(self, ctx: FileContext) -> Iterable[Violation]:
+        max_guards = ctx.config.options["max_guards"]
+        for function in _functions(ctx.tree):
+            count = self._max_guard_count(function)
+            if count > max_guards:
+                yield self.violation(
+                    ctx,
+                    f"function `{function.name}` strings together {count} sequential "
+                    f"guard clauses in one block (maximum {max_guards})",
+                    line=function.lineno,
+                    col=function.col_offset,
+                    suggestion=(
+                        "extract the guard checks into a single named filter/predicate "
+                        "function, and move the remaining logic into its own function — "
+                        "so each piece does exactly one thing"
+                    ),
+                    symbol=function.name,
+                )
+
+    @staticmethod
+    def _max_guard_count(function: FunctionNode) -> int:
+        return max(
+            (
+                sum(1 for statement in block if _is_guard_clause(statement))
+                for block in _blocks(function)
+            ),
+            default=0,
+        )

@@ -7,7 +7,7 @@ shows up here without anyone remembering to edit a static file.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     from cleancode.rules.base import Rule
@@ -49,12 +49,17 @@ def _render_rule(rule: type[Rule]) -> str:
     return "\n".join(lines) + "\n"
 
 
+_SCALAR_LITERALS: dict[type, Callable[[object], str]] = {
+    bool: lambda value: "true" if value else "false",
+    str: lambda value: f'"{value}"',
+}
+
+
 def _toml_literal(value: object) -> str:
     """Render a Python default as the TOML literal a user would type."""
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, str):
-        return f'"{value}"'
+    render = _SCALAR_LITERALS.get(type(value))
+    if render is not None:
+        return render(value)
     if isinstance(value, list):
         return "[" + ", ".join(_toml_literal(item) for item in value) + "]"
     return str(value)

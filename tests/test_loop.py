@@ -93,6 +93,22 @@ class TestProgress:
         phases = [event.phase for event in events]
         assert phases == ["generating", "checking", "checked"]
         assert events[-1].message == "clean"
+        assert events[-1].ok is True
+
+    def test_checked_event_carries_ok_false_when_dirty(self):
+        events = []
+        generate_clean_code(
+            "copy the data",
+            FakeLLMClient([DIRTY_REPLY, CLEAN_REPLY]),
+            on_progress=events.append,
+        )
+        checked = [event for event in events if event.phase == "checked"]
+        assert checked[0].ok is False
+        assert checked[1].ok is True
+
+    def test_negative_max_iterations_is_rejected(self):
+        with pytest.raises(ValueError, match="max_iterations must be >= 0"):
+            generate_clean_code("x", FakeLLMClient([CLEAN_REPLY]), max_iterations=-1)
 
     def test_emits_refining_between_iterations(self):
         client = FakeLLMClient([DIRTY_REPLY, CLEAN_REPLY])

@@ -17,6 +17,7 @@ from cleancode.rules.structure import (
     MaxFunctionLength,
     MaxNestingDepth,
     MaxParameters,
+    TooManyGuardClauses,
 )
 
 ALL_RULES: list[type[Rule]] = [
@@ -26,6 +27,7 @@ ALL_RULES: list[type[Rule]] = [
     MaxParameters,
     MaxComplexity,
     DoOneThing,
+    TooManyGuardClauses,
     SingleLetterName,
     MeaninglessName,
     CrypticAbbreviation,

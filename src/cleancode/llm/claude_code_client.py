@@ -54,10 +54,27 @@ class ClaudeCodeClient:
             ) from error
         except subprocess.CalledProcessError as error:
             raise ClaudeCodeError(
-                f"the {self.binary!r} CLI exited with status {error.returncode}: "
-                f"{(error.stderr or '').strip()}"
+                _diagnose_failure(self.binary, error.returncode, error.stderr or "")
             ) from error
         return completed.stdout.strip()
+
+
+def _diagnose_failure(binary: str, returncode: int, stderr: str) -> str:
+    """Turn a raw CLI failure into a message the user can act on."""
+    lowered = stderr.lower()
+    if "usage limit" in lowered or "rate limit" in lowered or "rate_limit" in lowered:
+        return (
+            "Claude Code usage limit reached. Wait for it to reset, or run with "
+            f"--via anthropic (needs ANTHROPIC_API_KEY) instead.\n({stderr.strip()})"
+        )
+    if "anthropic_api_key" in lowered and "precedence" in lowered:
+        return (
+            "The `claude` CLI ignored your claude.ai login because ANTHROPIC_API_KEY "
+            "is set in the environment. Either run `unset ANTHROPIC_API_KEY` to use "
+            "your Pro/Max subscription via --via claude-code, or pass --via anthropic "
+            f"to bill that key directly.\n({stderr.strip()})"
+        )
+    return f"the {binary!r} CLI exited with status {returncode}: {stderr.strip()}"
 
 
 def _flatten(messages: list[dict[str, str]]) -> str:

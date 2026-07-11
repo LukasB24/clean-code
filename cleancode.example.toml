@@ -41,6 +41,11 @@
 # conjunctions = ["and", "or"]
 # allowed_names = []
 
+# ST107  too-many-guard-clauses  [info]
+#   Flags a function where one block strings together more than `max_guards` sequential guard clauses (`if cond: continue/return/raise/break`) ahead of the real work. Filtering piled up next to a decision is a 'more than one thing' smell (see ST106): split the eligibility checks into their own filter/predicate function and the remaining logic into another.
+# [tool.cleancode.ST107]
+# max_guards = 2
+
 # NM201  single-letter-name  [warning]
 #   Flags single-character names. Conventional letters (i, j, k, n, x, y) are tolerated as loop/comprehension/lambda targets and `e` for exceptions; functions, classes, and ordinary variables always need real names.
 # [tool.cleancode.NM201]

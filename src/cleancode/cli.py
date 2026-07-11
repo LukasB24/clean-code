@@ -135,9 +135,9 @@ def rules() -> None:
 @click.option(
     "--via",
     type=click.Choice(["anthropic", "claude-code"]),
-    default="anthropic",
+    default="claude-code",
     show_default=True,
-    help="Backend: 'anthropic' needs ANTHROPIC_API_KEY; 'claude-code' shells out to the `claude` CLI and reuses its login (Pro/Max subscription).",
+    help="Backend: 'claude-code' shells out to the `claude` CLI and reuses its login (Pro/Max subscription); 'anthropic' needs ANTHROPIC_API_KEY.",
 )
 @click.option(
     "--model",
@@ -146,6 +146,7 @@ def rules() -> None:
 )
 @click.option(
     "--max-iterations",
+    type=click.IntRange(min=0),
     default=3,
     show_default=True,
     help="Refinement rounds after the initial generation.",
@@ -172,17 +173,21 @@ def generate(  # cleancode: disable=ST104
     except Exception as error:  # missing key/CLI surfaces as a clean usage error
         raise click.UsageError(str(error)) from error
 
-    backend = f"{via}" + (f" · {model}" if model else "")
+    backend = via + (f" · {model}" if model else "")
     click.echo(click.style(f"▸ generating clean code for: {task}", bold=True), err=True)
     click.echo(f"  backend: {backend}, up to {max_iterations + 1} attempt(s)\n", err=True)
 
-    generation = generate_clean_code(
-        task,
-        client,
-        config,
-        max_iterations=max_iterations,
-        on_progress=_report_progress,
-    )
+    try:
+        generation = generate_clean_code(
+            task,
+            client,
+            config,
+            max_iterations=max_iterations,
+            on_progress=_report_progress,
+        )
+    except Exception as error:  # backend failure mid-loop: report cleanly, no traceback
+        click.echo(f"\n{click.style('generation failed', fg='red')}: {error}", err=True)
+        sys.exit(1)
 
     if show_iterations:
         for index, iteration in enumerate(generation.iterations):
@@ -211,7 +216,7 @@ def _report_progress(event: ProgressEvent) -> None:
     """Print one live status line to stderr for a feedback-loop step."""
     label = f"  [{event.iteration}]"
     if event.phase == "checked":
-        symbol = click.style("✓", fg="green") if event.message == "clean" else "→"
+        symbol = click.style("✓", fg="green") if event.ok else "→"
         click.echo(f"{label} {symbol} {event.message}", err=True)
     else:
         click.echo(f"{label} {event.message}…", err=True)

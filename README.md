@@ -127,6 +127,7 @@ identical either way.
 | ST104 | max-parameters | `max_params=3` | warning |
 | ST105 | max-complexity | `max_complexity=10` | error |
 | ST106 | do-one-thing | `conjunctions=[and, or]` | warning |
+| ST107 | too-many-guard-clauses | `max_guards=2` | info |
 | NM201 | single-letter-name | `allowed=[i,j,k,n,x,y,_]` | warning |
 | NM202 | meaningless-name | configurable ban lists | warning |
 | NM203 | cryptic-abbreviation | `known_abbrevs=[cfg,ctx,idx,…]` | info |

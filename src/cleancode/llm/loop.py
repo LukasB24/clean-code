@@ -31,6 +31,7 @@ class ProgressEvent:
     phase: Phase
     iteration: int
     message: str
+    ok: bool | None = None  # set on "checked" events: did the code pass all rules?
 
 
 ProgressCallback = Callable[[ProgressEvent], None]
@@ -66,6 +67,8 @@ def generate_clean_code(  # cleancode: disable=ST104
     """
     if config is None:
         config = Config.default()
+    if max_iterations < 0:
+        raise ValueError("max_iterations must be >= 0")
     notify = on_progress or _ignore_progress
 
     system = build_system_prompt(config)
@@ -80,7 +83,11 @@ def generate_clean_code(  # cleancode: disable=ST104
         code = _extract_code(reply)
         check_result = _check_generated(code, config)
         iterations.append(Iteration(code=code, check_result=check_result))
-        notify(ProgressEvent("checked", iteration_index, _summarize(check_result)))
+        notify(
+            ProgressEvent(
+                "checked", iteration_index, _summarize(check_result), ok=check_result.ok
+            )
+        )
 
         if check_result.ok:
             stop_reason = "clean"
