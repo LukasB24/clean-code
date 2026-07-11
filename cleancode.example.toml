@@ -1,0 +1,90 @@
+# CleanCode configuration reference.
+#
+# Every rule is enabled by default. To customize, copy the entries you want
+# into your project's pyproject.toml (keeping the [tool.cleancode...] headers)
+# and uncomment them. Unknown rule ids or option keys are rejected, so typos
+# cannot silently disable a rule.
+
+[tool.cleancode]
+# fail_on = "warning"   # info | warning | error: lowest severity that fails a run
+# disable = []          # rule ids to turn off entirely, e.g. ["NM203"]
+# exclude = []          # extra glob patterns to skip, e.g. ["migrations/**"]
+
+# ST101  max-nesting-depth  [error]
+#   Limits how deeply loops, conditionals, `with`, and `try` blocks nest inside a function. Deep nesting is the hallmark of hard-to-review generated code.
+# [tool.cleancode.ST101]
+# max_depth = 2
+
+# ST102  max-function-length  [warning]
+#   Limits function length (docstring included) so one function fits one screen.
+# [tool.cleancode.ST102]
+# max_lines = 60
+
+# ST103  max-class-length  [warning]
+#   Limits class length; god classes hide too many responsibilities.
+# [tool.cleancode.ST103]
+# max_lines = 200
+
+# ST104  max-parameters  [warning]
+#   Limits the number of function parameters (self/cls, *args, **kwargs excluded).
+# [tool.cleancode.ST104]
+# max_params = 3
+
+# ST105  max-complexity  [error]
+#   Limits cyclomatic complexity per function: 1 + one per if/for/while/except/assert/ternary/match-case, per comprehension filter, and per extra and/or operand.
+# [tool.cleancode.ST105]
+# max_complexity = 10
+
+# NM201  single-letter-name  [warning]
+#   Flags single-character names. Conventional letters (i, j, k, n, x, y) are tolerated as loop/comprehension/lambda targets and `e` for exceptions; functions, classes, and ordinary variables always need real names.
+# [tool.cleancode.NM201]
+# allowed = ["i", "j", "k", "n", "x", "y", "_"]
+
+# NM202  meaningless-name  [warning]
+#   Flags names that say nothing about their content (tmp, data, foo, do_stuff) and numbered generics like `data2` or `result1`.
+# [tool.cleancode.NM202]
+# banned = ["tmp", "temp", "data", "result", "res", "ret", "retval", "foo", "bar", "baz", "stuff", "thing", "things", "obj", "var", "info", "output", "my_var", "temp_var", "my_list", "my_dict", "arr", "lst", "l"]
+# banned_functions = ["process", "handle", "run_stuff", "do_stuff", "do_it", "do_something", "do_work", "process_data", "handle_data", "my_func", "func", "helper", "do_the_thing", "main2"]
+# allowed_in_loops = ["item", "value", "val", "element", "entry", "key"]
+
+# NM203  cryptic-abbreviation  [info]
+#   Flags vowel-less abbreviation soup like `usr_mgr` or `calc_rslt`. Known abbreviations (cfg, ctx, idx, ...) are allowlisted and configurable.
+# [tool.cleancode.NM203]
+# known_abbrevs = ["cfg", "ctx", "idx", "db", "fn", "env", "src", "dst", "str", "css", "tmp", "xml", "html", "sql", "std", "cmd", "msg", "pkg", "txt", "sdk", "api", "url", "uri", "gcd", "rgb", "csv", "json", "yml", "js", "ts", "np", "df", "kwargs", "args", "cls", "llm"]
+
+# CM301  docstring-restates-name  [warning]
+#   Flags short docstrings whose words all come from the function signature (`def get_user_name`: """Gets the user name.""") — they cost reading time and add nothing.
+# [tool.cleancode.CM301]
+# overlap = 0.8
+
+# CM302  comment-restates-code  [warning]
+#   Flags comments that paraphrase the code line they annotate (`x = x + 1  # increment x by 1`). TODO/FIXME/NOTE and tool directives are exempt.
+# [tool.cleancode.CM302]
+# overlap = 0.7
+# min_words = 2
+
+# CM303  comment-density  [info]
+#   Flags functions with more than ~1 comment line per 3 code lines — a strong smell of generated padding. Docstrings are policed by CM301/CM304, not here.
+# [tool.cleancode.CM303]
+# max_ratio = 0.3
+# min_code_lines = 5
+
+# CM304  boilerplate-param-docs  [warning]
+#   Flags Google-style Args:/Returns: sections where entries like `data: The data.` describe nothing beyond the parameter name.
+# [tool.cleancode.CM304]
+# min_uninformative = 0.5
+
+# SL401  complex-subscript  [warning]
+#   Scores each subscript expression (+1 per dimension/step/None/ellipsis/negative index/arithmetic/call, +2 per nested subscript, negative steps count double) and flags scores above the threshold.
+# [tool.cleancode.SL401]
+# max_score = 5
+
+# SL402  chained-subscript  [warning]
+#   Flags subscript chains like `grid[i][j][k]`; bind intermediates to names or use multi-dimensional indexing `grid[i, j, k]`.
+# [tool.cleancode.SL402]
+# max_chain = 2
+
+# TY501  uninformative-any  [warning]
+#   Rejects annotations that reduce to bare `Any` (including `Optional[Any]` and `Any | None`) on parameters and return types. `Any` nested in a container such as `dict[str, Any]` is permitted as a justified exception.
+# [tool.cleancode.TY501]
+

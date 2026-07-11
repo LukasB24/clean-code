@@ -7,6 +7,7 @@ from cleancode.rules.comments import (
     CommentRestatesCode,
     DocstringRestatesName,
 )
+from cleancode.rules.hints import UninformativeAny
 from cleancode.rules.naming import CrypticAbbreviation, MeaninglessName, SingleLetterName
 from cleancode.rules.slicing import ChainedSubscript, ComplexSubscript
 from cleancode.rules.structure import (
@@ -32,6 +33,7 @@ ALL_RULES: list[type[Rule]] = [
     BoilerplateParamDocs,
     ComplexSubscript,
     ChainedSubscript,
+    UninformativeAny,
 ]
 
 RULES_BY_ID: dict[str, type[Rule]] = {rule.id: rule for rule in ALL_RULES}

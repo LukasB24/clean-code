@@ -121,10 +121,10 @@ identical either way.
 
 | ID | Name | Default | Severity |
 |----|------|---------|----------|
-| ST101 | max-nesting-depth | `max_depth=4` | error |
+| ST101 | max-nesting-depth | `max_depth=2` | error |
 | ST102 | max-function-length | `max_lines=60` | warning |
 | ST103 | max-class-length | `max_lines=200` | warning |
-| ST104 | max-parameters | `max_params=5` | warning |
+| ST104 | max-parameters | `max_params=3` | warning |
 | ST105 | max-complexity | `max_complexity=10` | error |
 | NM201 | single-letter-name | `allowed=[i,j,k,n,x,y,_]` | warning |
 | NM202 | meaningless-name | configurable ban lists | warning |
@@ -135,6 +135,7 @@ identical either way.
 | CM304 | boilerplate-param-docs | `min_uninformative=0.5` | warning |
 | SL401 | complex-subscript | `max_score=5` | warning |
 | SL402 | chained-subscript | `max_chain=2` | warning |
+| TY501 | uninformative-any | — | warning |
 
 `cleancode rules` prints the same list with full descriptions.
 
@@ -217,6 +218,17 @@ print(generation.stop_reason)    # "clean" | "max_iterations" | "no_improvement"
 Any object with `complete(*, system: str, messages: list[dict]) -> str`
 satisfies the `LLMClient` protocol, so other providers (or a fake for tests)
 drop straight in.
+
+## Use as a Claude Code skill
+
+This repo ships a [Claude Code](https://claude.com/claude-code) skill at
+`.claude/skills/cleancode/`. When you work in this repo with Claude Code, it can
+run `cleancode check` on Python it writes and fix the findings before handing
+back. To make it available in every session, copy it to your user skills folder:
+
+```bash
+cp -r .claude/skills/cleancode ~/.claude/skills/cleancode
+```
 
 ## Design notes
 

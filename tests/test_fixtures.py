@@ -30,6 +30,9 @@ EXPECTED_DIRTY_RULES = {
         "NM201",  # parameter x outside a loop context
         "NM202",  # val1
     },
+    "llm_style_types.py": {
+        "TY501",  # payload: Any, -> Any
+    },
 }
 
 

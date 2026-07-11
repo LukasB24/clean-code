@@ -50,7 +50,7 @@ class GenerationResult:
     iterations: list[Iteration] = field(default_factory=list)
 
 
-def generate_clean_code(
+def generate_clean_code(  # cleancode: disable=ST104
     task: str,
     client: LLMClient,
     config: Config | None = None,

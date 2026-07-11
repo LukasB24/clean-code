@@ -11,7 +11,7 @@ import click
 
 from cleancode.config import Config, ConfigError
 from cleancode.engine import analyze_path
-from cleancode.models import CheckResult, Severity
+from cleancode.models import CheckResult, Severity, Violation
 
 if TYPE_CHECKING:
     from cleancode.llm import GenerationResult, ProgressEvent
@@ -86,6 +86,25 @@ def check(  # cleancode: disable=ST104
         _print_human(file_results)
 
     sys.exit(_exit_code(file_results, config.fail_on))
+
+
+@main.command("config-template")
+@click.option(
+    "--out",
+    "out_path",
+    type=click.Path(path_type=Path),
+    help="Write the template to a file instead of stdout.",
+)
+def config_template(out_path: Path | None) -> None:
+    """Print a commented reference config listing every rule and its options."""
+    from cleancode.template import build_config_template
+
+    text = build_config_template()
+    if out_path is not None:
+        out_path.write_text(text, encoding="utf-8")
+        click.echo(f"wrote {out_path}", err=True)
+    else:
+        click.echo(text, nl=False)
 
 
 @main.command()
@@ -209,45 +228,60 @@ def _final_status(generation: GenerationResult) -> str:
 
 def _apply_rule_filters(config: Config, select: str | None, ignore: str | None) -> None:
     if select:
-        selected = {rule_id.strip() for rule_id in select.split(",")}
-        unknown = selected - config.rules.keys()
-        if unknown:
-            raise ConfigError(
-                f"--select: unknown rule id(s) {', '.join(sorted(unknown))}"
-            )
-        for rule_id, rule_config in config.rules.items():
-            rule_config.enabled = rule_id in selected
+        _apply_select(config, select)
     if ignore:
-        for rule_id in (part.strip() for part in ignore.split(",")):
-            if rule_id not in config.rules:
-                raise ConfigError(f"--ignore: unknown rule id {rule_id}")
-            config.rules[rule_id].enabled = False
+        _apply_ignore(config, ignore)
+
+
+def _apply_select(config: Config, select: str) -> None:
+    selected = {rule_id.strip() for rule_id in select.split(",")}
+    unknown = selected - config.rules.keys()
+    if unknown:
+        raise ConfigError(f"--select: unknown rule id(s) {', '.join(sorted(unknown))}")
+    for rule_id, rule_config in config.rules.items():
+        rule_config.enabled = rule_id in selected
+
+
+def _apply_ignore(config: Config, ignore: str) -> None:
+    for rule_id in (part.strip() for part in ignore.split(",")):
+        if rule_id not in config.rules:
+            raise ConfigError(f"--ignore: unknown rule id {rule_id}")
+        config.rules[rule_id].enabled = False
 
 
 def _print_human(file_results: list[CheckResult]) -> None:
-    total = 0
     counts = {severity: 0 for severity in Severity}
     for file_result in file_results:
-        if file_result.parse_error:
-            click.echo(
-                f"{file_result.path}: "
-                f"{click.style('syntax error', fg='red')}: {file_result.parse_error}"
-            )
-            continue
-        for violation in file_result.violations:
-            total += 1
-            counts[violation.severity] += 1
-            severity_label = click.style(
-                violation.severity.name.lower(), fg=_SEVERITY_COLORS[violation.severity]
-            )
-            location = f"{file_result.path}:{violation.line}:{violation.col}"
-            click.echo(
-                f"{location}: {severity_label} {violation.rule_id} "
-                f"[{violation.rule_name}] {violation.message}"
-            )
-            if violation.suggestion:
-                click.echo(f"    fix: {violation.suggestion}")
+        _print_file_result(file_result, counts)
+    _print_summary(file_results, counts)
 
+
+def _print_file_result(file_result: CheckResult, counts: dict[Severity, int]) -> None:
+    if file_result.parse_error:
+        click.echo(
+            f"{file_result.path}: "
+            f"{click.style('syntax error', fg='red')}: {file_result.parse_error}"
+        )
+        return
+    for violation in file_result.violations:
+        counts[violation.severity] += 1
+        _print_violation(file_result.path, violation)
+
+
+def _print_violation(path: str, violation: Violation) -> None:
+    severity_label = click.style(
+        violation.severity.name.lower(), fg=_SEVERITY_COLORS[violation.severity]
+    )
+    click.echo(
+        f"{path}:{violation.line}:{violation.col}: {severity_label} "
+        f"{violation.rule_id} [{violation.rule_name}] {violation.message}"
+    )
+    if violation.suggestion:
+        click.echo(f"    fix: {violation.suggestion}")
+
+
+def _print_summary(file_results: list[CheckResult], counts: dict[Severity, int]) -> None:
+    total = sum(counts.values())
     files = len(file_results)
     if total == 0 and not any(file_result.parse_error for file_result in file_results):
         click.echo(click.style(f"✓ {files} file(s) clean", fg="green"))

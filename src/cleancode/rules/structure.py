@@ -48,19 +48,24 @@ def _body_statements(node: ast.AST) -> Iterator[ast.stmt]:
     """Direct child statements of a block node, across all its clauses."""
     for clause in ("body", "orelse", "finalbody", "handlers", "cases"):
         for child in getattr(node, clause, []):
-            if isinstance(child, ast.ExceptHandler):
-                yield from child.body
-            elif isinstance(child, ast.match_case):
-                yield child  # match_case itself nests; its body is walked below
-            elif isinstance(child, ast.stmt):
-                yield child
+            yield from _clause_statements(child)
+
+
+def _clause_statements(child: ast.AST) -> Iterator[ast.stmt]:
+    """Normalize one clause child into the statements that nest under it."""
+    if isinstance(child, ast.ExceptHandler):
+        yield from child.body
+    elif isinstance(child, ast.match_case):
+        yield child  # match_case itself nests; its body is walked below
+    elif isinstance(child, ast.stmt):
+        yield child
 
 
 class MaxNestingDepth(Rule):
     id = "ST101"
     name = "max-nesting-depth"
     default_severity = Severity.ERROR
-    default_options = {"max_depth": 4}
+    default_options = {"max_depth": 2}
     description = (
         "Limits how deeply loops, conditionals, `with`, and `try` blocks nest inside a "
         "function. Deep nesting is the hallmark of hard-to-review generated code."
@@ -159,7 +164,7 @@ class MaxParameters(Rule):
     id = "ST104"
     name = "max-parameters"
     default_severity = Severity.WARNING
-    default_options = {"max_params": 5}
+    default_options = {"max_params": 3}
     description = "Limits the number of function parameters (self/cls, *args, **kwargs excluded)."
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
