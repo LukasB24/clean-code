@@ -3,7 +3,12 @@
 from cleancode.llm.anthropic_client import AnthropicClient
 from cleancode.llm.claude_code_client import ClaudeCodeClient, ClaudeCodeError
 from cleancode.llm.client import LLMClient
-from cleancode.llm.loop import GenerationResult, Iteration, generate_clean_code
+from cleancode.llm.loop import (
+    GenerationResult,
+    Iteration,
+    ProgressEvent,
+    generate_clean_code,
+)
 from cleancode.llm.prompts import build_system_prompt, render_feedback
 
 __all__ = [
@@ -13,6 +18,7 @@ __all__ = [
     "GenerationResult",
     "Iteration",
     "LLMClient",
+    "ProgressEvent",
     "build_system_prompt",
     "generate_clean_code",
     "render_feedback",

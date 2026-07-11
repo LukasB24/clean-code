@@ -73,11 +73,25 @@ output) — the same text that drives the LLM feedback loop.
 ```text
 $ export ANTHROPIC_API_KEY=sk-ant-...
 $ cleancode generate "parse a CSV of trades and return per-symbol totals" --out trades.py
-iteration 0: 4 violation(s)
-iteration 1: clean
-stopped: clean
+▸ generating clean code for: parse a CSV of trades and return per-symbol totals
+  backend: anthropic, up to 4 attempt(s)
+
+  [0] asking the model for code…
+  [0] analyzing the generated code…
+  [0] → 4 violation(s)
+  [0] sending the violations back…
+  [1] asking the model for code…
+  [1] analyzing the generated code…
+  [1] ✓ clean
+
+stopped (clean) after 2 attempt(s) — clean
 wrote trades.py
 ```
+
+Progress is printed live to **stderr** as the loop runs — each step is
+announced *before* it starts, so a slow model call shows `asking the model for
+code…` rather than a silent, hung-looking prompt. The final code goes to
+**stdout** (or `--out`), so you can still pipe or redirect it cleanly.
 
 The loop primes the model with every enabled rule and its threshold, so the
 first attempt is usually close; each refinement round sends the numbered
