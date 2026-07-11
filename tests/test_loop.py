@@ -3,16 +3,14 @@
 import pytest
 
 from cleancode.config import Config
-from cleancode.llm import build_system_prompt, generate_clean_code, render_feedback
 from cleancode.engine import analyze_source
+from cleancode.llm import build_system_prompt, generate_clean_code, render_feedback
 
-CLEAN_REPLY = '```python\ndef double_prices(prices):\n    return [price * 2 for price in prices]\n```'
-DIRTY_REPLY = '```python\ndef process_data(data):\n    tmp = [entry for entry in data]\n    return tmp\n```'
-LESS_DIRTY_REPLY = '```python\ndef copy_rows(rows):\n    tmp = [row for row in rows]\n    return tmp\n```'
+CLEAN_REPLY = "```python\ndef double_prices(prices):\n    return [price * 2 for price in prices]\n```"
+DIRTY_REPLY = "```python\ndef process_data(data):\n    tmp = [entry for entry in data]\n    return tmp\n```"
+LESS_DIRTY_REPLY = "```python\ndef copy_rows(rows):\n    tmp = [row for row in rows]\n    return tmp\n```"
 BROKEN_REPLY = "```python\ndef broken(:\n    pass\n```"
-SUPPRESSING_REPLY = (
-    '```python\ndef copy_rows(rows):\n    tmp = list(rows)  # cleancode: disable=NM202\n    return tmp\n```'
-)
+SUPPRESSING_REPLY = "```python\ndef copy_rows(rows):\n    tmp = list(rows)  # cleancode: disable=NM202\n    return tmp\n```"
 
 
 class FakeLLMClient:
@@ -88,6 +86,90 @@ class TestPrompts:
         assert "NM202" in feedback
 
 
+class TestClaudeCodeClient:
+    def test_missing_cli_raises_helpful_error(self, monkeypatch):
+        import cleancode.llm.claude_code_client as module
+
+        monkeypatch.setattr(module.shutil, "which", lambda binary: None)
+        with pytest.raises(module.ClaudeCodeError, match="not found on PATH"):
+            module.ClaudeCodeClient()
+
+    def test_complete_invokes_cli_and_returns_stdout(self, monkeypatch):
+        import cleancode.llm.claude_code_client as module
+
+        captured = {}
+
+        def fake_run(command, **kwargs):
+            captured["command"] = command
+            captured["input"] = kwargs["input"]
+            return type("Completed", (), {"stdout": "  hello  ", "stderr": ""})()
+
+        monkeypatch.setattr(module.shutil, "which", lambda binary: "/usr/bin/claude")
+        monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+        client = module.ClaudeCodeClient(model="claude-sonnet-5")
+        reply = client.complete(
+            system="sys",
+            messages=[
+                {"role": "user", "content": "first"},
+                {"role": "assistant", "content": "prior"},
+                {"role": "user", "content": "again"},
+            ],
+        )
+        assert reply == "hello"
+        assert captured["command"][:2] == ["claude", "--print"]
+        assert "--append-system-prompt" in captured["command"]
+        assert "--model" in captured["command"]
+        # multi-turn history is flattened with role labels, latest turn last
+        assert captured["input"].strip().endswith("User:\nagain")
+
+    def test_single_message_is_passed_verbatim(self, monkeypatch):
+        import cleancode.llm.claude_code_client as module
+
+        captured = {}
+
+        def fake_run(command, **kwargs):
+            captured["input"] = kwargs["input"]
+            return type("Completed", (), {"stdout": "ok", "stderr": ""})()
+
+        monkeypatch.setattr(module.shutil, "which", lambda binary: "/usr/bin/claude")
+        monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+        module.ClaudeCodeClient().complete(
+            system="sys", messages=[{"role": "user", "content": "just this"}]
+        )
+        assert captured["input"] == "just this"
+
+    def test_nonzero_exit_becomes_claude_code_error(self, monkeypatch):
+        import subprocess
+
+        import cleancode.llm.claude_code_client as module
+
+        def fake_run(command, **kwargs):
+            raise subprocess.CalledProcessError(2, command, stderr="boom")
+
+        monkeypatch.setattr(module.shutil, "which", lambda binary: "/usr/bin/claude")
+        monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+        with pytest.raises(module.ClaudeCodeError, match="boom"):
+            module.ClaudeCodeClient().complete(
+                system="s", messages=[{"role": "user", "content": "x"}]
+            )
+
+    def test_client_satisfies_loop(self, monkeypatch):
+        """A ClaudeCodeClient drops into generate_clean_code unchanged."""
+        import cleancode.llm.claude_code_client as module
+
+        def fake_run(command, **kwargs):
+            return type("Completed", (), {"stdout": CLEAN_REPLY, "stderr": ""})()
+
+        monkeypatch.setattr(module.shutil, "which", lambda binary: "/usr/bin/claude")
+        monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+        result = generate_clean_code("double the prices", module.ClaudeCodeClient())
+        assert result.clean and result.stop_reason == "clean"
+
+
 class TestAnthropicClient:
     def test_missing_dependency_raises_helpful_error(self, monkeypatch):
         import builtins
@@ -127,7 +209,9 @@ class TestAnthropicClient:
         from cleancode.llm.anthropic_client import AnthropicClient
 
         client = AnthropicClient(model="claude-sonnet-5")
-        reply = client.complete(system="sys", messages=[{"role": "user", "content": "hi"}])
+        reply = client.complete(
+            system="sys", messages=[{"role": "user", "content": "hi"}]
+        )
         assert reply == "hello"
         assert captured["model"] == "claude-sonnet-5"
         assert captured["system"] == "sys"

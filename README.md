@@ -17,11 +17,20 @@ CleanCode enforces reviewable Python in two ways:
    analyzes it, feeds the violations back to the model as structured feedback,
    and re-generates until the code is clean.
 
+## Disclaimer
+
+This project is under active development. The software is provided "as is", 
+without warranty of any kind, express or implied, including but not limited 
+to the warranties of merchantability, fitness for a particular purpose, 
+completeness, or correctness. In no event shall the authors be liable for 
+any claim, damages, or other liability arising from the use of this software.
+
 ## Installation
 
 ```bash
-pip install cleancode            # analyzer + CLI
-pip install "cleancode[llm]"     # + the LLM feedback loop (Anthropic)
+pip install -e ".[dev,llm]"
+pytest
+cleancode check src/cleancode
 ```
 
 Requires Python ≥ 3.11. The core has a single dependency (`click`).
@@ -78,6 +87,26 @@ silence the checker as a violation itself. If the model stops improving, the
 loop stops early and returns the *best* attempt, never a later-but-worse one.
 
 Exit code is `0` only if the final code is clean.
+
+### Backends: API key vs. Claude subscription
+
+`generate` supports two backends via `--via`:
+
+- `--via anthropic` (default) calls the Anthropic API directly and needs an
+  `ANTHROPIC_API_KEY` (billed as pay-as-you-go credits — a Claude Pro/Max
+  subscription does **not** include API access).
+- `--via claude-code` shells out to the [Claude Code](https://claude.com/claude-code)
+  CLI (`claude --print`) and reuses whatever login that CLI already holds, so a
+  **Pro or Max subscription** drives the loop with no API key:
+
+  ```text
+  $ cleancode generate "average a list of numbers" --via claude-code
+  ```
+
+  Requires the `claude` CLI on your `PATH`.
+
+Both backends implement the same `LLMClient` protocol, so the feedback loop is
+identical either way.
 
 ## The rules
 
@@ -190,11 +219,3 @@ drop straight in.
   config, and every fuzzy rule (NM203, CM303) defaults to `info` severity.
 - The project dogfoods itself: the test suite fails if `cleancode check src/`
   reports anything.
-
-## Development
-
-```bash
-pip install -e ".[dev,llm]"
-pytest
-cleancode check src/cleancode    # dogfood
-```

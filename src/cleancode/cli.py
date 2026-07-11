@@ -12,7 +12,11 @@ from cleancode.config import Config, ConfigError
 from cleancode.engine import analyze_path
 from cleancode.models import CheckResult, Severity
 
-_SEVERITY_COLORS = {Severity.INFO: "cyan", Severity.WARNING: "yellow", Severity.ERROR: "red"}
+_SEVERITY_COLORS = {
+    Severity.INFO: "cyan",
+    Severity.WARNING: "yellow",
+    Severity.ERROR: "red",
+}
 
 
 @click.group()
@@ -22,13 +26,28 @@ def main() -> None:
 
 
 @main.command()
-@click.argument("paths", nargs=-1, required=True, type=click.Path(exists=True, path_type=Path))
+@click.argument(
+    "paths", nargs=-1, required=True, type=click.Path(exists=True, path_type=Path)
+)
 @click.option("--json", "as_json", is_flag=True, help="Emit machine-readable JSON.")
-@click.option("--config", "config_path", type=click.Path(exists=True, path_type=Path), help="Explicit TOML config file (default: nearest pyproject.toml).")
-@click.option("--select", help="Comma-separated rule ids to run exclusively (e.g. ST101,CM302).")
+@click.option(
+    "--config",
+    "config_path",
+    type=click.Path(exists=True, path_type=Path),
+    help="Explicit TOML config file (default: nearest pyproject.toml).",
+)
+@click.option(
+    "--select", help="Comma-separated rule ids to run exclusively (e.g. ST101,CM302)."
+)
 @click.option("--ignore", help="Comma-separated rule ids to skip.")
-@click.option("--no-suppress", is_flag=True, help="Ignore inline `# cleancode: disable` comments.")
-@click.option("--fail-on", type=click.Choice(["info", "warning", "error"]), help="Lowest severity that causes a non-zero exit (default from config).")
+@click.option(
+    "--no-suppress", is_flag=True, help="Ignore inline `# cleancode: disable` comments."
+)
+@click.option(
+    "--fail-on",
+    type=click.Choice(["info", "warning", "error"]),
+    help="Lowest severity that causes a non-zero exit (default from config).",
+)
 def check(  # cleancode: disable=ST104
     paths: tuple[Path, ...],
     as_json: bool,
@@ -49,10 +68,16 @@ def check(  # cleancode: disable=ST104
 
     file_results: list[CheckResult] = []
     for path in paths:
-        file_results.extend(analyze_path(path, config, honor_suppressions=not no_suppress))
+        file_results.extend(
+            analyze_path(path, config, honor_suppressions=not no_suppress)
+        )
 
     if as_json:
-        click.echo(json.dumps([file_result.to_dict() for file_result in file_results], indent=2))
+        click.echo(
+            json.dumps(
+                [file_result.to_dict() for file_result in file_results], indent=2
+            )
+        )
     else:
         _print_human(file_results)
 
@@ -65,7 +90,9 @@ def rules() -> None:
     from cleancode.rules import ALL_RULES
 
     for rule in ALL_RULES:
-        defaults = ", ".join(f"{key}={value}" for key, value in rule.default_options.items())
+        defaults = ", ".join(
+            f"{key}={value}" for key, value in rule.default_options.items()
+        )
         header = f"{rule.id}  {rule.name}"
         click.echo(
             f"{click.style(header, bold=True)}  "
@@ -76,23 +103,54 @@ def rules() -> None:
 
 @main.command()
 @click.argument("task")
-@click.option("--out", "out_path", type=click.Path(path_type=Path), help="Write the final code to a file instead of stdout.")
-@click.option("--model", default="claude-sonnet-5", show_default=True, help="Anthropic model id.")
-@click.option("--max-iterations", default=3, show_default=True, help="Refinement rounds after the initial generation.")
-@click.option("--show-iterations", is_flag=True, help="Print each iteration's code to stderr, not just its violation count.")
-def generate(
+@click.option(
+    "--out",
+    "out_path",
+    type=click.Path(path_type=Path),
+    help="Write the final code to a file instead of stdout.",
+)
+@click.option(
+    "--via",
+    type=click.Choice(["anthropic", "claude-code"]),
+    default="anthropic",
+    show_default=True,
+    help="Backend: 'anthropic' needs ANTHROPIC_API_KEY; 'claude-code' shells out to the `claude` CLI and reuses its login (Pro/Max subscription).",
+)
+@click.option(
+    "--model",
+    default=None,
+    help="Model id (defaults to claude-sonnet-5 for anthropic, the CLI's default for claude-code).",
+)
+@click.option(
+    "--max-iterations",
+    default=3,
+    show_default=True,
+    help="Refinement rounds after the initial generation.",
+)
+@click.option(
+    "--show-iterations",
+    is_flag=True,
+    help="Print each iteration's code to stderr, not just its violation count.",
+)
+def generate(  # cleancode: disable=ST104
     task: str,
     out_path: Path | None,
-    model: str,
+    via: str,
+    model: str | None,
     max_iterations: int,
     show_iterations: bool,
 ) -> None:
     """Generate code for TASK with an LLM, re-prompting until it passes all rules."""
-    from cleancode.llm import AnthropicClient, generate_clean_code
+    from cleancode.llm import generate_clean_code
 
     config = Config.load(Path.cwd())
-    client = AnthropicClient(model=model)
-    generation = generate_clean_code(task, client, config, max_iterations=max_iterations)
+    try:
+        client = _build_client(via, model)
+    except Exception as error:  # missing key/CLI surfaces as a clean usage error
+        raise click.UsageError(str(error)) from error
+    generation = generate_clean_code(
+        task, client, config, max_iterations=max_iterations
+    )
 
     for index, iteration in enumerate(generation.iterations):
         status = (
@@ -115,12 +173,23 @@ def generate(
     sys.exit(0 if generation.clean else 1)
 
 
+def _build_client(via: str, model: str | None):
+    """Construct the requested LLM backend, applying its default model."""
+    from cleancode.llm import AnthropicClient, ClaudeCodeClient
+
+    if via == "claude-code":
+        return ClaudeCodeClient(model=model)
+    return AnthropicClient(model=model) if model else AnthropicClient()
+
+
 def _apply_rule_filters(config: Config, select: str | None, ignore: str | None) -> None:
     if select:
         selected = {rule_id.strip() for rule_id in select.split(",")}
         unknown = selected - config.rules.keys()
         if unknown:
-            raise ConfigError(f"--select: unknown rule id(s) {', '.join(sorted(unknown))}")
+            raise ConfigError(
+                f"--select: unknown rule id(s) {', '.join(sorted(unknown))}"
+            )
         for rule_id, rule_config in config.rules.items():
             rule_config.enabled = rule_id in selected
     if ignore:

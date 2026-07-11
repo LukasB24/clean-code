@@ -20,7 +20,7 @@ class AnthropicClient:
             import anthropic
         except ImportError as error:
             raise ImportError(
-                'the LLM feedback loop needs the anthropic package; install it with '
+                "the LLM feedback loop needs the anthropic package; install it with "
                 'pip install "cleancode[llm]"'
             ) from error
         self.model = model
