@@ -88,11 +88,6 @@ stopped (clean) after 2 attempt(s) — clean
 wrote trades.py
 ```
 
-Progress is printed live to **stderr** as the loop runs — each step is
-announced *before* it starts, so a slow model call shows `asking the model for
-code…` rather than a silent, hung-looking prompt. The final code goes to
-**stdout** (or `--out`), so you can still pipe or redirect it cleanly.
-
 The loop primes the model with every enabled rule and its threshold, so the
 first attempt is usually close; each refinement round sends the numbered
 violations with the offending source lines quoted. Generated code may not
