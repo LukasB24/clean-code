@@ -73,9 +73,18 @@ output) — the same text that drives the LLM feedback loop.
 ```text
 $ export ANTHROPIC_API_KEY=sk-ant-...
 $ cleancode generate "parse a CSV of trades and return per-symbol totals" --out trades.py
-iteration 0: 4 violation(s)
-iteration 1: clean
-stopped: clean
+▸ generating clean code for: parse a CSV of trades and return per-symbol totals
+  backend: anthropic, up to 4 attempt(s)
+
+  [0] asking the model for code…
+  [0] analyzing the generated code…
+  [0] → 4 violation(s)
+  [0] sending the violations back…
+  [1] asking the model for code…
+  [1] analyzing the generated code…
+  [1] ✓ clean
+
+stopped (clean) after 2 attempt(s) — clean
 wrote trades.py
 ```
 

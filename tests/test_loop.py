@@ -71,6 +71,47 @@ class TestLoop:
         assert result.clean
 
 
+class TestProgress:
+    def test_reports_generating_before_the_model_call(self):
+        events = []
+        order = []
+
+        class RecordingClient:
+            def complete(self, *, system, messages):
+                order.append("model-called")
+                return CLEAN_REPLY
+
+        def record(event):
+            order.append(f"progress:{event.phase}")
+            events.append(event)
+
+        generate_clean_code("double", RecordingClient(), on_progress=record)
+
+        # the 'generating' event must reach the caller before the blocking call
+        assert order[0] == "progress:generating"
+        assert order[1] == "model-called"
+        phases = [event.phase for event in events]
+        assert phases == ["generating", "checking", "checked"]
+        assert events[-1].message == "clean"
+
+    def test_emits_refining_between_iterations(self):
+        client = FakeLLMClient([DIRTY_REPLY, CLEAN_REPLY])
+        events = []
+        generate_clean_code("copy the data", client, on_progress=events.append)
+        phases = [event.phase for event in events]
+        assert phases == [
+            "generating", "checking", "checked", "refining",
+            "generating", "checking", "checked",
+        ]
+        assert [event.iteration for event in events[:4]] == [0, 0, 0, 0]
+        assert events[4].iteration == 1
+
+    def test_progress_is_optional(self):
+        # no callback -> no error, loop behaves exactly as before
+        result = generate_clean_code("double", FakeLLMClient([CLEAN_REPLY]))
+        assert result.clean
+
+
 class TestPrompts:
     def test_system_prompt_lists_enabled_rules_only(self):
         config = Config.default()

@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 import re
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Callable, Literal
 
 from cleancode.config import Config
 from cleancode.engine import analyze_source
@@ -17,6 +17,23 @@ _CODE_BLOCK = re.compile(r"```(?:python)?\s*\n(.*?)```", re.DOTALL)
 _SUPPRESSION_COMMENT = re.compile(r"#.*cleancode:\s*disable")
 
 StopReason = Literal["clean", "max_iterations", "no_improvement"]
+Phase = Literal["generating", "checking", "checked", "refining"]
+
+
+@dataclass
+class ProgressEvent:
+    """A step the feedback loop is about to take or has just finished.
+
+    Emitted through the ``on_progress`` callback so callers (the CLI) can show
+    live status instead of a silent wait while the model responds.
+    """
+
+    phase: Phase
+    iteration: int
+    message: str
+
+
+ProgressCallback = Callable[[ProgressEvent], None]
 
 
 @dataclass
@@ -38,25 +55,32 @@ def generate_clean_code(
     client: LLMClient,
     config: Config | None = None,
     max_iterations: int = 3,
+    on_progress: ProgressCallback | None = None,
 ) -> GenerationResult:
     """Ask ``client`` to solve ``task``, re-prompting with violations until clean.
 
     Runs at most ``max_iterations`` refinement rounds after the initial
     generation. Always returns the best attempt seen, never a later-but-worse one.
+    ``on_progress`` receives a :class:`ProgressEvent` before each model call and
+    after each analysis, so a caller can narrate the otherwise silent wait.
     """
     if config is None:
         config = Config.default()
+    notify = on_progress or _ignore_progress
 
     system = build_system_prompt(config)
     messages: list[dict[str, str]] = [{"role": "user", "content": task}]
     iterations: list[Iteration] = []
     stop_reason: StopReason = "max_iterations"
 
-    for _ in range(max_iterations + 1):
+    for iteration_index in range(max_iterations + 1):
+        notify(ProgressEvent("generating", iteration_index, "asking the model for code"))
         reply = client.complete(system=system, messages=messages)
+        notify(ProgressEvent("checking", iteration_index, "analyzing the generated code"))
         code = _extract_code(reply)
         check_result = _check_generated(code, config)
         iterations.append(Iteration(code=code, check_result=check_result))
+        notify(ProgressEvent("checked", iteration_index, _summarize(check_result)))
 
         if check_result.ok:
             stop_reason = "clean"
@@ -64,6 +88,7 @@ def generate_clean_code(
         if _stalled(iterations):
             stop_reason = "no_improvement"
             break
+        notify(ProgressEvent("refining", iteration_index, "sending the violations back"))
         messages.append({"role": "assistant", "content": reply})
         messages.append({"role": "user", "content": render_feedback(check_result, code)})
 
@@ -74,6 +99,20 @@ def generate_clean_code(
         stop_reason=stop_reason,
         iterations=iterations,
     )
+
+
+def _ignore_progress(event: ProgressEvent) -> None:
+    """Default no-op sink when the caller supplies no progress callback."""
+
+
+def _summarize(check_result: CheckResult) -> str:
+    """One-line human summary of a check result for progress output."""
+    if check_result.parse_error:
+        return f"generated code did not parse ({check_result.parse_error})"
+    count = len(check_result.violations)
+    if count == 0:
+        return "clean"
+    return f"{count} violation(s)"
 
 
 def _extract_code(reply: str) -> str:

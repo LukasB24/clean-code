@@ -5,12 +5,16 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
 
 from cleancode.config import Config, ConfigError
 from cleancode.engine import analyze_path
 from cleancode.models import CheckResult, Severity
+
+if TYPE_CHECKING:
+    from cleancode.llm import GenerationResult, ProgressEvent
 
 _SEVERITY_COLORS = {
     Severity.INFO: "cyan",
@@ -148,23 +152,25 @@ def generate(  # cleancode: disable=ST104
         client = _build_client(via, model)
     except Exception as error:  # missing key/CLI surfaces as a clean usage error
         raise click.UsageError(str(error)) from error
+
+    backend = f"{via}" + (f" · {model}" if model else "")
+    click.echo(click.style(f"▸ generating clean code for: {task}", bold=True), err=True)
+    click.echo(f"  backend: {backend}, up to {max_iterations + 1} attempt(s)\n", err=True)
+
     generation = generate_clean_code(
-        task, client, config, max_iterations=max_iterations
+        task,
+        client,
+        config,
+        max_iterations=max_iterations,
+        on_progress=_report_progress,
     )
 
-    for index, iteration in enumerate(generation.iterations):
-        status = (
-            "clean"
-            if iteration.check_result.ok
-            else f"{len(iteration.check_result.violations)} violation(s)"
-        )
-        if iteration.check_result.parse_error:
-            status = f"syntax error ({iteration.check_result.parse_error})"
-        click.echo(f"iteration {index}: {status}", err=True)
-        if show_iterations:
+    if show_iterations:
+        for index, iteration in enumerate(generation.iterations):
+            click.echo(f"\n--- iteration {index} code ---", err=True)
             click.echo(iteration.code, err=True)
 
-    click.echo(f"stopped: {generation.stop_reason}", err=True)
+    click.echo("\n" + _final_status(generation), err=True)
     if out_path is not None:
         out_path.write_text(generation.code + "\n", encoding="utf-8")
         click.echo(f"wrote {out_path}", err=True)
@@ -180,6 +186,25 @@ def _build_client(via: str, model: str | None):
     if via == "claude-code":
         return ClaudeCodeClient(model=model)
     return AnthropicClient(model=model) if model else AnthropicClient()
+
+
+def _report_progress(event: ProgressEvent) -> None:
+    """Print one live status line to stderr for a feedback-loop step."""
+    label = f"  [{event.iteration}]"
+    if event.phase == "checked":
+        symbol = click.style("✓", fg="green") if event.message == "clean" else "→"
+        click.echo(f"{label} {symbol} {event.message}", err=True)
+    else:
+        click.echo(f"{label} {event.message}…", err=True)
+
+
+def _final_status(generation: GenerationResult) -> str:
+    """Closing summary line: why the loop stopped and whether the code is clean."""
+    rounds = len(generation.iterations)
+    outcome = click.style("clean", fg="green") if generation.clean else click.style(
+        "still has violations", fg="yellow"
+    )
+    return f"stopped ({generation.stop_reason}) after {rounds} attempt(s) — {outcome}"
 
 
 def _apply_rule_filters(config: Config, select: str | None, ignore: str | None) -> None:
