@@ -10,7 +10,7 @@ docstrings and comments that restate the code without saying anything.
 
 CleanCode enforces reviewable Python in two ways:
 
-1. **A static analyzer** (`cleancode check`) — 14 deterministic rules built on
+1. **A static analyzer** (`cleancode check`) — 17 deterministic rules built on
    stdlib `ast` + `tokenize`, tuned for the failure modes of generated code.
    No LLM is needed to *check* code.
 2. **An LLM feedback loop** (`cleancode generate`) — generates code for a task,
@@ -37,12 +37,12 @@ Requires Python ≥ 3.11. The core has a single dependency (`click`).
 
 ## Use as a Claude Code skill
 
-This repo ships two [Claude Code](https://claude.com/claude-code) skills at
-`.claude/skills/cleancode/` and `.claude/skills/cleancode-generate/`.
-To make them available in every session, copy them to your user skills folder:
+This repo ships a [Claude Code](https://claude.com/claude-code) skill at
+`.claude/skills/cleancode/`. To make it available in every session, copy it to
+your user skills folder:
 
 ```bash
-mkdir -p ~/.claude/skills/ && cp -r .claude/skills/* ~/.claude/skills/
+mkdir -p ~/.claude/skills/ && cp -r .claude/skills/cleancode ~/.claude/skills/
 ```
 
 ## 30-second demo
@@ -69,7 +69,7 @@ trades.py:1:0: warning NM202 [meaningless-name] meaningless function name `proce
 trades.py:1:17: warning NM202 [meaningless-name] meaningless parameter name `data`
 trades.py:2:4: warning CM301 [docstring-restates-name] docstring of `process_data` only restates the function signature
 trades.py:3:4: warning NM202 [meaningless-name] meaningless variable name `result`
-trades.py:8:20: error ST101 [max-nesting-depth] nesting depth 5 exceeds the maximum of 4
+trades.py:6:12: error ST101 [max-nesting-depth] nesting depth 5 exceeds the maximum of 2
 trades.py:9:24: warning CM302 [comment-restates-code] comment restates the code it annotates: `# append the price to result`
 
 6 violation(s) in 1 file(s): 1 error(s), 5 warning(s), 0 info(s)
@@ -82,7 +82,7 @@ output) — the same text that drives the LLM feedback loop.
 
 ```text
 $ export ANTHROPIC_API_KEY=sk-ant-...
-$ cleancode generate "parse a CSV of trades and return per-symbol totals" --out trades.py
+$ cleancode generate "parse a CSV of trades and return per-symbol totals" --via anthropic --out trades.py
 ▸ generating clean code for: parse a CSV of trades and return per-symbol totals
   backend: anthropic, up to 4 attempt(s)
 
