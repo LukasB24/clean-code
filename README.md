@@ -1,4 +1,4 @@
-# CleanCode
+# Clean Code
 
 **A readability enforcer for LLM-generated Python.**
 
@@ -28,12 +28,22 @@ any claim, damages, or other liability arising from the use of this software.
 ## Installation
 
 ```bash
-pip install -e ".[dev,llm]"
+pip install -e ".[llm]"
 pytest
 cleancode check src/cleancode
 ```
 
 Requires Python ≥ 3.11. The core has a single dependency (`click`).
+
+## Use as a Claude Code skill
+
+This repo ships two [Claude Code](https://claude.com/claude-code) skills at
+`.claude/skills/cleancode/` and `.claude/skills/cleancode-generate/`.
+To make them available in every session, copy them to your user skills folder:
+
+```bash
+mkdir -p ~/.claude/skills/ && cp -r .claude/skills/* ~/.claude/skills/
+```
 
 ## 30-second demo
 
@@ -95,27 +105,22 @@ contain `# cleancode: disable` comments — the loop reports any attempt to
 silence the checker as a violation itself. If the model stops improving, the
 loop stops early and returns the *best* attempt, never a later-but-worse one.
 
-Exit code is `0` only if the final code is clean.
-
 ### Backends: API key vs. Claude subscription
 
 `generate` supports two backends via `--via`:
 
-- `--via anthropic` (default) calls the Anthropic API directly and needs an
-  `ANTHROPIC_API_KEY` (billed as pay-as-you-go credits — a Claude Pro/Max
-  subscription does **not** include API access).
-- `--via claude-code` shells out to the [Claude Code](https://claude.com/claude-code)
+- `--via claude-code` (default) shells out to the [Claude Code](https://claude.com/claude-code)
   CLI (`claude --print`) and reuses whatever login that CLI already holds, so a
-  **Pro or Max subscription** drives the loop with no API key:
+  **Pro or Max subscription** drives the loop with no API key
+- `--via anthropic` calls the Anthropic API directly and needs an
+  `ANTHROPIC_API_KEY` (billed as pay-as-you-go credits — a Claude Pro/Max
+  subscription does **not** include API access):
 
   ```text
-  $ cleancode generate "average a list of numbers" --via claude-code
+  $ cleancode generate "average a list of numbers"
   ```
 
   Requires the `claude` CLI on your `PATH`.
-
-Both backends implement the same `LLMClient` protocol, so the feedback loop is
-identical either way.
 
 ## The rules
 
@@ -220,17 +225,6 @@ print(generation.stop_reason)    # "clean" | "max_iterations" | "no_improvement"
 Any object with `complete(*, system: str, messages: list[dict]) -> str`
 satisfies the `LLMClient` protocol, so other providers (or a fake for tests)
 drop straight in.
-
-## Use as a Claude Code skill
-
-This repo ships a [Claude Code](https://claude.com/claude-code) skill at
-`.claude/skills/cleancode/`. When you work in this repo with Claude Code, it can
-run `cleancode check` on Python it writes and fix the findings before handing
-back. To make it available in every session, copy it to your user skills folder:
-
-```bash
-cp -r .claude/skills/cleancode ~/.claude/skills/cleancode
-```
 
 ## Design notes
 

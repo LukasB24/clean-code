@@ -207,9 +207,9 @@ def _build_client(via: str, model: str | None):
     """Construct the requested LLM backend, applying its default model."""
     from cleancode.llm import AnthropicClient, ClaudeCodeClient
 
-    if via == "claude-code":
-        return ClaudeCodeClient(model=model)
-    return AnthropicClient(model=model) if model else AnthropicClient()
+    if via == "anthropic":
+        return AnthropicClient(model=model) if model else AnthropicClient()
+    return ClaudeCodeClient(model=model)
 
 
 def _report_progress(event: ProgressEvent) -> None:
