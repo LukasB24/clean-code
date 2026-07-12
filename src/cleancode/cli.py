@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 import sys
+import threading
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -177,17 +180,20 @@ def generate(  # cleancode: disable=ST104
     click.echo(click.style(f"▸ generating clean code for: {task}", bold=True), err=True)
     click.echo(f"  backend: {backend}, up to {max_iterations + 1} attempt(s)\n", err=True)
 
+    reporter = _LiveProgress()
     try:
         generation = generate_clean_code(
             task,
             client,
             config,
             max_iterations=max_iterations,
-            on_progress=_report_progress,
+            on_progress=reporter,
         )
     except Exception as error:  # backend failure mid-loop: report cleanly, no traceback
+        reporter.close()
         click.echo(f"\n{click.style('generation failed', fg='red')}: {error}", err=True)
         sys.exit(1)
+    reporter.close()
 
     if show_iterations:
         for index, iteration in enumerate(generation.iterations):
@@ -212,14 +218,73 @@ def _build_client(via: str, model: str | None):
     return ClaudeCodeClient(model=model)
 
 
-def _report_progress(event: ProgressEvent) -> None:
-    """Print one live status line to stderr for a feedback-loop step."""
-    label = f"  [{event.iteration}]"
-    if event.phase == "checked":
-        symbol = click.style("✓", fg="green") if event.ok else "→"
-        click.echo(f"{label} {symbol} {event.message}", err=True)
-    else:
-        click.echo(f"{label} {event.message}…", err=True)
+class _Spinner:
+    """A one-line stderr spinner shown while a blocking step runs.
+
+    Animates only on a real TTY; when stderr is piped or captured (CI, tests) it
+    prints the label once and stays silent, so machine-readable output and test
+    assertions are never touched by escape codes.
+    """
+
+    _FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+    def __init__(self, label: str) -> None:
+        self._label = label
+        self._animated = sys.stderr.isatty()
+        self._stop_event = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        if not self._animated:
+            click.echo(f"{self._label}…", err=True)
+            return
+        self._thread = threading.Thread(target=self._animate, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        if self._thread is None:
+            return
+        self._stop_event.set()
+        self._thread.join()
+        sys.stderr.write("\r\033[K")  # carriage return, then clear to end of line
+        sys.stderr.flush()
+
+    def _animate(self) -> None:
+        started = time.monotonic()
+        for frame in itertools.cycle(self._FRAMES):
+            elapsed = int(time.monotonic() - started)
+            sys.stderr.write(f"\r{frame} {self._label} ({elapsed}s)")
+            sys.stderr.flush()
+            if self._stop_event.wait(0.15):
+                return
+
+
+class _LiveProgress:
+    """``on_progress`` callback that spins during the model call and logs results."""
+
+    def __init__(self) -> None:
+        self._spinner: _Spinner | None = None
+
+    def __call__(self, event: ProgressEvent) -> None:
+        self._clear()
+        label = f"  [{event.iteration}]"
+        if event.phase == "generating":
+            self._spinner = _Spinner(f"{label} {event.message}")
+            self._spinner.start()
+        elif event.phase == "checked":
+            symbol = click.style("✓", fg="green") if event.ok else "→"
+            click.echo(f"{label} {symbol} {event.message}", err=True)
+        else:
+            click.echo(f"{label} {event.message}…", err=True)
+
+    def _clear(self) -> None:
+        if self._spinner is not None:
+            self._spinner.stop()
+            self._spinner = None
+
+    def close(self) -> None:
+        """Stop any spinner left running (e.g. if the loop raised mid-call)."""
+        self._clear()
 
 
 def _final_status(generation: GenerationResult) -> str:

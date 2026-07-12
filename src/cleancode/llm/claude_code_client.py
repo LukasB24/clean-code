@@ -10,6 +10,16 @@ class ClaudeCodeError(RuntimeError):
     """The ``claude`` CLI was missing, timed out, or exited non-zero."""
 
 
+# The `claude` CLI is an agentic coding tool: given "create a json parser" it
+# will otherwise try to *build* it — reading the project, running Bash, writing
+# files — which is slow and can hang on tool permissions. We only want one text
+# completion, so every agentic tool is disabled and it answers directly.
+_DISALLOWED_TOOLS = [
+    "Bash", "Edit", "Write", "Read", "Glob", "Grep", "Task",
+    "WebFetch", "WebSearch", "NotebookEdit", "TodoWrite",
+]
+
+
 class ClaudeCodeClient:
     """LLM client that shells out to the Claude Code CLI (``claude --print``).
 
@@ -34,7 +44,14 @@ class ClaudeCodeClient:
         self.timeout = timeout
 
     def complete(self, *, system: str, messages: list[dict[str, str]]) -> str:
-        command = [self.binary, "--print", "--append-system-prompt", system]
+        command = [
+            self.binary,
+            "--print",
+            "--append-system-prompt",
+            system,
+            "--disallowedTools",
+            *_DISALLOWED_TOOLS,
+        ]
         if self.model is not None:
             command += ["--model", self.model]
         try:

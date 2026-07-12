@@ -177,6 +177,10 @@ class TestClaudeCodeClient:
         assert captured["command"][:2] == ["claude", "--print"]
         assert "--append-system-prompt" in captured["command"]
         assert "--model" in captured["command"]
+        # agentic tools must be disabled so the CLI answers as text, not by
+        # exploring/writing files (which hangs on "create a json parser")
+        assert "--disallowedTools" in captured["command"]
+        assert "Bash" in captured["command"] and "Write" in captured["command"]
         # multi-turn history is flattened with role labels, latest turn last
         assert captured["input"].strip().endswith("User:\nagain")
 

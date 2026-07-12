@@ -111,6 +111,9 @@ class TestGenerate:
         assert "def add_two_numbers(first, second):" in result.stdout
         assert "generating clean code for: add two numbers" in result.stderr
         assert "[0]" in result.stderr and "clean" in result.stderr
+        # captured (non-TTY) output must degrade to static lines: no spinner
+        # carriage returns or ANSI erase codes leaking into logs/pipes
+        assert "\r" not in result.stderr and "\x1b[K" not in result.stderr
 
     def test_writes_to_out_file(self, runner, monkeypatch, tmp_path):
         self._patch_client(monkeypatch, _FakeGenerateClient())
