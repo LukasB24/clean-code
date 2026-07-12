@@ -84,21 +84,25 @@ class SingleLetterName(Rule):
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         allowed = set(ctx.config.options["allowed"])
         for binding in collect_bindings(ctx.tree):
-            if len(binding.name) != 1 or binding.name == "_":
-                continue
-            if binding.name.isupper():
-                continue  # T = TypeVar("T") and friends are conventional
-            if binding.kind in _RELAXED_KINDS and binding.name in allowed:
-                continue
-            if binding.kind == KIND_EXCEPT and binding.name == "e":
-                continue
-            yield self.violation(
-                ctx,
-                f"single-letter {binding.kind} `{binding.name}`",
-                line=binding.line,
-                col=binding.col,
-                suggestion="use a descriptive name that states what the value represents",
-            )
+            if self._is_flagged(binding, allowed):
+                yield self.violation(
+                    ctx,
+                    f"single-letter {binding.kind} `{binding.name}`",
+                    line=binding.line,
+                    col=binding.col,
+                    suggestion="use a descriptive name that states what the value represents",
+                )
+
+    @staticmethod
+    def _is_flagged(binding: Binding, allowed: set[str]) -> bool:
+        """True unless the single-letter name is one of the conventional exemptions."""
+        is_single_letter = len(binding.name) == 1 and binding.name != "_"
+        is_exempt = (
+            binding.name.isupper()  # T = TypeVar("T") and friends are conventional
+            or (binding.kind in _RELAXED_KINDS and binding.name in allowed)
+            or (binding.kind == KIND_EXCEPT and binding.name == "e")
+        )
+        return is_single_letter and not is_exempt
 
 
 class MeaninglessName(Rule):

@@ -6,7 +6,7 @@ import ast
 from typing import Iterable, Iterator
 
 from cleancode.models import FileContext, Severity, Violation
-from cleancode.rules.base import Rule
+from cleancode.rules.base import Rule, split_identifier
 
 FunctionNode = ast.FunctionDef | ast.AsyncFunctionDef
 
@@ -48,19 +48,24 @@ def _body_statements(node: ast.AST) -> Iterator[ast.stmt]:
     """Direct child statements of a block node, across all its clauses."""
     for clause in ("body", "orelse", "finalbody", "handlers", "cases"):
         for child in getattr(node, clause, []):
-            if isinstance(child, ast.ExceptHandler):
-                yield from child.body
-            elif isinstance(child, ast.match_case):
-                yield child  # match_case itself nests; its body is walked below
-            elif isinstance(child, ast.stmt):
-                yield child
+            yield from _clause_statements(child)
+
+
+def _clause_statements(child: ast.AST) -> Iterator[ast.stmt]:
+    """Normalize one clause child into the statements that nest under it."""
+    if isinstance(child, ast.ExceptHandler):
+        yield from child.body
+    elif isinstance(child, ast.match_case):
+        yield child  # match_case itself nests; its body is walked below
+    elif isinstance(child, ast.stmt):
+        yield child
 
 
 class MaxNestingDepth(Rule):
     id = "ST101"
     name = "max-nesting-depth"
     default_severity = Severity.ERROR
-    default_options = {"max_depth": 4}
+    default_options = {"max_depth": 2}
     description = (
         "Limits how deeply loops, conditionals, `with`, and `try` blocks nest inside a "
         "function. Deep nesting is the hallmark of hard-to-review generated code."
@@ -91,8 +96,6 @@ class MaxNestingDepth(Rule):
 
         def walk(statement: ast.stmt, depth: int) -> None:
             nonlocal deepest, first_offender
-            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                return  # nested functions are measured on their own
             if isinstance(statement, _NESTING_NODES) and not _is_elif(statement):
                 depth += 1
                 deepest = max(deepest, depth)
@@ -159,7 +162,7 @@ class MaxParameters(Rule):
     id = "ST104"
     name = "max-parameters"
     default_severity = Severity.WARNING
-    default_options = {"max_params": 5}
+    default_options = {"max_params": 3}
     description = "Limits the number of function parameters (self/cls, *args, **kwargs excluded)."
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
@@ -232,3 +235,137 @@ class MaxComplexity(Rule):
             elif isinstance(node, ast.comprehension):
                 complexity += len(node.ifs)
         return complexity
+
+
+def _is_dunder(name: str) -> bool:
+    return name.startswith("__") and name.endswith("__")
+
+
+class DoOneThing(Rule):
+    id = "ST106"
+    name = "do-one-thing"
+    default_severity = Severity.WARNING
+    default_options = {
+        "conjunctions": ["and", "or"],
+        "allowed_names": [],
+    }
+    description = (
+        "Flags functions whose name joins responsibilities with a conjunction "
+        "(`load_and_save`, `fetch_or_default`). Needing 'and'/'or' to name a "
+        "function is a sign it does more than one thing — split it."
+    )
+
+    def check(self, ctx: FileContext) -> Iterable[Violation]:
+        conjunctions = set(ctx.config.options["conjunctions"])
+        allowed = set(ctx.config.options["allowed_names"])
+        for function in _functions(ctx.tree):
+            word = self._conjunction(function, conjunctions, allowed)
+            if word is not None:
+                yield self.violation(
+                    ctx,
+                    f"function `{function.name}` joins responsibilities with "
+                    f"`{word}`; a function should do one thing",
+                    line=function.lineno,
+                    col=function.col_offset,
+                    suggestion=(
+                        "split into separate, single-purpose functions — one for each "
+                        "part of the name — and let the caller compose them"
+                    ),
+                    symbol=function.name,
+                )
+
+    @staticmethod
+    def _conjunction(
+        function: FunctionNode, conjunctions: set[str], allowed: set[str]
+    ) -> str | None:
+        if function.name in allowed or _is_dunder(function.name):
+            return None
+        joined = sorted(conjunctions.intersection(split_identifier(function.name)))
+        return joined[0] if joined else None
+
+
+_GUARD_EXIT_TYPES = (ast.Continue, ast.Return, ast.Raise, ast.Break)
+
+
+def _is_guard_clause(statement: ast.stmt) -> bool:
+    """An `if` with no `else` whose entire body is a single control-flow exit."""
+    return (
+        isinstance(statement, ast.If)
+        and not statement.orelse
+        and len(statement.body) == 1
+        and isinstance(statement.body[0], _GUARD_EXIT_TYPES)
+    )
+
+
+def _blocks(function: FunctionNode) -> Iterator[list[ast.stmt]]:
+    """Every statement list nested directly inside ``function``, one per scope.
+
+    A block is the function body itself, or the body/orelse/finalbody/except/
+    match-case of any statement within it. Nested function and class
+    definitions are skipped — they are examined on their own.
+    """
+
+    def walk(statements: list[ast.stmt]) -> Iterator[list[ast.stmt]]:
+        yield statements
+        for statement in statements:
+            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                continue
+            for child_block in _child_blocks(statement):
+                yield from walk(child_block)
+
+    yield from walk(function.body)
+
+
+def _child_blocks(statement: ast.stmt) -> Iterator[list[ast.stmt]]:
+    """The body/orelse/finalbody/handler/case statement-lists of one statement."""
+    for attr in ("body", "orelse", "finalbody"):
+        block = getattr(statement, attr, None)
+        if block:
+            yield block
+    for handler in getattr(statement, "handlers", []):
+        yield handler.body
+    for case in getattr(statement, "cases", []):
+        yield case.body
+
+
+class TooManyGuardClauses(Rule):
+    id = "ST107"
+    name = "too-many-guard-clauses"
+    default_severity = Severity.INFO
+    default_options = {"max_guards": 2}
+    description = (
+        "Flags a function where one block strings together more than `max_guards` "
+        "sequential guard clauses (`if cond: continue/return/raise/break`) ahead of "
+        "the real work. Filtering piled up next to a decision is a 'more than one "
+        "thing' smell (see ST106): split the eligibility checks into their own "
+        "filter/predicate function and the remaining logic into another."
+    )
+
+    def check(self, ctx: FileContext) -> Iterable[Violation]:
+        max_guards = ctx.config.options["max_guards"]
+        for function in _functions(ctx.tree):
+            count = self._max_guard_count(function)
+            if count > max_guards:
+                yield self.violation(
+                    ctx,
+                    f"function `{function.name}` strings together {count} sequential "
+                    f"guard clauses in one block (maximum {max_guards})",
+                    line=function.lineno,
+                    col=function.col_offset,
+                    suggestion=(
+                        "extract the guard checks into a single named filter/predicate "
+                        "function, and move the remaining logic into its own function — "
+                        "so each piece does exactly one thing"
+                    ),
+                    symbol=function.name,
+                )
+
+    @staticmethod
+    def _max_guard_count(function: FunctionNode) -> int:
+        return max(
+            (
+                sum(1 for statement in block if _is_guard_clause(statement))
+                for block in _blocks(function)
+            ),
+            default=0,
+        )

@@ -170,19 +170,8 @@ class CommentRestatesCode(Rule):
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
-        overlap_threshold = ctx.config.options["overlap"]
-        min_words = ctx.config.options["min_words"]
-        for comment in ctx.comments:
-            if _is_exempt(comment) or not comment.text:
-                continue
-            comment_words = content_words(comment.text)
-            if len(comment_words) < min_words:
-                continue
-            code_text = self._annotated_code(ctx, comment)
-            if code_text is None:
-                continue
-            code_words = _code_line_words(code_text)
-            if len(comment_words & code_words) / len(comment_words) >= overlap_threshold:
+        for comment, comment_words in self._candidates(ctx):
+            if self._restates_code(ctx, comment, comment_words):
                 yield self.violation(
                     ctx,
                     f"comment restates the code it annotates: `# {comment.text}`",
@@ -190,6 +179,27 @@ class CommentRestatesCode(Rule):
                     col=comment.col,
                     suggestion="delete it; comments should explain *why*, not repeat *what*",
                 )
+
+    def _candidates(self, ctx: FileContext) -> Iterator[tuple[Comment, set[str]]]:
+        """Yield (comment, words) for comments substantial enough to be worth checking."""
+        min_words = ctx.config.options["min_words"]
+        for comment in ctx.comments:
+            if _is_exempt(comment) or not comment.text:
+                continue
+            comment_words = content_words(comment.text)
+            if len(comment_words) >= min_words:
+                yield comment, comment_words
+
+    def _restates_code(
+        self, ctx: FileContext, comment: Comment, comment_words: set[str]
+    ) -> bool:
+        """True when the comment's words mostly duplicate the code it annotates."""
+        code_text = self._annotated_code(ctx, comment)
+        if code_text is None:
+            return False
+        overlap_threshold = ctx.config.options["overlap"]
+        code_words = _code_line_words(code_text)
+        return len(comment_words & code_words) / len(comment_words) >= overlap_threshold
 
     def _annotated_code(self, ctx: FileContext, comment: Comment) -> str | None:
         if comment.inline:

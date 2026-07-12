@@ -27,6 +27,9 @@ class RuleConfig:
 class Config:
     rules: dict[str, RuleConfig] = field(default_factory=dict)
     fail_on: Severity = Severity.WARNING
+    min_severity: Severity = Severity.WARNING
+    fail_on_explicit: bool = False
+    min_severity_explicit: bool = False
     exclude: list[str] = field(default_factory=lambda: list(DEFAULT_EXCLUDES))
 
     @classmethod
@@ -68,19 +71,26 @@ class Config:
         from cleancode.rules import RULES_BY_ID
 
         for key, value in section.items():
-            if key == "disable":
-                for rule_id in _expect_str_list(key, value):
-                    self._rule_config(rule_id).enabled = False
-            elif key == "fail_on":
-                self.fail_on = Severity.from_name(_expect_str(key, value))
-            elif key == "exclude":
-                self.exclude = list(DEFAULT_EXCLUDES) + _expect_str_list(key, value)
-            elif key in RULES_BY_ID:
-                self._apply_rule_table(key, _expect_table(key, value))
-            else:
-                raise ConfigError(
-                    f"unknown key [tool.cleancode.{key}]: not a rule id or global option"
-                )
+            self._apply_top_level(key, value, RULES_BY_ID)
+
+    def _apply_top_level(self, key: str, value: object, rules_by_id: dict) -> None:
+        if key == "disable":
+            for rule_id in _expect_str_list(key, value):
+                self._rule_config(rule_id).enabled = False
+        elif key == "fail_on":
+            self.fail_on = Severity.from_name(_expect_str(key, value))
+            self.fail_on_explicit = True
+        elif key == "min_severity":
+            self.min_severity = Severity.from_name(_expect_str(key, value))
+            self.min_severity_explicit = True
+        elif key == "exclude":
+            self.exclude = list(DEFAULT_EXCLUDES) + _expect_str_list(key, value)
+        elif key in rules_by_id:
+            self._apply_rule_table(key, _expect_table(key, value))
+        else:
+            raise ConfigError(
+                f"unknown key [tool.cleancode.{key}]: not a rule id or global option"
+            )
 
     def _apply_rule_table(self, rule_id: str, table: dict[str, Any]) -> None:
         from cleancode.rules import RULES_BY_ID
@@ -117,19 +127,19 @@ def _find_pyproject(start: Path) -> Path | None:
     return None
 
 
-def _expect_str(key: str, value: Any) -> str:
+def _expect_str(key: str, value: object) -> str:
     if not isinstance(value, str):
         raise ConfigError(f"{key!r} must be a string, got {type(value).__name__}")
     return value
 
 
-def _expect_str_list(key: str, value: Any) -> list[str]:
+def _expect_str_list(key: str, value: object) -> list[str]:
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise ConfigError(f"{key!r} must be a list of strings")
     return value
 
 
-def _expect_table(key: str, value: Any) -> dict[str, Any]:
+def _expect_table(key: str, value: object) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ConfigError(f"[tool.cleancode.{key}] must be a table")
     return value

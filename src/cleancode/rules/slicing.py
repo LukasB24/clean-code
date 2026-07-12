@@ -8,7 +8,7 @@ expressions and push complex indexing into named intermediate steps.
 from __future__ import annotations
 
 import ast
-from typing import Iterable
+from typing import Callable, Iterable
 
 from cleancode.models import FileContext, Severity, Violation
 from cleancode.rules.base import Rule
@@ -25,18 +25,27 @@ def _in_annotation(node: ast.Subscript) -> bool:
     child: ast.AST = node
     parent = getattr(node, "parent", None)
     while parent is not None:
-        if isinstance(parent, (ast.AnnAssign, ast.arg)) and child is parent.annotation:
+        if _is_annotation_slot(parent, child):
             return True
-        if (
-            isinstance(parent, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and child is parent.returns
-        ):
-            return True
-        if isinstance(parent, ast.stmt) and not isinstance(parent, ast.AnnAssign):
+        if _ends_annotation_search(parent):
             return False
         child = parent
         parent = getattr(parent, "parent", None)
     return False
+
+
+def _is_annotation_slot(parent: ast.AST, child: ast.AST) -> bool:
+    """True when ``child`` fills the annotation slot of a var/param/return type."""
+    if isinstance(parent, (ast.AnnAssign, ast.arg)):
+        return child is parent.annotation
+    if isinstance(parent, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return child is parent.returns
+    return False
+
+
+def _ends_annotation_search(parent: ast.AST) -> bool:
+    """True when ``parent`` proves the walk has left any annotation it started in."""
+    return isinstance(parent, ast.stmt) and not isinstance(parent, ast.AnnAssign)
 
 
 def _index_features(index: ast.expr) -> tuple[int, list[str]]:
@@ -56,21 +65,9 @@ def _index_features(index: ast.expr) -> tuple[int, list[str]]:
 
 
 def _score_node(node: ast.AST, negative_steps: set[ast.AST]) -> tuple[int, list[str]] | None:
-    if isinstance(node, ast.Slice):
-        return _score_slice_step(node, negative_steps)
-    if isinstance(node, ast.Constant):
-        return _score_constant(node)
-    if isinstance(node, ast.UnaryOp):
-        if _is_negative(node) and node not in negative_steps:
-            return 1, ["negative index"]
-        return None
-    if isinstance(node, ast.BinOp):
-        return 1, ["arithmetic in index"]
-    if isinstance(node, ast.Subscript):
-        return 2, ["nested subscript"]
-    if isinstance(node, ast.Call):
-        return 1, ["function call in index"]
-    return None
+    """Score one node inside a subscript index, dispatched by its concrete AST type."""
+    scorer = _NODE_SCORERS.get(type(node))
+    return scorer(node, negative_steps) if scorer else None
 
 
 def _score_slice_step(
@@ -92,12 +89,32 @@ def _score_constant(node: ast.Constant) -> tuple[int, list[str]] | None:
     return None
 
 
+def _score_unary(
+    node: ast.UnaryOp, negative_steps: set[ast.AST]
+) -> tuple[int, list[str]] | None:
+    if _is_negative(node) and node not in negative_steps:
+        return 1, ["negative index"]
+    return None
+
+
 def _is_negative(node: ast.expr) -> bool:
     return (
         isinstance(node, ast.UnaryOp)
         and isinstance(node.op, ast.USub)
         and isinstance(node.operand, ast.Constant)
     )
+
+
+Scorer = Callable[[ast.AST, "set[ast.AST]"], "tuple[int, list[str]] | None"]
+
+_NODE_SCORERS: dict[type, Scorer] = {
+    ast.Slice: _score_slice_step,
+    ast.Constant: lambda node, _steps: _score_constant(node),
+    ast.UnaryOp: _score_unary,
+    ast.BinOp: lambda node, _steps: (1, ["arithmetic in index"]),
+    ast.Subscript: lambda node, _steps: (2, ["nested subscript"]),
+    ast.Call: lambda node, _steps: (1, ["function call in index"]),
+}
 
 
 class ComplexSubscript(Rule):
@@ -114,28 +131,41 @@ class ComplexSubscript(Rule):
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         max_score = ctx.config.options["max_score"]
         for node in ast.walk(ctx.tree):
-            if not isinstance(node, ast.Subscript) or not _is_chain_head(node):
-                continue
-            if _in_annotation(node):
-                continue  # dict[str, int]-style generics are types, not slicing
-            if _nested_in_another_index(node):
-                continue  # already counted as +2 inside the outer subscript's score
-            score, reasons = self._chain_score(node)
-            if score > max_score:
-                snippet = ast.get_source_segment(ctx.source, node) or "<subscript>"
-                summary = ", ".join(sorted(set(reasons)))
-                yield self.violation(
-                    ctx,
-                    f"subscript `{snippet}` has complexity {score} "
-                    f"(maximum {max_score}): {summary}",
-                    line=node.lineno,
-                    col=node.col_offset,
-                    suggestion=(
-                        "name the index expressions (`window = slice(start, stop, 2)`) "
-                        "or build the result in intermediate, well-named slices"
-                    ),
-                    symbol=ctx.enclosing_symbol(node),
-                )
+            if isinstance(node, ast.Subscript) and self._is_scoreable(node):
+                yield from self._check_subscript(ctx, node, max_score)
+
+    @staticmethod
+    def _is_scoreable(node: ast.Subscript) -> bool:
+        """True for a subscript that should be scored on its own.
+
+        Type annotations like ``dict[str, int]`` aren't slicing, and a subscript
+        nested inside another's index is already counted there (+2).
+        """
+        return (
+            _is_chain_head(node)
+            and not _in_annotation(node)
+            and not _nested_in_another_index(node)
+        )
+
+    def _check_subscript(
+        self, ctx: FileContext, node: ast.Subscript, max_score: int
+    ) -> Iterable[Violation]:
+        score, reasons = self._chain_score(node)
+        if score <= max_score:
+            return
+        snippet = ast.get_source_segment(ctx.source, node) or "<subscript>"
+        summary = ", ".join(sorted(set(reasons)))
+        yield self.violation(
+            ctx,
+            f"subscript `{snippet}` has complexity {score} (maximum {max_score}): {summary}",
+            line=node.lineno,
+            col=node.col_offset,
+            suggestion=(
+                "name the index expressions (`window = slice(start, stop, 2)`) "
+                "or build the result in intermediate, well-named slices"
+            ),
+            symbol=ctx.enclosing_symbol(node),
+        )
 
     def _chain_score(self, node: ast.Subscript) -> tuple[int, list[str]]:
         score, reasons = _index_features(node.slice)

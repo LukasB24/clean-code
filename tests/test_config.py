@@ -17,9 +17,10 @@ def write_pyproject(directory: Path, body: str) -> Path:
 class TestDefaults:
     def test_default_config_has_every_rule_enabled(self):
         config = Config.default()
-        assert len(config.rules) == 14
+        assert len(config.rules) == 17
         assert all(rule.enabled for rule in config.rules.values())
         assert config.fail_on == Severity.WARNING
+        assert config.min_severity == Severity.WARNING
 
 
 class TestLoading:
@@ -37,7 +38,7 @@ class TestLoading:
     def test_missing_section_keeps_defaults(self, tmp_path):
         write_pyproject(tmp_path, "[tool.other]\nkey = 1\n")
         config = Config.load(tmp_path)
-        assert config.rules["ST101"].options["max_depth"] == 4
+        assert config.rules["ST101"].options["max_depth"] == 2
 
     def test_fail_on_and_severity_override(self, tmp_path):
         write_pyproject(
@@ -47,6 +48,11 @@ class TestLoading:
         config = Config.load(tmp_path)
         assert config.fail_on == Severity.ERROR
         assert config.rules["CM303"].severity == Severity.ERROR
+
+    def test_min_severity_override(self, tmp_path):
+        write_pyproject(tmp_path, "[tool.cleancode]\nmin_severity = 'info'\n")
+        config = Config.load(tmp_path)
+        assert config.min_severity == Severity.INFO
 
 
 class TestValidation:

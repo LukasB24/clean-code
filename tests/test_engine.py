@@ -37,7 +37,7 @@ class TestRegistry:
     def test_rule_ids_are_unique_and_well_formed(self):
         ids = [rule.id for rule in ALL_RULES]
         assert len(ids) == len(set(ids))
-        assert all(re.fullmatch(r"(ST|NM|CM|SL)\d{3}", rule_id) for rule_id in ids)
+        assert all(re.fullmatch(r"(ST|NM|CM|SL|TY)\d{3}", rule_id) for rule_id in ids)
         assert RULES_BY_ID.keys() == set(ids)
 
     def test_every_rule_has_the_required_metadata(self):

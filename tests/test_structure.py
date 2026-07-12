@@ -1,4 +1,4 @@
-"""Tests for the structural rules ST101–ST105."""
+"""Tests for the structural rules ST101–ST106."""
 
 
 def lines_of(violations):
@@ -29,7 +29,7 @@ class TestMaxNestingDepth:
         """
         assert check(source, "ST101", max_depth=2) == []
 
-    def test_nested_function_resets_depth(self, check):
+    def test_nested_function_body_inherits_enclosing_depth(self, check):
         source = """
         def outer(values):
             if values:
@@ -40,7 +40,11 @@ class TestMaxNestingDepth:
                                 return 1
                     return inner
         """
+        # if(1) -> if(2) -> inner's if(3) -> if(4): visually 4 deep, not reset.
         assert check(source, "ST101", max_depth=4) == []
+        violations = check(source, "ST101", max_depth=2)
+        assert lines_of(violations) == [("ST101", 6)]
+        assert "depth 4" in violations[0].message
 
     def test_try_and_with_count_as_levels(self, check):
         source = """
@@ -146,3 +150,156 @@ class TestMaxComplexity:
         """
         violations = check(source, "ST105", max_complexity=2)
         assert lines_of(violations) == [("ST105", 2)]
+
+
+class TestDoOneThing:
+    def test_flags_and_joined_name(self, check):
+        violations = check("def load_and_save(record):\n    return record\n", "ST106")
+        assert lines_of(violations) == [("ST106", 1)]
+        assert "`and`" in violations[0].message
+
+    def test_flags_or_joined_name(self, check):
+        violations = check("def fetch_or_default(key):\n    return key\n", "ST106")
+        assert lines_of(violations) == [("ST106", 1)]
+
+    def test_flags_camelcase_conjunction(self, check):
+        violations = check("def loadAndSave(record):\n    return record\n", "ST106")
+        assert lines_of(violations) == [("ST106", 1)]
+
+    def test_flags_methods_too(self, check):
+        source = """
+        class Store:
+            def read_and_write(self, item):
+                return item
+        """
+        assert [v.rule_id for v in check(source, "ST106")] == ["ST106"]
+
+    def test_single_purpose_name_passes(self, check):
+        assert check("def normalize(value):\n    return value\n", "ST106") == []
+
+    def test_substring_conjunctions_do_not_false_positive(self, check):
+        # 'and'/'or' inside a single word must not trigger
+        source = (
+            "def standardize(x):\n    return x\n\n"
+            "def reorder(items):\n    return items\n\n"
+            "def command(action):\n    return action\n"
+        )
+        assert check(source, "ST106") == []
+
+    def test_dunder_methods_are_exempt(self, check):
+        source = """
+        class Node:
+            def __init_and_setup__(self):
+                pass
+        """
+        assert check(source, "ST106") == []
+
+    def test_allowed_names_config(self, check):
+        source = "def get_or_create(key):\n    return key\n"
+        assert check(source, "ST106", allowed_names=["get_or_create"]) == []
+
+    def test_conjunctions_config_can_drop_or(self, check):
+        source = "def read_or_none(key):\n    return key\n"
+        assert check(source, "ST106", conjunctions=["and"]) == []
+
+
+class TestTooManyGuardClauses:
+    def test_flags_three_sequential_guards_in_a_loop(self, check):
+        # the motivating case: filtering interleaved with the real decision
+        source = """
+        def check(comments, overlap_threshold, min_words):
+            for comment in comments:
+                if comment.exempt:
+                    continue
+                if len(comment.words) < min_words:
+                    continue
+                if comment.code_text is None:
+                    continue
+                if comment.overlap >= overlap_threshold:
+                    print(comment)
+        """
+        violations = check(source, "ST107")
+        assert lines_of(violations) == [("ST107", 2)]
+        assert "3 sequential guard clauses" in violations[0].message
+        assert "filter/predicate" in violations[0].suggestion
+
+    def test_two_guards_pass_by_default(self, check):
+        source = """
+        def process(items):
+            for item in items:
+                if item is None:
+                    continue
+                if item < 0:
+                    continue
+                print(item)
+        """
+        assert check(source, "ST107") == []
+
+    def test_top_level_guards_also_count(self, check):
+        source = """
+        def load(value):
+            if value is None:
+                return None
+            if not value.strip():
+                return None
+            if value.startswith("#"):
+                return None
+            return value.strip()
+        """
+        violations = check(source, "ST107")
+        assert lines_of(violations) == [("ST107", 2)]
+
+    def test_guard_with_else_does_not_count(self, check):
+        source = """
+        def branchy(value):
+            for item in value:
+                if item is None:
+                    continue
+                else:
+                    print("noop")
+                if item < 0:
+                    continue
+                if item > 100:
+                    continue
+        """
+        assert check(source, "ST107") == []
+
+    def test_multi_statement_if_body_does_not_count_as_guard(self, check):
+        source = """
+        def branchy(value):
+            for item in value:
+                if item is None:
+                    log(item)
+                    continue
+                if item < 0:
+                    continue
+                if item > 100:
+                    continue
+        """
+        assert check(source, "ST107") == []
+
+    def test_raise_and_break_count_as_guard_exits(self, check):
+        source = """
+        def load(value):
+            if value is None:
+                raise ValueError("missing")
+            if not value:
+                raise ValueError("empty")
+            if len(value) > 100:
+                raise ValueError("too long")
+            return value
+        """
+        violations = check(source, "ST107")
+        assert lines_of(violations) == [("ST107", 2)]
+
+    def test_threshold_is_configurable(self, check):
+        source = """
+        def process(items):
+            for item in items:
+                if item is None:
+                    continue
+                if item < 0:
+                    continue
+                print(item)
+        """
+        assert check(source, "ST107", max_guards=1) != []

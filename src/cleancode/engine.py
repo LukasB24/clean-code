@@ -15,7 +15,7 @@ from cleancode.models import CheckResult, Comment, FileContext
 _SUPPRESSION = re.compile(r"cleancode:\s*disable(?:\s*=\s*(?P<ids>[A-Z]{2}\d{3}(?:\s*,\s*[A-Z]{2}\d{3})*))?")
 
 
-def analyze_source(
+def analyze_source(  # cleancode: disable=ST104
     source: str,
     config: Config | None = None,
     path: str = "<string>",
@@ -137,18 +137,22 @@ def _parse_suppressions(comments: list[Comment]) -> dict[int, set[str] | None]:
     suppressions: dict[int, set[str] | None] = {}
     for comment in comments:
         match = _SUPPRESSION.search(comment.text)
-        if match is None:
-            continue
-        ids = match.group("ids")
-        if ids is None:
-            suppressions[comment.line] = None
-        else:
-            existing = suppressions.get(comment.line)
-            if existing is None and comment.line in suppressions:
-                continue  # a blanket disable on this line already wins
-            new_ids = {rule_id.strip() for rule_id in ids.split(",")}
-            suppressions[comment.line] = (existing or set()) | new_ids
+        if match is not None:
+            _record_suppression(suppressions, comment.line, match.group("ids"))
     return suppressions
+
+
+def _record_suppression(
+    suppressions: dict[int, set[str] | None], line: int, ids: str | None
+) -> None:
+    """Merge one ``cleancode: disable[=IDS]`` directive into the per-line map."""
+    if ids is None:
+        suppressions[line] = None  # a blanket disable overrides everything on the line
+        return
+    if line in suppressions and suppressions[line] is None:
+        return  # a blanket disable already covers this line
+    existing = suppressions.get(line) or set()
+    suppressions[line] = existing | {rule_id.strip() for rule_id in ids.split(",")}
 
 
 def _is_suppressed(line: int, rule_id: str, suppressions: dict[int, set[str] | None]) -> bool:

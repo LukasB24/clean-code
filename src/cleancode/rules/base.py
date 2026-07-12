@@ -80,9 +80,7 @@ def split_identifier(name: str) -> list[str]:
     """
     words: list[str] = []
     for chunk in name.split("_"):
-        for word in _CAMEL_BOUNDARY.split(chunk):
-            if word:
-                words.append(word.lower())
+        words.extend(word.lower() for word in _CAMEL_BOUNDARY.split(chunk) if word)
     return words
 
 
