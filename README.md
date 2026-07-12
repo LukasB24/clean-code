@@ -48,6 +48,14 @@ the bundled skill into your user skills folder once:
 mkdir -p ~/.claude/skills/ && cp -r .claude/skills/clean-code ~/.claude/skills/
 ```
 
+### Usage
+
+Once installed, trigger the tool directly within your Claude Code CLI or VS Code extension:
+
+```text
+/clean-code [instruction or target_path]
+```
+
 ## Set it up for your project
 
 Out of the box the defaults are strict (max nesting depth 2, max 3
