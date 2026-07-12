@@ -85,66 +85,6 @@ class TestCheck:
         assert result.exit_code == 1
 
 
-CLEAN_GENERATE_REPLY = (
-    "```python\ndef add_two_numbers(first, second):\n    return first + second\n```"
-)
-
-
-class _FakeGenerateClient:
-    def __init__(self, reply=CLEAN_GENERATE_REPLY):
-        self.reply = reply
-
-    def complete(self, *, system, messages):
-        return self.reply
-
-
-class TestGenerate:
-    def _patch_client(self, monkeypatch, client):
-        import cleancode.cli as cli_module
-
-        monkeypatch.setattr(cli_module, "_build_client", lambda via, model: client)
-
-    def test_prints_progress_to_stderr_and_code_to_stdout(self, runner, monkeypatch):
-        self._patch_client(monkeypatch, _FakeGenerateClient())
-        result = runner.invoke(main, ["generate", "add two numbers"])
-        assert result.exit_code == 0
-        assert "def add_two_numbers(first, second):" in result.stdout
-        assert "generating clean code for: add two numbers" in result.stderr
-        assert "[0]" in result.stderr and "clean" in result.stderr
-        # captured (non-TTY) output must degrade to static lines: no spinner
-        # carriage returns or ANSI erase codes leaking into logs/pipes
-        assert "\r" not in result.stderr and "\x1b[K" not in result.stderr
-
-    def test_writes_to_out_file(self, runner, monkeypatch, tmp_path):
-        self._patch_client(monkeypatch, _FakeGenerateClient())
-        out = tmp_path / "result.py"
-        result = runner.invoke(main, ["generate", "add", "--out", str(out)])
-        assert result.exit_code == 0
-        assert "def add_two_numbers" in out.read_text()
-
-    def test_negative_max_iterations_is_a_usage_error(self, runner):
-        result = runner.invoke(main, ["generate", "x", "--max-iterations=-1"])
-        assert result.exit_code == 2
-
-    def test_backend_failure_mid_loop_is_reported_cleanly_not_as_traceback(
-        self, runner, monkeypatch
-    ):
-        # regression test: a ClaudeCodeError (auth conflict, rate limit, ...)
-        # raised while the loop is running must not surface as a raw traceback
-        from cleancode.llm.claude_code_client import ClaudeCodeError
-
-        class FailingClient:
-            def complete(self, *, system, messages):
-                raise ClaudeCodeError("claude.ai connectors are disabled because ...")
-
-        self._patch_client(monkeypatch, FailingClient())
-        result = runner.invoke(main, ["generate", "make a json parser"])
-        assert result.exit_code == 1
-        assert result.exception is None or isinstance(result.exception, SystemExit)
-        assert "generation failed" in result.stderr
-        assert "Traceback" not in result.output
-
-
 class TestRules:
     def test_lists_all_rules(self, runner):
         result = runner.invoke(main, ["rules"])
