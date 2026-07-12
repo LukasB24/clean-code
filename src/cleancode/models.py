@@ -60,7 +60,7 @@ class Violation:
     severity: Severity
     suggestion: str | None = None
     symbol: str | None = None
-    path: str | None = None  # set only by ProjectRule violations; engine fills it in
+    path: str | None = None  # set by ProjectRule.violation(); per-file Rule violations leave it None
 
     def to_dict(self) -> dict[str, Any]:
         return {

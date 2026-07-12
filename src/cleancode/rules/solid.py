@@ -71,11 +71,15 @@ def _type_check_target(test: ast.expr) -> str | None:
 
 
 def _elif_chain(node: ast.If) -> Iterator[ast.If]:
-    """``node`` followed by each subsequent ``elif`` branch in its chain."""
+    """``node`` followed by each subsequent true ``elif`` branch in its chain.
+
+    Stops at a hand-written ``else:\\n    if ...`` (a nested if, not an
+    elif) rather than folding it into the same type-switch chain.
+    """
     current: ast.If | None = node
     while current is not None:
         yield current
-        if len(current.orelse) == 1 and isinstance(current.orelse[0], ast.If):
+        if len(current.orelse) == 1 and is_elif_branch(current.orelse[0]):
             current = current.orelse[0]
         else:
             current = None

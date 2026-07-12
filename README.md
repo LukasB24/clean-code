@@ -178,10 +178,11 @@ override that.
 `cleancode rules` prints the same list with full descriptions.
 
 **DP701 is a project-level rule**: it compares every function across every
-file in one run, so it only ever fires when you check a directory
-(`clean-code check src`), never a single file in isolation
-(`clean-code check src/foo.py` can't see a duplicate living in `src/bar.py`).
-SD801/SD802 stay ordinary single-file rules.
+file reached in one `check` run. It still runs — and can still catch
+duplicates within the same file — when you point it at a single file
+(`clean-code check src/foo.py`); it just can't see a duplicate living in
+`src/bar.py` unless that file is part of the same run too
+(`clean-code check src`). SD801/SD802 stay ordinary single-file rules.
 
 A few details worth knowing:
 

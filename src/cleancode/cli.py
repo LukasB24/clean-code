@@ -10,7 +10,7 @@ from pathlib import Path
 import click
 
 from cleancode.config import Config, ConfigError
-from cleancode.engine import analyze_path
+from cleancode.engine import analyze_paths
 from cleancode.models import CheckResult, Severity, Violation
 
 _SEVERITY_COLORS = {
@@ -89,9 +89,7 @@ def check(paths: tuple[Path, ...], **kwargs: object) -> None:
         # that severity; don't let the default min_severity hide it from view.
         config.min_severity = config.fail_on
 
-    file_results: list[CheckResult] = []
-    for path in paths:
-        file_results.extend(analyze_path(path, config))
+    file_results = analyze_paths(list(paths), config)
     if options.as_json:
         shown_results = _filter_by_severity(file_results, config.min_severity)
         shown_results = [

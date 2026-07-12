@@ -9,7 +9,7 @@ the single-file ``check``/``analyze`` fixtures.
 import textwrap
 
 from cleancode.config import Config
-from cleancode.engine import analyze_path, parse_file
+from cleancode.engine import analyze_path, analyze_paths, parse_file
 from cleancode.rules.duplication import DuplicateFunctionBody
 
 
@@ -180,3 +180,32 @@ class TestDuplicateFunctionBodyIntegration:
         )
         results = {result.path: result for result in analyze_path(tmp_path)}
         assert results[str(tmp_path / "b.py")].violations == []
+
+    def test_analyze_paths_aggregates_separate_targets_into_one_project_run(self, tmp_path):
+        """Two CLI targets (e.g. `clean-code check a.py b.py`) must be compared
+        against each other, not analyzed as two isolated runs."""
+        first_dir = tmp_path / "first"
+        second_dir = tmp_path / "second"
+        first_dir.mkdir()
+        second_dir.mkdir()
+        (first_dir / "a.py").write_text(
+            "def compute_totals(rows):\n"
+            "    total = 0\n"
+            "    count = 0\n"
+            "    for row in rows:\n"
+            "        total += row.amount\n"
+            "        count += 1\n"
+            "    return total / count\n"
+        )
+        (second_dir / "b.py").write_text(
+            "def average_amounts(items):\n"
+            "    accumulator = 0\n"
+            "    number = 0\n"
+            "    for entry in items:\n"
+            "        accumulator += entry.amount\n"
+            "        number += 1\n"
+            "    return accumulator / number\n"
+        )
+        results = {result.path: result for result in analyze_paths([first_dir, second_dir])}
+        assert [v.rule_id for v in results[str(second_dir / "b.py")].violations] == ["DP701"]
+        assert results[str(first_dir / "a.py")].violations == []

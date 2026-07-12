@@ -48,16 +48,25 @@ def analyze_source(
 
 
 def analyze_path(target: Path, config: Config | None = None) -> list[CheckResult]:
-    """Analyze a ``.py`` file or every ``.py`` file under a directory.
+    """Analyze a ``.py`` file or every ``.py`` file under a directory."""
+    return analyze_paths([target], config)
 
-    Directory-level project rules (cross-file duplication, cross-file SOLID
-    checks) only see files reached this way, never a single ``analyze_source``
-    call — they need the whole set of parsed files to compare across.
+
+def analyze_paths(targets: list[Path], config: Config | None = None) -> list[CheckResult]:
+    """Analyze every ``.py`` file reached from ``targets`` as one project run.
+
+    Project rules (cross-file duplication, cross-file SOLID checks) only see
+    files reached in the same call — pass every target together (as the CLI
+    does with all its ``paths`` arguments) so duplication is caught across
+    them, not just within each one in isolation.
     """
     if config is None:
         config = Config.default()
 
-    file_paths = [target] if target.is_file() else sorted(target.rglob("*.py"))
+    file_paths: list[Path] = []
+    for target in targets:
+        file_paths.extend([target] if target.is_file() else sorted(target.rglob("*.py")))
+
     results: list[CheckResult] = []
     parsed_files: list[ParsedFile] = []
     for file_path in file_paths:
