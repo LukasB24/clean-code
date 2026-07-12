@@ -1,14 +1,16 @@
 """Rule registry. Rules are registered explicitly — no plugin machinery."""
 
-from cleancode.rules.base import Rule
+from cleancode.rules.base import ProjectRule, Rule
 from cleancode.rules.comments import (
     BoilerplateParamDocs,
     CommentDensity,
     CommentRestatesCode,
     DocstringRestatesName,
 )
+from cleancode.rules.duplication import DuplicateFunctionBody
 from cleancode.rules.hints import UninformativeAny
 from cleancode.rules.naming import CrypticAbbreviation, MeaninglessName, ShortName
+from cleancode.rules.solid import LowCohesionClass, TypeSwitchViolatesOCP
 from cleancode.rules.semantic import (
     AnonymousTupleIndexing,
     ComprehensionDensity,
@@ -33,7 +35,7 @@ from cleancode.rules.structure import (
     TooManyGuardClauses,
 )
 
-ALL_RULES: list[type[Rule]] = [
+ALL_RULES: list[type[Rule] | type[ProjectRule]] = [
     MaxNestingDepth,
     MaxFunctionLength,
     MaxClassLength,
@@ -62,6 +64,9 @@ ALL_RULES: list[type[Rule]] = [
     EagerDatasetLoading,
     PrematureDevicePlacement,
     RedundantIsinstanceCheck,
+    TypeSwitchViolatesOCP,
+    LowCohesionClass,
+    DuplicateFunctionBody,
 ]
 
-RULES_BY_ID: dict[str, type[Rule]] = {rule.id: rule for rule in ALL_RULES}
+RULES_BY_ID: dict[str, type[Rule] | type[ProjectRule]] = {rule.id: rule for rule in ALL_RULES}

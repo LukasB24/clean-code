@@ -2,6 +2,7 @@
 
 import re
 
+from cleancode.config import Config
 from cleancode.rules import ALL_RULES, RULES_BY_ID
 
 
@@ -21,7 +22,9 @@ class TestSuppressions:
 
     def test_no_suppress_flag_reports_anyway(self, analyze):
         source = "tmp = 1  # cleancode: disable\n"
-        result = analyze(source, honor_suppressions=False)
+        config = Config.default()
+        config.honor_suppressions = False
+        result = analyze(source, config=config)
         assert [violation.rule_id for violation in result.violations] == ["NM202"]
 
 
@@ -37,7 +40,7 @@ class TestRegistry:
     def test_rule_ids_are_unique_and_well_formed(self):
         ids = [rule.id for rule in ALL_RULES]
         assert len(ids) == len(set(ids))
-        assert all(re.fullmatch(r"(ST|NM|CM|SL|TY|SM)\d{3}", rule_id) for rule_id in ids)
+        assert all(re.fullmatch(r"(ST|NM|CM|SL|TY|SM|DP|SD)\d{3}", rule_id) for rule_id in ids)
         assert RULES_BY_ID.keys() == set(ids)
 
     def test_every_rule_has_the_required_metadata(self):

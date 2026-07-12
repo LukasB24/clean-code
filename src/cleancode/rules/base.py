@@ -2,14 +2,49 @@
 
 from __future__ import annotations
 
+import ast
 import re
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, ClassVar, Iterable
+from typing import TYPE_CHECKING, Any, ClassVar, Iterable, Iterator
 
-from cleancode.models import Severity, Violation
+from cleancode.models import Location, Positioned, Severity, Violation, ViolationDetails
 
 if TYPE_CHECKING:
-    from cleancode.models import FileContext
+    from cleancode.config import Config
+    from cleancode.models import FileContext, ParsedFile
+
+FunctionNode = ast.FunctionDef | ast.AsyncFunctionDef
+
+
+def functions(tree: ast.Module) -> Iterator[FunctionNode]:
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            yield node
+
+
+def subscript_base_name(node: ast.Subscript) -> str | None:
+    """The name a subscript's ``.value`` resolves to: ``x[...]`` -> ``"x"``, ``a.b[...]`` -> ``"b"``."""
+    value = node.value
+    if isinstance(value, ast.Name):
+        return value.id
+    if isinstance(value, ast.Attribute):
+        return value.attr
+    return None
+
+
+def is_elif_branch(statement: ast.stmt) -> bool:
+    """True for the `elif` branches of an if-chain, which the AST nests in orelse.
+
+    A hand-written `else:\\n    if ...` sits one indent deeper, so the column
+    offset distinguishes it from `elif` (which shares the parent's column).
+    """
+    parent = getattr(statement, "parent", None)
+    return (
+        isinstance(statement, ast.If)
+        and isinstance(parent, ast.If)
+        and parent.orelse == [statement]
+        and statement.col_offset == parent.col_offset
+    )
 
 
 class Rule(ABC):
@@ -22,24 +57,49 @@ class Rule(ABC):
     @abstractmethod
     def check(self, ctx: "FileContext") -> Iterable[Violation]: ...
 
-    def violation(  # cleancode: disable=ST104
-        self,
-        ctx: "FileContext",
-        message: str,
-        line: int,
-        col: int,
-        suggestion: str | None = None,
-        symbol: str | None = None,
-    ) -> Violation:
+    def violation(self, ctx: "FileContext", node: Positioned, details: ViolationDetails) -> Violation:
         return Violation(
             rule_id=self.id,
             rule_name=self.name,
-            message=message,
-            line=line,
-            col=col,
+            message=details.message,
+            line=node.lineno,
+            col=node.col_offset,
             severity=ctx.config.severity,
-            suggestion=suggestion,
-            symbol=symbol,
+            suggestion=details.suggestion,
+            symbol=details.symbol,
+        )
+
+
+class ProjectRule(ABC):
+    """A rule that compares code across every file in one analysis run.
+
+    Unlike ``Rule``, which sees one file at a time, ``check_project`` receives
+    every parsed file up front — the only way to catch cross-file DRY/SOLID
+    smells like duplicate function bodies.
+    """
+
+    id: ClassVar[str]
+    name: ClassVar[str]
+    default_severity: ClassVar[Severity]
+    default_options: ClassVar[dict[str, Any]]
+    description: ClassVar[str]
+
+    @abstractmethod
+    def check_project(
+        self, files: list["ParsedFile"], config: "Config"
+    ) -> Iterable[Violation]: ...
+
+    def violation(self, config: "Config", location: Location, details: ViolationDetails) -> Violation:
+        return Violation(
+            rule_id=self.id,
+            rule_name=self.name,
+            message=details.message,
+            line=location.node.lineno,
+            col=location.node.col_offset,
+            severity=config.rules[self.id].severity,
+            suggestion=details.suggestion,
+            symbol=details.symbol,
+            path=location.path,
         )
 
 

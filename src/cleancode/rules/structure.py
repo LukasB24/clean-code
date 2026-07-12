@@ -5,10 +5,8 @@ from __future__ import annotations
 import ast
 from typing import Iterable, Iterator
 
-from cleancode.models import FileContext, Severity, Violation
-from cleancode.rules.base import Rule, split_identifier
-
-FunctionNode = ast.FunctionDef | ast.AsyncFunctionDef
+from cleancode.models import FileContext, Severity, Violation, ViolationDetails
+from cleancode.rules.base import FunctionNode, Rule, functions, is_elif_branch, split_identifier
 
 _NESTING_NODES = (
     ast.If,
@@ -21,27 +19,6 @@ _NESTING_NODES = (
     ast.TryStar,
     ast.match_case,
 )
-
-
-def _is_elif(statement: ast.stmt) -> bool:
-    """True for the `elif` branches of an if-chain, which the AST nests in orelse.
-
-    A hand-written `else:\\n    if ...` sits one indent deeper, so the column
-    offset distinguishes it from `elif` (which shares the parent's column).
-    """
-    parent = getattr(statement, "parent", None)
-    return (
-        isinstance(statement, ast.If)
-        and isinstance(parent, ast.If)
-        and parent.orelse == [statement]
-        and statement.col_offset == parent.col_offset
-    )
-
-
-def _functions(tree: ast.Module) -> Iterator[FunctionNode]:
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            yield node
 
 
 def _body_statements(node: ast.AST) -> Iterator[ast.stmt]:
@@ -73,19 +50,20 @@ class MaxNestingDepth(Rule):
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         max_depth = ctx.config.options["max_depth"]
-        for function in _functions(ctx.tree):
+        for function in functions(ctx.tree):
             deepest, first_offender = self._measure(function, max_depth)
             if first_offender is not None:
                 yield self.violation(
                     ctx,
-                    f"nesting depth {deepest} exceeds the maximum of {max_depth}",
-                    line=first_offender.lineno,
-                    col=first_offender.col_offset,
-                    suggestion=(
-                        "extract the inner block into a well-named helper function, or "
-                        "flatten with early returns / guard clauses"
+                    first_offender,
+                    ViolationDetails(
+                        message=f"nesting depth {deepest} exceeds the maximum of {max_depth}",
+                        suggestion=(
+                            "extract the inner block into a well-named helper function, or "
+                            "flatten with early returns / guard clauses"
+                        ),
+                        symbol=ctx.enclosing_symbol(function.body[0]) or function.name,
                     ),
-                    symbol=ctx.enclosing_symbol(function.body[0]) or function.name,
                 )
 
     def _measure(
@@ -96,7 +74,7 @@ class MaxNestingDepth(Rule):
 
         def walk(statement: ast.stmt, depth: int) -> None:
             nonlocal deepest, first_offender
-            if isinstance(statement, _NESTING_NODES) and not _is_elif(statement):
+            if isinstance(statement, _NESTING_NODES) and not is_elif_branch(statement):
                 depth += 1
                 deepest = max(deepest, depth)
                 if depth > max_depth and first_offender is None:
@@ -127,12 +105,13 @@ class _MaxBlockLength(Rule):
             if length > max_lines:
                 yield self.violation(
                     ctx,
-                    f"{self.block_kind} `{node.name}` is {length} lines long "
-                    f"(maximum {max_lines})",
-                    line=node.lineno,
-                    col=node.col_offset,
-                    suggestion=self.suggestion,
-                    symbol=node.name,
+                    node,
+                    ViolationDetails(
+                        message=f"{self.block_kind} `{node.name}` is {length} lines long "
+                        f"(maximum {max_lines})",
+                        suggestion=self.suggestion,
+                        symbol=node.name,
+                    ),
                 )
 
 
@@ -167,7 +146,7 @@ class MaxParameters(Rule):
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         max_params = ctx.config.options["max_params"]
-        for function in _functions(ctx.tree):
+        for function in functions(ctx.tree):
             parameters = [
                 *function.args.posonlyargs,
                 *function.args.args,
@@ -178,12 +157,13 @@ class MaxParameters(Rule):
             if len(parameters) > max_params:
                 yield self.violation(
                     ctx,
-                    f"function `{function.name}` takes {len(parameters)} parameters "
-                    f"(maximum {max_params})",
-                    line=function.lineno,
-                    col=function.col_offset,
-                    suggestion="group related parameters into a dataclass or config object",
-                    symbol=function.name,
+                    function,
+                    ViolationDetails(
+                        message=f"function `{function.name}` takes {len(parameters)} parameters "
+                        f"(maximum {max_params})",
+                        suggestion="group related parameters into a dataclass or config object",
+                        symbol=function.name,
+                    ),
                 )
 
     @staticmethod
@@ -203,20 +183,21 @@ class MaxComplexity(Rule):
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         max_complexity = ctx.config.options["max_complexity"]
-        for function in _functions(ctx.tree):
+        for function in functions(ctx.tree):
             complexity = self._complexity(function)
             if complexity > max_complexity:
                 yield self.violation(
                     ctx,
-                    f"function `{function.name}` has cyclomatic complexity {complexity} "
-                    f"(maximum {max_complexity})",
-                    line=function.lineno,
-                    col=function.col_offset,
-                    suggestion=(
-                        "extract decision-heavy blocks into helpers or replace branch "
-                        "chains with a dispatch dict / early returns"
+                    function,
+                    ViolationDetails(
+                        message=f"function `{function.name}` has cyclomatic complexity {complexity} "
+                        f"(maximum {max_complexity})",
+                        suggestion=(
+                            "extract decision-heavy blocks into helpers or replace branch "
+                            "chains with a dispatch dict / early returns"
+                        ),
+                        symbol=function.name,
                     ),
-                    symbol=function.name,
                 )
 
     @staticmethod
@@ -258,20 +239,21 @@ class DoOneThing(Rule):
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         conjunctions = set(ctx.config.options["conjunctions"])
         allowed = set(ctx.config.options["allowed_names"])
-        for function in _functions(ctx.tree):
+        for function in functions(ctx.tree):
             word = self._conjunction(function, conjunctions, allowed)
             if word is not None:
                 yield self.violation(
                     ctx,
-                    f"function `{function.name}` joins responsibilities with "
-                    f"`{word}`; a function should do one thing",
-                    line=function.lineno,
-                    col=function.col_offset,
-                    suggestion=(
-                        "split into separate, single-purpose functions — one for each "
-                        "part of the name — and let the caller compose them"
+                    function,
+                    ViolationDetails(
+                        message=f"function `{function.name}` joins responsibilities with "
+                        f"`{word}`; a function should do one thing",
+                        suggestion=(
+                            "split into separate, single-purpose functions — one for each "
+                            "part of the name — and let the caller compose them"
+                        ),
+                        symbol=function.name,
                     ),
-                    symbol=function.name,
                 )
 
     @staticmethod
@@ -343,21 +325,22 @@ class TooManyGuardClauses(Rule):
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         max_guards = ctx.config.options["max_guards"]
-        for function in _functions(ctx.tree):
+        for function in functions(ctx.tree):
             count = self._max_guard_count(function)
             if count > max_guards:
                 yield self.violation(
                     ctx,
-                    f"function `{function.name}` strings together {count} sequential "
-                    f"guard clauses in one block (maximum {max_guards})",
-                    line=function.lineno,
-                    col=function.col_offset,
-                    suggestion=(
-                        "extract the guard checks into a single named filter/predicate "
-                        "function, and move the remaining logic into its own function — "
-                        "so each piece does exactly one thing"
+                    function,
+                    ViolationDetails(
+                        message=f"function `{function.name}` strings together {count} sequential "
+                        f"guard clauses in one block (maximum {max_guards})",
+                        suggestion=(
+                            "extract the guard checks into a single named filter/predicate "
+                            "function, and move the remaining logic into its own function — "
+                            "so each piece does exactly one thing"
+                        ),
+                        symbol=function.name,
                     ),
-                    symbol=function.name,
                 )
 
     @staticmethod

@@ -171,56 +171,34 @@ override that.
 | SM609 | eager-dataset-loading | — | warning |
 | SM610 | premature-device-placement | — | warning |
 | SM611 | redundant-isinstance-check | — | warning |
+| SD801 | type-switch-violates-ocp | `min_branches=3` | warning |
+| SD802 | low-cohesion-class | `min_methods=4` | warning |
+| DP701 | duplicate-function-body | `min_statements=4` | warning |
 
 `cleancode rules` prints the same list with full descriptions.
 
 A few details worth knowing:
 
-- **Naming rules look at binding sites only** (assignments, defs, parameters,
-  loop targets) — a bad name is reported once, where it is introduced.
-  `i`/`x` are fine as loop, comprehension, and lambda targets; `except ... as e`
-  is fine; `T = TypeVar("T")` and `ALL_CAPS` constants are exempt.
-- **NM201 flags names under `min_length` characters**, not just single
-  letters — `ab`, `bc`, and `df` are cryptic even though they're not bare
-  letters. Single-character names keep the old loop/comprehension/lambda-only
-  exemption; short multi-letter names (`id`, `ok`, `fh`, ...) are exempt via
-  the same `allowed` list regardless of where they're bound.
-- **CM301/CM302 are deterministic**, not LLM-judged: they compare the
-  informative words of a docstring/comment against the identifier words (plus
-  an operator-synonym table) of the code it annotates. `x = x + 1  # increment
-  x by 1` is flagged; a comment explaining *why* is not. Generic filler nouns
-  ("number", "value", "variable", ...) are ignored on the comment side so they
-  can't dilute the overlap score — `x += 1  # increase a number` is flagged.
-  `TODO`/`FIXME`/`NOTE` and tool directives are always exempt.
-- **SL401 scores subscripts** (+1 per dimension, step, `None`/`...`, negative
-  index, arithmetic, or call in the index; +2 per nested subscript; negative
-  steps count double) and ignores type annotations like `dict[str, int]`.
-- **SM6xx catches structural smells that node-counting misses**: SM601 flags
-  a comprehension nesting another comprehension whose filter is a ternary;
-  SM602 flags integer-constant indexing (`bounds[0]`) into a parameter typed
-  as a fixed multi-element tuple (`tuple[T, ...]` variadic tuples are exempt);
-  SM603 flags inline ternaries whose branch is chosen by a hardcoded
-  `.startswith()`/`.endswith()`/`.find()`/`.rfind()` string check — plain
-  `if`/`elif` statements using the same methods are not flagged, since that's
-  ordinary, idiomatic control flow. SM604 flags ternaries that return
-  explicit `True`/`False` literals for an already-boolean condition; SM605
-  flags `reduce(lambda a, b: a + b, xs)` in favor of `sum(xs)`; SM606 flags a
-  comprehension re-iterating a `Subscript`/`Attribute`/`Call` collection
-  (`item["metrics"]`) already iterated earlier in the same function — bare
-  variable names are exempt, since consuming an already-computed local in a
-  second comprehension is an ordinary filter-then-map step, not a repeated
-  pass over a shared source; SM607 flags numeric literals embedded directly
-  in a `BinOp`/`Compare` (not literals assigned straight to a name), exempting
-  a configurable `ignore` list; SM608 flags `len(x) > 0`/`len(x) == 0` style
-  checks in favor of `if x:`/`if not x:`. SM609/SM610 target
-  `torch.utils.data.Dataset` subclasses (matched syntactically by base-class
-  name, no type checker involved): SM609 flags file/array-loading calls
-  (`np.load`, `open`, `Image.open`, `cv2.imread`, `torch.load`) inside
-  `__init__` — eager loading of every sample defeats lazy loading and can OOM;
-  SM610 flags `.cuda()`/`.to(device=...)` calls inside `__init__` or
-  `__getitem__` — initializing a CUDA context before `DataLoader` workers fork
-  corrupts it across worker processes. SM611 flags `isinstance(x, T)` where
-  `x` already carries a simple (non-generic) static annotation of exactly
-  `T` — the check is hallucinated safety a type checker already guarantees.
-- `elif` chains do **not** count as nesting for ST101 (each branch still counts
-  toward ST105 complexity).
+- **Naming rules look at binding sites only** — a bad name is reported once,
+  where it's introduced. Loop/comprehension/lambda letters, `except ... as e`,
+  `TypeVar`, and `ALL_CAPS` constants are exempt.
+- **CM301/CM302 are deterministic, not LLM-judged** — they compare word
+  overlap between a docstring/comment and the code it annotates. Comments
+  explaining *why* (not *what*) are always exempt.
+- **SL401/SL402 score subscript complexity** (dimensions, steps, nesting,
+  chaining) and ignore type annotations like `dict[str, int]`.
+- **SM6xx catches structural smells node-counting misses**: nested
+  comprehensions, anonymous tuple indexing, magic-string branching, redundant
+  ternaries, `reduce` instead of `sum`, repeated iteration, magic numbers,
+  non-idiomatic emptiness checks, and PyTorch `Dataset` pitfalls (eager
+  loading, premature `.cuda()`, redundant `isinstance` on an annotated type).
+- **`elif` chains don't count as nesting** for ST101 (they still count toward
+  ST105 complexity).
+- **SD801 flags a same-variable type-switch** (`isinstance`/`type()` chain) —
+  an Open/Closed Principle smell. Dispatching on Python's own `ast.*` node
+  types is exempt, since that's routine AST tooling, not the smell targeted.
+- **SD802 flags a class whose methods split into disjoint groups** sharing no
+  state or calls — an SRP smell beyond ST103's line count.
+- **DP701 flags copy-pasted function bodies** (once names are ignored) across
+  the whole run — it only catches cross-file duplicates when you check a
+  directory containing both files, not one file at a time.

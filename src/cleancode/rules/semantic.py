@@ -12,18 +12,10 @@ from __future__ import annotations
 import ast
 from typing import Iterable, Iterator
 
-from cleancode.models import FileContext, Severity, Violation
-from cleancode.rules.base import Rule
-
-FunctionNode = ast.FunctionDef | ast.AsyncFunctionDef
+from cleancode.models import FileContext, Severity, Violation, ViolationDetails
+from cleancode.rules.base import FunctionNode, Rule, functions, subscript_base_name
 
 _COMP_TYPES = (ast.ListComp, ast.DictComp, ast.SetComp, ast.GeneratorExp)
-
-
-def _functions(tree: ast.Module) -> Iterator[FunctionNode]:
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            yield node
 
 
 def _nested_ternary_comprehension(node: ast.AST) -> ast.AST | None:
@@ -54,24 +46,16 @@ class ComprehensionDensity(Rule):
             if isinstance(node, _COMP_TYPES) and _nested_ternary_comprehension(node) is not None:
                 yield self.violation(
                     ctx,
-                    "comprehension nests another comprehension filtered by a ternary",
-                    line=node.lineno,
-                    col=node.col_offset,
-                    suggestion=(
-                        "pull the nested comprehension and its ternary condition "
-                        "into a named helper function"
+                    node,
+                    ViolationDetails(
+                        message="comprehension nests another comprehension filtered by a ternary",
+                        suggestion=(
+                            "pull the nested comprehension and its ternary condition "
+                            "into a named helper function"
+                        ),
+                        symbol=ctx.enclosing_symbol(node),
                     ),
-                    symbol=ctx.enclosing_symbol(node),
                 )
-
-
-def _base_name(node: ast.Subscript) -> str | None:
-    value = node.value
-    if isinstance(value, ast.Name):
-        return value.id
-    if isinstance(value, ast.Attribute):
-        return value.attr
-    return None
 
 
 def _is_fixed_tuple(annotation: ast.expr) -> bool:
@@ -80,7 +64,7 @@ def _is_fixed_tuple(annotation: ast.expr) -> bool:
     Excludes the variadic ``tuple[T, ...]`` form: that's a homogeneous
     sequence, not a positional struct, so indexing it isn't anonymous.
     """
-    if not (isinstance(annotation, ast.Subscript) and _base_name(annotation) == "tuple"):
+    if not (isinstance(annotation, ast.Subscript) and subscript_base_name(annotation) == "tuple"):
         return False
     slice_ = annotation.slice
     elements = list(slice_.elts) if isinstance(slice_, ast.Tuple) else [slice_]
@@ -118,7 +102,7 @@ class AnonymousTupleIndexing(Rule):
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
-        for function in _functions(ctx.tree):
+        for function in functions(ctx.tree):
             tracked = _tuple_annotated_params(function)
             if not tracked:
                 continue
@@ -132,15 +116,16 @@ class AnonymousTupleIndexing(Rule):
                 name = node.value.id  # type: ignore[union-attr]
                 yield self.violation(
                     ctx,
-                    f"`{name}[{node.slice.value}]` indexes tuple parameter `{name}` "  # type: ignore[union-attr]
-                    "by position — meaning is opaque",
-                    line=node.lineno,
-                    col=node.col_offset,
-                    suggestion=(
-                        "replace the tuple parameter with a NamedTuple/dataclass with "
-                        "named fields, or unpack it once at the top of the function"
+                    node,
+                    ViolationDetails(
+                        message=f"`{name}[{node.slice.value}]` indexes tuple parameter "  # type: ignore[union-attr]
+                        f"`{name}` by position — meaning is opaque",
+                        suggestion=(
+                            "replace the tuple parameter with a NamedTuple/dataclass with "
+                            "named fields, or unpack it once at the top of the function"
+                        ),
+                        symbol=function.name,
                     ),
-                    symbol=function.name,
                 )
 
 
@@ -175,15 +160,16 @@ class MagicStringBranching(Rule):
                 snippet = ast.get_source_segment(ctx.source, node.test) or "<call>"
                 yield self.violation(
                     ctx,
-                    f"ternary branches on a hardcoded string check: `{snippet}`",
-                    line=node.test.lineno,
-                    col=node.test.col_offset,
-                    suggestion=(
-                        "name the condition (e.g. `is_transaction_metric = "
-                        "k.startswith('tx_')`) so the branch reflects a domain "
-                        "concept, not a string literal"
+                    node.test,
+                    ViolationDetails(
+                        message=f"ternary branches on a hardcoded string check: `{snippet}`",
+                        suggestion=(
+                            "name the condition (e.g. `is_transaction_metric = "
+                            "k.startswith('tx_')`) so the branch reflects a domain "
+                            "concept, not a string literal"
+                        ),
+                        symbol=ctx.enclosing_symbol(node),
                     ),
-                    symbol=ctx.enclosing_symbol(node),
                 )
 
 
@@ -216,11 +202,12 @@ class RedundantBooleanTernary(Rule):
             suggestion = condition if body_value else f"not ({condition})"
             yield self.violation(
                 ctx,
-                "ternary returns explicit True/False for an already-boolean condition",
-                line=node.lineno,
-                col=node.col_offset,
-                suggestion=f"replace the ternary with `{suggestion}`",
-                symbol=ctx.enclosing_symbol(node),
+                node,
+                ViolationDetails(
+                    message="ternary returns explicit True/False for an already-boolean condition",
+                    suggestion=f"replace the ternary with `{suggestion}`",
+                    symbol=ctx.enclosing_symbol(node),
+                ),
             )
 
 
@@ -264,11 +251,13 @@ class ReduceInsteadOfSum(Rule):
             ):
                 yield self.violation(
                     ctx,
-                    "`reduce(lambda a, b: a + b, ...)` reimplements the built-in `sum()`",
-                    line=node.lineno,
-                    col=node.col_offset,
-                    suggestion="replace with `sum(iterable)`",
-                    symbol=ctx.enclosing_symbol(node),
+                    node,
+                    ViolationDetails(
+                        message="`reduce(lambda a, b: a + b, ...)` reimplements the "
+                        "built-in `sum()`",
+                        suggestion="replace with `sum(iterable)`",
+                        symbol=ctx.enclosing_symbol(node),
+                    ),
                 )
 
 
@@ -304,7 +293,7 @@ class RepeatedCollectionIteration(Rule):
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
-        for function in _functions(ctx.tree):
+        for function in functions(ctx.tree):
             yield from self._check_function(ctx, function)
 
     def _check_function(self, ctx: FileContext, function: FunctionNode) -> Iterator[Violation]:
@@ -316,11 +305,14 @@ class RepeatedCollectionIteration(Rule):
                 continue
             yield self.violation(
                 ctx,
-                f"`{signature}` is iterated again here — already iterated at line {first.lineno}",
-                line=iter_node.lineno,
-                col=iter_node.col_offset,
-                suggestion="merge into a single pass: derive both results from one comprehension/loop",
-                symbol=function.name,
+                iter_node,
+                ViolationDetails(
+                    message=f"`{signature}` is iterated again here — already iterated "
+                    f"at line {first.lineno}",
+                    suggestion="merge into a single pass: derive both results from one "
+                    "comprehension/loop",
+                    symbol=function.name,
+                ),
             )
 
 
@@ -363,11 +355,12 @@ class MagicNumber(Rule):
             if value is not None and value not in ignore:
                 yield self.violation(
                     ctx,
-                    f"magic number `{value}` — extract it to a named, typed constant",
-                    line=operand.lineno,
-                    col=operand.col_offset,
-                    suggestion=f"e.g. `SOME_DESCRIPTIVE_NAME = {value}`",
-                    symbol=ctx.enclosing_symbol(node),
+                    operand,
+                    ViolationDetails(
+                        message=f"magic number `{value}` — extract it to a named, typed constant",
+                        suggestion=f"e.g. `SOME_DESCRIPTIVE_NAME = {value}`",
+                        symbol=ctx.enclosing_symbol(node),
+                    ),
                 )
 
 
@@ -400,11 +393,14 @@ class NonIdiomaticEmptinessCheck(Rule):
                 arg = ast.get_source_segment(ctx.source, node.left.args[0]) or "x"  # type: ignore[attr-defined]
                 yield self.violation(
                     ctx,
-                    f"`len({arg}) {_op_symbol(node.ops[0])} 0` — rely on truthiness instead",
-                    line=node.lineno,
-                    col=node.col_offset,
-                    suggestion=f"use `if {arg}:` or `if not {arg}:` instead of comparing length to 0",
-                    symbol=ctx.enclosing_symbol(node),
+                    node,
+                    ViolationDetails(
+                        message=f"`len({arg}) {_op_symbol(node.ops[0])} 0` — rely on "
+                        "truthiness instead",
+                        suggestion=f"use `if {arg}:` or `if not {arg}:` instead of "
+                        "comparing length to 0",
+                        symbol=ctx.enclosing_symbol(node),
+                    ),
                 )
 
 
@@ -471,14 +467,15 @@ class EagerDatasetLoading(Rule):
                 snippet = ast.get_source_segment(ctx.source, node) or "<call>"
                 yield self.violation(
                     ctx,
-                    f"`{snippet}` loads data eagerly inside `__init__`",
-                    line=node.lineno,
-                    col=node.col_offset,
-                    suggestion=(
-                        "store the file path in `__init__` and load the payload lazily "
-                        "in `__getitem__`"
+                    node,
+                    ViolationDetails(
+                        message=f"`{snippet}` loads data eagerly inside `__init__`",
+                        suggestion=(
+                            "store the file path in `__init__` and load the payload lazily "
+                            "in `__getitem__`"
+                        ),
+                        symbol=f"{class_def.name}.__init__",
                     ),
-                    symbol=f"{class_def.name}.__init__",
                 )
 
 
@@ -529,14 +526,15 @@ class PrematureDevicePlacement(Rule):
                 snippet = ast.get_source_segment(ctx.source, node) or "<call>"
                 yield self.violation(
                     ctx,
-                    f"`{snippet}` places a tensor on-device inside `{method.name}`",
-                    line=node.lineno,
-                    col=node.col_offset,
-                    suggestion=(
-                        "keep tensors on CPU in the Dataset; move to the target device in "
-                        "the training loop after the DataLoader yields the batch"
+                    node,
+                    ViolationDetails(
+                        message=f"`{snippet}` places a tensor on-device inside `{method.name}`",
+                        suggestion=(
+                            "keep tensors on CPU in the Dataset; move to the target device in "
+                            "the training loop after the DataLoader yields the batch"
+                        ),
+                        symbol=f"{class_def.name}.{method.name}",
                     ),
-                    symbol=f"{class_def.name}.{method.name}",
                 )
 
 
@@ -593,7 +591,7 @@ class RedundantIsinstanceCheck(Rule):
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
-        for function in _functions(ctx.tree):
+        for function in functions(ctx.tree):
             tracked = _annotated_names(function)
             if not tracked:
                 continue
@@ -611,12 +609,14 @@ class RedundantIsinstanceCheck(Rule):
                 continue
             yield self.violation(
                 ctx,
-                f"`isinstance({target.id}, {tracked[target.id]})` is redundant — "
-                f"`{target.id}` is already annotated `{tracked[target.id]}`",
-                line=node.lineno,
-                col=node.col_offset,
-                suggestion="remove the check; the static annotation already guarantees the type",
-                symbol=ctx.enclosing_symbol(node),
+                node,
+                ViolationDetails(
+                    message=f"`isinstance({target.id}, {tracked[target.id]})` is redundant — "
+                    f"`{target.id}` is already annotated `{tracked[target.id]}`",
+                    suggestion="remove the check; the static annotation already "
+                    "guarantees the type",
+                    symbol=ctx.enclosing_symbol(node),
+                ),
             )
 
 

@@ -143,6 +143,21 @@
 # [tool.cleancode.SM610]
 
 # SM611  redundant-isinstance-check  [warning]
-#   Flags `isinstance(x, T)` where `x` already carries a simple static annotation of exactly `T` — the runtime check is hallucinated safety that a type checker already guarantees.
+#   Flags `isinstance(x, T)` where `x` already carries a simple static annotation of exactly `T` — the runtime check is hallucinated safety that a type checker already guarantees, and it costs cycles in hot loops like `__getitem__`.
 # [tool.cleancode.SM611]
+
+# SD801  type-switch-violates-ocp  [warning]
+#   Flags an if/elif chain of `min_branches`-or-more (default 3) branches that each test `isinstance(x, ...)`/`type(x) is ...` against the same variable — adding a new type means editing this chain instead of extending via polymorphism, the classic Open/Closed Principle violation.
+# [tool.cleancode.SD801]
+# min_branches = 3
+
+# SD802  low-cohesion-class  [warning]
+#   Flags a class whose instance methods split into two or more groups that share no instance attribute and never call each other — a concrete proxy for 'this class does more than one thing' (SRP), beyond the line-count check in ST103. Dunder methods and @staticmethod/@classmethod helpers are excluded from the count and the grouping.
+# [tool.cleancode.SD802]
+# min_methods = 4
+
+# DP701  duplicate-function-body  [warning]
+#   Flags two or more functions/methods, anywhere in the analyzed files, whose bodies are structurally identical once names are ignored — copy-paste DRY violations a single-file rule can't see. Stub bodies (pass/.../raise NotImplementedError), dunder methods, and bodies shorter than `min_statements` are exempt.
+# [tool.cleancode.DP701]
+# min_statements = 4
 

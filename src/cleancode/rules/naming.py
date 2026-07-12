@@ -12,7 +12,7 @@ import re
 from dataclasses import dataclass
 from typing import Iterable, Iterator
 
-from cleancode.models import FileContext, Severity, Violation
+from cleancode.models import FileContext, Severity, Violation, ViolationDetails
 from cleancode.rules.base import Rule, split_identifier
 
 # Binding kinds. The distinction matters for context-dependent allowances.
@@ -33,8 +33,8 @@ _RELAXED_KINDS = frozenset({KIND_LOOP, KIND_COMPREHENSION, KIND_LAMBDA_PARAM})
 class Binding:
     name: str
     kind: str
-    line: int
-    col: int
+    lineno: int
+    col_offset: int
 
 
 def collect_bindings(tree: ast.Module) -> Iterator[Binding]:
@@ -93,10 +93,12 @@ class ShortName(Rule):
             if self._is_flagged(binding, allowed, min_length):
                 yield self.violation(
                     ctx,
-                    f"short {binding.kind} `{binding.name}` ({len(binding.name)} characters)",
-                    line=binding.line,
-                    col=binding.col,
-                    suggestion="use a descriptive name that states what the value represents",
+                    binding,
+                    ViolationDetails(
+                        message=f"short {binding.kind} `{binding.name}` "
+                        f"({len(binding.name)} characters)",
+                        suggestion="use a descriptive name that states what the value represents",
+                    ),
                 )
 
     @staticmethod
@@ -168,12 +170,13 @@ class MeaninglessName(Rule):
             if bad:
                 yield self.violation(
                     ctx,
-                    f"meaningless {binding.kind} name `{binding.name}`",
-                    line=binding.line,
-                    col=binding.col,
-                    suggestion=(
-                        "rename to describe the content or role, e.g. `raw_rows`, "
-                        "`user_totals`, `parse_trades`"
+                    binding,
+                    ViolationDetails(
+                        message=f"meaningless {binding.kind} name `{binding.name}`",
+                        suggestion=(
+                            "rename to describe the content or role, e.g. `raw_rows`, "
+                            "`user_totals`, `parse_trades`"
+                        ),
                     ),
                 )
 
@@ -213,11 +216,13 @@ class CrypticAbbreviation(Rule):
                 pretty = ", ".join(f"`{part}`" for part in cryptic)
                 yield self.violation(
                     ctx,
-                    f"{binding.kind} `{binding.name}` contains cryptic abbreviation(s) {pretty}",
-                    line=binding.line,
-                    col=binding.col,
-                    suggestion=(
-                        "spell the word out (`usr_mgr` -> `user_manager`) or add the "
-                        "abbreviation to `known_abbrevs` if it is domain-standard"
+                    binding,
+                    ViolationDetails(
+                        message=f"{binding.kind} `{binding.name}` contains cryptic "
+                        f"abbreviation(s) {pretty}",
+                        suggestion=(
+                            "spell the word out (`usr_mgr` -> `user_manager`) or add the "
+                            "abbreviation to `known_abbrevs` if it is domain-standard"
+                        ),
                     ),
                 )

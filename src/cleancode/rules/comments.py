@@ -12,10 +12,15 @@ import ast
 import re
 from typing import Iterable, Iterator
 
-from cleancode.models import Comment, FileContext, Severity, Violation
-from cleancode.rules.base import FRAMING_VERBS, Rule, content_words, split_identifier
-
-FunctionNode = ast.FunctionDef | ast.AsyncFunctionDef
+from cleancode.models import Comment, FileContext, Severity, Violation, ViolationDetails
+from cleancode.rules.base import (
+    FRAMING_VERBS,
+    FunctionNode,
+    Rule,
+    content_words,
+    functions,
+    split_identifier,
+)
 
 # Comment prefixes that are directives or markers, never prose noise.
 _EXEMPT_PREFIXES = (
@@ -128,12 +133,6 @@ def _stemmed(words: set[str]) -> set[str]:
     return {stem for word in words for stem in _stem_candidates(word)}
 
 
-def _functions(tree: ast.Module) -> Iterator[FunctionNode]:
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            yield node
-
-
 def _docstring_node(function: FunctionNode) -> ast.Constant | None:
     if not function.body:
         return None
@@ -208,7 +207,7 @@ class DocstringRestatesName(Rule):
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         overlap_threshold = ctx.config.options["overlap"]
-        for function in _functions(ctx.tree):
+        for function in functions(ctx.tree):
             docstring = ast.get_docstring(function, clean=True)
             node = _docstring_node(function)
             if docstring is None or node is None:
@@ -227,14 +226,15 @@ class DocstringRestatesName(Rule):
                 continue
             yield self.violation(
                 ctx,
-                message,
-                line=node.lineno,
-                col=node.col_offset,
-                suggestion=(
-                    "delete it, or document what the name cannot say: why, edge cases, "
-                    "units, invariants"
+                node,
+                ViolationDetails(
+                    message=message,
+                    suggestion=(
+                        "delete it, or document what the name cannot say: why, edge cases, "
+                        "units, invariants"
+                    ),
+                    symbol=function.name,
                 ),
-                symbol=function.name,
             )
 
 
@@ -255,10 +255,11 @@ class CommentRestatesCode(Rule):
             if self._restates_code(ctx, comment, comment_words):
                 yield self.violation(
                     ctx,
-                    f"comment restates the code it annotates: `# {comment.text}`",
-                    line=comment.line,
-                    col=comment.col,
-                    suggestion="delete it; comments should explain *why*, not repeat *what*",
+                    comment,
+                    ViolationDetails(
+                        message=f"comment restates the code it annotates: `# {comment.text}`",
+                        suggestion="delete it; comments should explain *why*, not repeat *what*",
+                    ),
                 )
 
     def _candidates(self, ctx: FileContext) -> Iterator[tuple[Comment, set[str]]]:
@@ -286,9 +287,9 @@ class CommentRestatesCode(Rule):
 
     def _annotated_code(self, ctx: FileContext, comment: Comment) -> str | None:
         if comment.inline:
-            return ctx.lines[comment.line - 1][: comment.col]
-        comment_columns = {other.line: other.col for other in ctx.comments}
-        for line_number in range(comment.line + 1, len(ctx.lines) + 1):
+            return ctx.lines[comment.lineno - 1][: comment.col_offset]
+        comment_columns = {other.lineno: other.col_offset for other in ctx.comments}
+        for line_number in range(comment.lineno + 1, len(ctx.lines) + 1):
             text = ctx.lines[line_number - 1]
             stripped = text.strip()
             if not stripped:
@@ -313,17 +314,18 @@ class CommentDensity(Rule):
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         max_ratio = ctx.config.options["max_ratio"]
         min_code_lines = ctx.config.options["min_code_lines"]
-        for function in _functions(ctx.tree):
+        for function in functions(ctx.tree):
             code_lines, comment_lines = self._count_lines(ctx, function)
             if code_lines >= min_code_lines and comment_lines / code_lines > max_ratio:
                 yield self.violation(
                     ctx,
-                    f"function `{function.name}` has {comment_lines} comment lines "
-                    f"for {code_lines} code lines (max ratio {max_ratio})",
-                    line=function.lineno,
-                    col=function.col_offset,
-                    suggestion="strip comments that narrate the code; keep only the why",
-                    symbol=function.name,
+                    function,
+                    ViolationDetails(
+                        message=f"function `{function.name}` has {comment_lines} comment lines "
+                        f"for {code_lines} code lines (max ratio {max_ratio})",
+                        suggestion="strip comments that narrate the code; keep only the why",
+                        symbol=function.name,
+                    ),
                 )
 
     @staticmethod
@@ -333,7 +335,7 @@ class CommentDensity(Rule):
         inline_comment_lines: set[int] = set()
         for comment in ctx.comments:
             target = inline_comment_lines if comment.inline else comment_only_lines
-            target.add(comment.line)
+            target.add(comment.lineno)
         docstring_lines = _docstring_line_span(function)
 
         code_lines = 0
@@ -363,7 +365,7 @@ class BoilerplateParamDocs(Rule):
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         min_uninformative = ctx.config.options["min_uninformative"]
-        for function in _functions(ctx.tree):
+        for function in functions(ctx.tree):
             docstring = ast.get_docstring(function, clean=True)
             node = _docstring_node(function)
             if docstring is None or node is None:
@@ -376,14 +378,16 @@ class BoilerplateParamDocs(Rule):
                 pretty = ", ".join(f"`{name}`" for name in uninformative)
                 yield self.violation(
                     ctx,
-                    f"docstring of `{function.name}` has boilerplate parameter docs: {pretty}",
-                    line=node.lineno,
-                    col=node.col_offset,
-                    suggestion=(
-                        "delete entries that restate the name; document only parameters "
-                        "whose meaning, units, or constraints are not obvious"
+                    node,
+                    ViolationDetails(
+                        message=f"docstring of `{function.name}` has boilerplate parameter "
+                        f"docs: {pretty}",
+                        suggestion=(
+                            "delete entries that restate the name; document only parameters "
+                            "whose meaning, units, or constraints are not obvious"
+                        ),
+                        symbol=function.name,
                     ),
-                    symbol=function.name,
                 )
 
     def _section_entries(
