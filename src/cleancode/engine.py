@@ -10,83 +10,153 @@ import tokenize
 from pathlib import Path
 
 from cleancode.config import Config
-from cleancode.models import CheckResult, Comment, FileContext
+from cleancode.models import CheckResult, Comment, FileContext, ParsedFile, Violation
 
 _SUPPRESSION = re.compile(r"cleancode:\s*disable(?:\s*=\s*(?P<ids>[A-Z]{2}\d{3}(?:\s*,\s*[A-Z]{2}\d{3})*))?")
 
 
-def analyze_source(  # cleancode: disable=ST104
+def parse_file(source: str, path: str = "<string>") -> ParsedFile:
+    """Parse ``source`` into the artifact every rule operates on. Raises ``SyntaxError``."""
+    tree = ast.parse(source)
+    _attach_parents(tree)
+    return ParsedFile(
+        path=path,
+        source=source,
+        lines=source.splitlines(),
+        tree=tree,
+        comments=_extract_comments(source),
+    )
+
+
+def analyze_source(
     source: str,
     config: Config | None = None,
     path: str = "<string>",
-    honor_suppressions: bool = True,
 ) -> CheckResult:
-    """Run all enabled rules over ``source`` and return the sorted violations."""
-    from cleancode.rules import ALL_RULES
-
+    """Run all enabled per-file rules over ``source`` and return the sorted violations."""
     if config is None:
         config = Config.default()
 
     try:
-        tree = ast.parse(source)
+        parsed = parse_file(source, path)
     except SyntaxError as error:
         return CheckResult(path=path, parse_error=f"line {error.lineno}: {error.msg}")
 
-    _attach_parents(tree)
-    comments = _extract_comments(source)
-    lines = source.splitlines()
+    violations = _run_file_rules(parsed, config)
+    violations = _finalize(violations, parsed.comments, config)
+    return CheckResult(path=path, violations=violations)
 
-    violations = []
+
+def analyze_path(target: Path, config: Config | None = None) -> list[CheckResult]:
+    """Analyze a ``.py`` file or every ``.py`` file under a directory.
+
+    Directory-level project rules (cross-file duplication, cross-file SOLID
+    checks) only see files reached this way, never a single ``analyze_source``
+    call — they need the whole set of parsed files to compare across.
+    """
+    if config is None:
+        config = Config.default()
+
+    file_paths = [target] if target.is_file() else sorted(target.rglob("*.py"))
+    results: list[CheckResult] = []
+    parsed_files: list[ParsedFile] = []
+    for file_path in file_paths:
+        if _is_excluded(file_path, config.exclude):
+            continue
+        path = str(file_path)
+        try:
+            parsed = parse_file(file_path.read_text(encoding="utf-8"), path)
+        except SyntaxError as error:
+            results.append(CheckResult(path=path, parse_error=f"line {error.lineno}: {error.msg}"))
+            continue
+        parsed_files.append(parsed)
+        violations = _finalize(_run_file_rules(parsed, config), parsed.comments, config)
+        results.append(CheckResult(path=path, violations=violations))
+
+    _run_project_rules(parsed_files, config, results)
+    return results
+
+
+def _run_file_rules(parsed: ParsedFile, config: Config) -> list[Violation]:
+    from cleancode.rules import ALL_RULES
+    from cleancode.rules.base import ProjectRule
+
+    violations: list[Violation] = []
     for rule_class in ALL_RULES:
+        if issubclass(rule_class, ProjectRule):
+            continue
         rule_config = config.rules[rule_class.id]
         if not rule_config.enabled:
             continue
         ctx = FileContext(
-            path=path,
-            source=source,
-            lines=lines,
-            tree=tree,
-            comments=comments,
+            path=parsed.path,
+            source=parsed.source,
+            lines=parsed.lines,
+            tree=parsed.tree,
+            comments=parsed.comments,
             config=rule_config,
         )
         violations.extend(rule_class().check(ctx))
+    return violations
 
-    if honor_suppressions:
+
+class _ProjectIndex:
+    """Lookup tables ``_record_project_violation`` needs to place a violation."""
+
+    def __init__(self, files: list[ParsedFile], results: list[CheckResult]) -> None:
+        self.by_path = {file_result.path: file_result for file_result in results}
+        self.suppressions_by_path = {
+            parsed.path: _parse_suppressions(parsed.comments) for parsed in files
+        }
+
+
+def _enabled_project_rules(config: Config) -> list[type]:
+    from cleancode.rules import ALL_RULES
+    from cleancode.rules.base import ProjectRule
+
+    return [
+        rule_class
+        for rule_class in ALL_RULES
+        if issubclass(rule_class, ProjectRule) and config.rules[rule_class.id].enabled
+    ]
+
+
+def _run_project_rules(
+    files: list[ParsedFile], config: Config, results: list[CheckResult]
+) -> None:
+    project_rule_classes = _enabled_project_rules(config)
+    if not project_rule_classes or not files:
+        return
+
+    index = _ProjectIndex(files, results)
+    for rule_class in project_rule_classes:
+        for violation in rule_class().check_project(files, config):
+            _record_project_violation(violation, index, config)
+
+    for file_result in results:
+        file_result.violations.sort(key=lambda violation: (violation.line, violation.col, violation.rule_id))
+
+
+def _record_project_violation(violation: Violation, index: _ProjectIndex, config: Config) -> None:
+    file_result = index.by_path.get(violation.path)
+    if file_result is None:
+        return
+    suppressions = index.suppressions_by_path.get(violation.path, {})
+    if config.honor_suppressions and _is_suppressed(violation.line, violation.rule_id, suppressions):
+        return
+    file_result.violations.append(violation)
+
+
+def _finalize(violations: list[Violation], comments: list[Comment], config: Config) -> list[Violation]:
+    if config.honor_suppressions:
         suppressions = _parse_suppressions(comments)
         violations = [
             violation
             for violation in violations
             if not _is_suppressed(violation.line, violation.rule_id, suppressions)
         ]
-
     violations.sort(key=lambda violation: (violation.line, violation.col, violation.rule_id))
-    return CheckResult(path=path, violations=violations)
-
-
-def analyze_path(
-    target: Path,
-    config: Config | None = None,
-    honor_suppressions: bool = True,
-) -> list[CheckResult]:
-    """Analyze a ``.py`` file or every ``.py`` file under a directory."""
-    if config is None:
-        config = Config.default()
-
-    files = [target] if target.is_file() else sorted(target.rglob("*.py"))
-    results = []
-    for file_path in files:
-        if _is_excluded(file_path, config.exclude):
-            continue
-        source = file_path.read_text(encoding="utf-8")
-        results.append(
-            analyze_source(
-                source,
-                config,
-                path=str(file_path),
-                honor_suppressions=honor_suppressions,
-            )
-        )
-    return results
+    return violations
 
 
 def _attach_parents(tree: ast.Module) -> None:
@@ -123,8 +193,8 @@ def _extract_comments(source: str) -> list[Comment]:
         line, col = token.start
         comments.append(
             Comment(
-                line=line,
-                col=col,
+                lineno=line,
+                col_offset=col,
                 text=token.string.lstrip("#").strip(),
                 inline=line in code_lines,
             )
@@ -138,7 +208,7 @@ def _parse_suppressions(comments: list[Comment]) -> dict[int, set[str] | None]:
     for comment in comments:
         match = _SUPPRESSION.search(comment.text)
         if match is not None:
-            _record_suppression(suppressions, comment.line, match.group("ids"))
+            _record_suppression(suppressions, comment.lineno, match.group("ids"))
     return suppressions
 
 

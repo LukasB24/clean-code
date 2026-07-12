@@ -10,7 +10,7 @@ from __future__ import annotations
 import ast
 from typing import Callable, Iterable
 
-from cleancode.models import FileContext, Severity, Violation
+from cleancode.models import FileContext, Severity, Violation, ViolationDetails
 from cleancode.rules.base import Rule
 
 
@@ -157,14 +157,16 @@ class ComplexSubscript(Rule):
         summary = ", ".join(sorted(set(reasons)))
         yield self.violation(
             ctx,
-            f"subscript `{snippet}` has complexity {score} (maximum {max_score}): {summary}",
-            line=node.lineno,
-            col=node.col_offset,
-            suggestion=(
-                "name the index expressions (`window = slice(start, stop, 2)`) "
-                "or build the result in intermediate, well-named slices"
+            node,
+            ViolationDetails(
+                message=f"subscript `{snippet}` has complexity {score} "
+                f"(maximum {max_score}): {summary}",
+                suggestion=(
+                    "name the index expressions (`window = slice(start, stop, 2)`) "
+                    "or build the result in intermediate, well-named slices"
+                ),
+                symbol=ctx.enclosing_symbol(node),
             ),
-            symbol=ctx.enclosing_symbol(node),
         )
 
     def _chain_score(self, node: ast.Subscript) -> tuple[int, list[str]]:
@@ -210,15 +212,16 @@ class ChainedSubscript(Rule):
                 snippet = ast.get_source_segment(ctx.source, node) or "<subscript>"
                 yield self.violation(
                     ctx,
-                    f"subscript chain `{snippet}` is {length} levels deep "
-                    f"(maximum {max_chain})",
-                    line=node.lineno,
-                    col=node.col_offset,
-                    suggestion=(
-                        "bind intermediate lookups to named variables "
-                        "(`row = grid[i]`) or use `grid[i, j, k]` for arrays"
+                    node,
+                    ViolationDetails(
+                        message=f"subscript chain `{snippet}` is {length} levels deep "
+                        f"(maximum {max_chain})",
+                        suggestion=(
+                            "bind intermediate lookups to named variables "
+                            "(`row = grid[i]`) or use `grid[i, j, k]` for arrays"
+                        ),
+                        symbol=ctx.enclosing_symbol(node),
                     ),
-                    symbol=ctx.enclosing_symbol(node),
                 )
 
     def _chain_length(self, node: ast.Subscript) -> int:

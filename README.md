@@ -171,8 +171,17 @@ override that.
 | SM609 | eager-dataset-loading | — | warning |
 | SM610 | premature-device-placement | — | warning |
 | SM611 | redundant-isinstance-check | — | warning |
+| SD801 | type-switch-violates-ocp | `min_branches=3` | warning |
+| SD802 | low-cohesion-class | `min_methods=4` | warning |
+| DP701 | duplicate-function-body | `min_statements=4` | warning |
 
 `cleancode rules` prints the same list with full descriptions.
+
+**DP701 is a project-level rule**: it compares every function across every
+file in one run, so it only ever fires when you check a directory
+(`clean-code check src`), never a single file in isolation
+(`clean-code check src/foo.py` can't see a duplicate living in `src/bar.py`).
+SD801/SD802 stay ordinary single-file rules.
 
 A few details worth knowing:
 
@@ -224,3 +233,18 @@ A few details worth knowing:
   `T` — the check is hallucinated safety a type checker already guarantees.
 - `elif` chains do **not** count as nesting for ST101 (each branch still counts
   toward ST105 complexity).
+- **SD801/SD802/DP701 target SOLID/DRY smells the rules above don't reach.**
+  SD801 flags an if/elif chain of 3+ branches that each test
+  `isinstance(x, ...)`/`type(x) is ...` against the same variable — a
+  type-switch that violates the Open/Closed Principle. Dispatching on
+  Python's own `ast.*` node types is exempt: that's routine, closed-hierarchy
+  AST tooling, not the extensible-domain-type smell the rule targets. SD802
+  flags a class whose instance methods split into two or more groups sharing
+  no instance attribute and never calling each other — a concrete SRP signal
+  beyond ST103's line count. Dunder methods and `@staticmethod`/`@classmethod`
+  helpers are excluded from both the method count and the grouping. DP701
+  flags two or more functions/methods whose bodies are structurally identical
+  once names are ignored (literal constants still have to match) — the
+  copy-paste DRY violation a single-file rule can't see. Stub bodies
+  (`pass`/`...`/bare `raise NotImplementedError`), dunder methods, and bodies
+  shorter than `min_statements` are exempt.

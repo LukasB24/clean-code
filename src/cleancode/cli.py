@@ -1,9 +1,10 @@
-"""Command-line interface: ``clean-code check``, ``cleancode rules``, ``cleancode generate``."""
+"""Command-line interface: ``clean-code check``, ``config-template``, ``rules``."""
 
 from __future__ import annotations
 
 import json
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 import click
@@ -17,6 +18,19 @@ _SEVERITY_COLORS = {
     Severity.WARNING: "yellow",
     Severity.ERROR: "red",
 }
+
+
+@dataclass(frozen=True)
+class CheckOptions:
+    """The ``check`` command's flags, grouped so the command itself takes one param."""
+
+    as_json: bool
+    config_path: Path | None
+    select: str | None
+    ignore: str | None
+    no_suppress: bool
+    fail_on: str | None
+    min_severity: str | None
 
 
 @click.group()
@@ -55,27 +69,20 @@ def main() -> None:
     help="Lowest severity to display (default from config, itself default "
     "'warning'). Pass 'info' to opt in to the lowest-signal noise.",
 )
-def check(  # cleancode: disable=ST104
-    paths: tuple[Path, ...],
-    as_json: bool,
-    config_path: Path | None,
-    select: str | None,
-    ignore: str | None,
-    no_suppress: bool,
-    fail_on: str | None,
-    min_severity: str | None,
-) -> None:
+def check(paths: tuple[Path, ...], **kwargs: object) -> None:
     """Analyze Python files and report readability violations."""
+    options = CheckOptions(**kwargs)
     try:
-        config = Config.load(paths[0], override=config_path)
-        _apply_rule_filters(config, select, ignore)
+        config = Config.load(paths[0], override=options.config_path)
+        _apply_rule_filters(config, options.select, options.ignore)
     except (ConfigError, ValueError) as error:
         raise click.UsageError(str(error)) from error
-    if fail_on is not None:
-        config.fail_on = Severity.from_name(fail_on)
+    config.honor_suppressions = not options.no_suppress
+    if options.fail_on is not None:
+        config.fail_on = Severity.from_name(options.fail_on)
         config.fail_on_explicit = True
-    if min_severity is not None:
-        config.min_severity = Severity.from_name(min_severity)
+    if options.min_severity is not None:
+        config.min_severity = Severity.from_name(options.min_severity)
         config.min_severity_explicit = True
     if config.fail_on_explicit and not config.min_severity_explicit:
         # An explicit fail_on with no min_severity means the user cares about
@@ -84,10 +91,8 @@ def check(  # cleancode: disable=ST104
 
     file_results: list[CheckResult] = []
     for path in paths:
-        file_results.extend(
-            analyze_path(path, config, honor_suppressions=not no_suppress)
-        )
-    if as_json:
+        file_results.extend(analyze_path(path, config))
+    if options.as_json:
         shown_results = _filter_by_severity(file_results, config.min_severity)
         shown_results = [
             file_result

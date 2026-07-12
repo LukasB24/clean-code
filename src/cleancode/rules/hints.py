@@ -5,16 +5,8 @@ from __future__ import annotations
 import ast
 from typing import Iterable, Iterator
 
-from cleancode.models import FileContext, Severity, Violation
-from cleancode.rules.base import Rule
-
-FunctionNode = ast.FunctionDef | ast.AsyncFunctionDef
-
-
-def _functions(tree: ast.Module) -> Iterator[FunctionNode]:
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            yield node
+from cleancode.models import FileContext, Severity, Violation, ViolationDetails
+from cleancode.rules.base import FunctionNode, Rule, functions, subscript_base_name
 
 
 def _annotations(function: FunctionNode) -> Iterator[tuple[ast.expr, str]]:
@@ -40,15 +32,6 @@ def _slice_elements(node: ast.Subscript) -> list[ast.expr]:
     return list(inner.elts) if isinstance(inner, ast.Tuple) else [inner]
 
 
-def _subscript_name(node: ast.Subscript) -> str | None:
-    value = node.value
-    if isinstance(value, ast.Name):
-        return value.id
-    if isinstance(value, ast.Attribute):
-        return value.attr
-    return None
-
-
 def _reduces_to_any(annotation: ast.expr) -> bool:
     """True when the whole annotation is semantically ``Any``.
 
@@ -60,7 +43,7 @@ def _reduces_to_any(annotation: ast.expr) -> bool:
     if _is_any(annotation):
         return True
     if isinstance(annotation, ast.Subscript):
-        if _subscript_name(annotation) in ("Optional", "Union"):
+        if subscript_base_name(annotation) in ("Optional", "Union"):
             return any(_reduces_to_any(elt) for elt in _slice_elements(annotation))
         return False
     if isinstance(annotation, ast.BinOp) and isinstance(annotation.op, ast.BitOr):
@@ -80,7 +63,7 @@ class UninformativeAny(Rule):
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
-        for function in _functions(ctx.tree):
+        for function in functions(ctx.tree):
             yield from self._check_function(ctx, function)
 
     def _check_function(
@@ -90,13 +73,14 @@ class UninformativeAny(Rule):
             if _reduces_to_any(annotation):
                 yield self.violation(
                     ctx,
-                    f"{label} of `{function.name}` is annotated with bare `Any`",
-                    line=annotation.lineno,
-                    col=annotation.col_offset,
-                    suggestion=(
-                        "use a structured type (`TypedDict`, a dataclass) or `object` "
-                        "for a truly arbitrary value; reserve `Any` for container "
-                        "payloads like `dict[str, Any]`"
+                    annotation,
+                    ViolationDetails(
+                        message=f"{label} of `{function.name}` is annotated with bare `Any`",
+                        suggestion=(
+                            "use a structured type (`TypedDict`, a dataclass) or `object` "
+                            "for a truly arbitrary value; reserve `Any` for container "
+                            "payloads like `dict[str, Any]`"
+                        ),
+                        symbol=function.name,
                     ),
-                    symbol=function.name,
                 )

@@ -31,6 +31,7 @@ class Config:
     fail_on_explicit: bool = False
     min_severity_explicit: bool = False
     exclude: list[str] = field(default_factory=lambda: list(DEFAULT_EXCLUDES))
+    honor_suppressions: bool = True
 
     @classmethod
     def default(cls) -> "Config":

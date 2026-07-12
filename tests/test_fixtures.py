@@ -68,6 +68,12 @@ EXPECTED_DIRTY_RULES = {
         "CM303",  # comment-heavy __getitem__
         "SM611",  # isinstance(spec, torch.Tensor)
     },
+    "llm_style_solid.py": {
+        "SD801",  # compute_area type-switches on Circle/Square/Triangle
+        "SD802",  # UsageReport splits into shape-tracking vs. db-query groups
+        "SM607",  # 3.14159, 0.5
+        "NM203",  # dsn
+    },
 }
 
 
