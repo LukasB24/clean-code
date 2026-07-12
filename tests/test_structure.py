@@ -29,7 +29,7 @@ class TestMaxNestingDepth:
         """
         assert check(source, "ST101", max_depth=2) == []
 
-    def test_nested_function_resets_depth(self, check):
+    def test_nested_function_body_inherits_enclosing_depth(self, check):
         source = """
         def outer(values):
             if values:
@@ -40,7 +40,11 @@ class TestMaxNestingDepth:
                                 return 1
                     return inner
         """
+        # if(1) -> if(2) -> inner's if(3) -> if(4): visually 4 deep, not reset.
         assert check(source, "ST101", max_depth=4) == []
+        violations = check(source, "ST101", max_depth=2)
+        assert lines_of(violations) == [("ST101", 6)]
+        assert "depth 4" in violations[0].message
 
     def test_try_and_with_count_as_levels(self, check):
         source = """

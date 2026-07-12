@@ -96,8 +96,6 @@ class MaxNestingDepth(Rule):
 
         def walk(statement: ast.stmt, depth: int) -> None:
             nonlocal deepest, first_offender
-            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                return  # nested functions are measured on their own
             if isinstance(statement, _NESTING_NODES) and not _is_elif(statement):
                 depth += 1
                 deepest = max(deepest, depth)
