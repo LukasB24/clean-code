@@ -2,7 +2,6 @@
 
 import tomllib
 
-import pytest
 from click.testing import CliRunner
 
 from cleancode.cli import main

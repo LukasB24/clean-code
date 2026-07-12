@@ -31,18 +31,45 @@ class TestCheck:
 
     def test_dirty_file_exits_one_and_reports(self, runner, tmp_path):
         path = write(tmp_path, "dirty.py", DIRTY)
-        result = runner.invoke(main, ["check", str(path)])
+        result = runner.invoke(main, ["check", "--min-severity", "warning", str(path)])
         assert result.exit_code == 1
         assert "NM202" in result.output
 
+    def test_default_shows_warnings_but_hides_info(self, runner, tmp_path):
+        source = "def usr_mgr(data):\n    tmp = [d for d in data]\n    return tmp\n"
+        path = write(tmp_path, "dirty.py", source)
+        result = runner.invoke(main, ["check", str(path)])
+        assert result.exit_code == 1
+        assert "NM202" in result.output  # warning: shown by default
+        assert "NM203" not in result.output  # info: hidden by default
+        assert "hidden below --min-severity warning" in result.output
+
     def test_json_output_is_valid_and_structured(self, runner, tmp_path):
         path = write(tmp_path, "dirty.py", DIRTY)
-        result = runner.invoke(main, ["check", "--json", str(path)])
+        result = runner.invoke(
+            main, ["check", "--json", "--min-severity", "warning", str(path)]
+        )
         payload = json.loads(result.output)
         assert payload[0]["path"] == str(path)
-        assert payload[0]["ok"] is False
         first = payload[0]["violations"][0]
         assert {"rule_id", "message", "line", "col", "severity", "suggestion"} <= first.keys()
+
+    def test_json_output_respects_min_severity(self, runner, tmp_path):
+        path = write(tmp_path, "dirty.py", DIRTY)
+        result = runner.invoke(
+            main, ["check", "--json", "--min-severity", "error", str(path)]
+        )
+        payload = json.loads(result.output)
+        assert payload == []
+
+    def test_json_output_omits_clean_files(self, runner, tmp_path):
+        clean_path = write(tmp_path, "clean.py", CLEAN)
+        dirty_path = write(tmp_path, "dirty.py", DIRTY)
+        result = runner.invoke(
+            main, ["check", "--json", "--min-severity", "warning", str(clean_path), str(dirty_path)]
+        )
+        payload = json.loads(result.output)
+        assert [entry["path"] for entry in payload] == [str(dirty_path)]
 
     def test_syntax_error_exits_two(self, runner, tmp_path):
         path = write(tmp_path, "broken.py", "def broken(:\n")

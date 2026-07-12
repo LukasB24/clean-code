@@ -67,7 +67,6 @@ class CheckResult:
     def to_dict(self) -> dict[str, Any]:
         return {
             "path": self.path,
-            "ok": self.ok,
             "parse_error": self.parse_error,
             "violations": [violation.to_dict() for violation in self.violations],
         }

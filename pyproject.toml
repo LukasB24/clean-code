@@ -32,3 +32,6 @@ Repository = "https://github.com/LukasB24/CleanCode"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/cleancode"]
+
+[tool.cleancode]
+fail_on = "info"

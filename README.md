@@ -1,44 +1,85 @@
 # clean-code
 
-**A readability enforcer for LLM-generated Python.**
+You ask an LLM for a function and it hands back something that runs — buried
+five `if`s deep, 90 lines long, with a variable called `data2` and a comment
+that just repeats the line under it. It works. Nobody wants to review it.
 
-LLM-generated code usually *works* — but a human still has to review it. And what
-LLMs produce is often exactly what makes review painful: five levels of nested
-loops and `if`s, 80-line functions, names like `data2` and `do_stuff`, subscript
-one-liners like `x[:, None, idx[i+1]:idx[i+2]:2, ::-1]`, and a blanket of
-docstrings and comments that restate the code without saying anything.
+clean-code is a linter built for exactly that mess. Two things make it
+different from asking an LLM to review its own code:
 
-clean-code enforces reviewable Python by utilizing a **static analyzer** (`cleancode check`) — 17 deterministic rules built on
-   stdlib `ast` + `tokenize`, tuned for the failure modes of generated code.
-   No LLM is needed to *check* code.
+- **Finding violations costs nothing and never hallucinates.** It's plain
+  `ast` parsing under the hood, not another model — deterministic, instant,
+  and reproducible. No API key, no tokens burned, no judgment call you can't
+  trace back to a rule.
+- **Every violation ships a fix an LLM can act on directly.** Not just "line
+  12: too complex," but a concrete instruction — rename this, extract that,
+  flatten this branch — so you (or the agent that wrote the code) can feed
+  the output straight back in and get a real correction, not another guess.
 
 ## Disclaimer
 
-This project is under active development. The software is provided "as is", 
-without warranty of any kind, express or implied, including but not limited 
-to the warranties of merchantability, fitness for a particular purpose, 
-completeness, or correctness. In no event shall the authors be liable for 
+This project is under active development. The software is provided "as is",
+without warranty of any kind, express or implied, including but not limited
+to the warranties of merchantability, fitness for a particular purpose,
+completeness, or correctness. In no event shall the authors be liable for
 any claim, damages, or other liability arising from the use of this software.
 
-## Installation
+## Install
 
 ```bash
 pip install -e .
-pytest
+```
+
+That's it — you get a `clean-code` command. Requires Python 3.11+, and the
+only dependency is `click`.
+
+Point it at your code:
+
+```bash
 clean-code check src
 ```
 
-Requires Python ≥ 3.11. The core has a single dependency (`click`).
+### Using it with Claude Code
 
-## Use as a Claude Code skill
-
-This repo ships a [Claude Code](https://claude.com/claude-code) skill at
-`.claude/skills/clean-code/`. To make it available in every session, copy it to
-your user skills folder:
+If you want clean-code to run itself as part of a Claude Code session, copy
+the bundled skill into your user skills folder once:
 
 ```bash
 mkdir -p ~/.claude/skills/ && cp -r .claude/skills/clean-code ~/.claude/skills/
 ```
+
+## Set it up for your project
+
+Out of the box the defaults are strict (max nesting depth 2, max 3
+function params, etc.) — good for shaking out problems, but you'll likely
+want to loosen a few knobs for your codebase. Drop a `[tool.cleancode]` table
+in your `pyproject.toml`:
+
+```toml
+[tool.cleancode]
+disable = ["NM203"]           # rules you don't want at all
+fail_on = "warning"           # info | warning | error — what fails the build
+exclude = ["migrations/**"]   # globs to skip entirely
+
+[tool.cleancode.ST101]
+max_depth = 3                 # loosen the default nesting limit
+
+[tool.cleancode.NM201]
+allowed = ["i", "j", "k", "n", "x", "y", "_", "df"]  # your short names are fine
+```
+
+clean-code finds this automatically by walking up from whatever path you
+check (or point it elsewhere with `--config`).
+
+One line too noisy to fix right now? Suppress it inline instead of touching
+the config:
+
+```python
+legacy_tmp = migrate(rows)  # cleancode: disable=NM202
+```
+
+That's the whole setup. Everything below is reference material — the demo
+and the full rule list — for when you need it.
 
 ## 30-second demo
 
@@ -60,18 +101,35 @@ def process_data(data):
 
 ```text
 $ cleancode check trades.py
-trades.py:1:0: warning NM202 [meaningless-name] meaningless function name `process_data`
-trades.py:1:17: warning NM202 [meaningless-name] meaningless parameter name `data`
-trades.py:2:4: warning CM301 [docstring-restates-name] docstring of `process_data` only restates the function signature
-trades.py:3:4: warning NM202 [meaningless-name] meaningless variable name `result`
-trades.py:6:12: error ST101 [max-nesting-depth] nesting depth 5 exceeds the maximum of 2
-trades.py:9:24: warning CM302 [comment-restates-code] comment restates the code it annotates: `# append the price to result`
+trades.py:
+  1:0: warning NM202 meaningless function name `process_data`
+      fix: rename to describe the content or role, e.g. `raw_rows`, `user_totals`, `parse_trades`
+  1:17: warning NM202 meaningless parameter name `data`
+      fix: rename to describe the content or role, e.g. `raw_rows`, `user_totals`, `parse_trades`
+  2:4: warning CM301 docstring of `process_data` only restates the function signature
+      fix: delete it, or document what the name cannot say: why, edge cases, units, invariants
+  3:4: warning NM202 meaningless variable name `result`
+      fix: rename to describe the content or role, e.g. `raw_rows`, `user_totals`, `parse_trades`
+  6:12: error ST101 nesting depth 5 exceeds the maximum of 2
+      fix: extract the inner block into a well-named helper function, or flatten with early returns / guard clauses
+  9:24: warning CM302 comment restates the code it annotates: `# append the price to result`
+      fix: delete it; comments should explain *why*, not repeat *what*
 
 6 violation(s) in 1 file(s): 1 error(s), 5 warning(s), 0 info(s)
 ```
 
-Every violation carries a concrete fix suggestion (shown with `fix:` in the
-output).
+Violations are grouped by file (the path is printed once, not repeated per
+line) and each carries a concrete fix suggestion — both cut tokens when the
+tool is driven by an LLM. The `rule_name` is still available via `--json` or
+`cleancode rules`, just not repeated inline since the message already says
+what the rule name would.
+
+By default `info`-severity violations (the fuzziest, lowest-signal rules) are
+hidden — pass `--min-severity info` to see everything. `--min-severity` never
+hides a violation that `--fail-on`/`fail_on` would fail the run on: setting
+`fail_on` without `min_severity` lowers the display floor to match, so you
+always see what can fail your build. Set `min_severity` explicitly to
+override that.
 
 ## The rules
 
@@ -113,59 +171,3 @@ A few details worth knowing:
   steps count double) and ignores type annotations like `dict[str, int]`.
 - `elif` chains do **not** count as nesting for ST101 (each branch still counts
   toward ST105 complexity).
-
-## Configuration
-
-Add a `[tool.cleancode]` table to your `pyproject.toml` (found automatically by
-walking up from the checked path, or pass `--config`):
-
-```toml
-[tool.cleancode]
-disable = ["NM203"]
-fail_on = "warning"          # info | warning | error
-exclude = ["migrations/**"]
-
-[tool.cleancode.ST101]
-max_depth = 3
-
-[tool.cleancode.NM201]
-allowed = ["i", "j", "k", "n", "x", "y", "_", "df"]
-
-[tool.cleancode.CM303]
-severity = "warning"
-```
-
-Unknown rule ids or option keys are rejected loudly, so typos can't silently
-disable a rule.
-
-Suppress a single line with an inline comment, and audit suppressions with
-`--no-suppress`:
-
-```python
-legacy_tmp = migrate(rows)  # cleancode: disable=NM202
-```
-
-CLI extras: `--select ST101,CM302` runs only those rules, `--ignore` skips
-rules, `--json` emits machine-readable output. Exit codes: `0` clean, `1`
-violations at or above `fail_on`, `2` usage or syntax error.
-
-## Python API
-
-```python
-from cleancode import analyze_source, Config
-
-result = analyze_source(open("trades.py").read())
-for violation in result.violations:
-    print(violation.rule_id, violation.line, violation.message)
-```
-
-## Design notes
-
-- Analysis is pure stdlib (`ast` for structure, `tokenize` for comments —
-  `ast` discards them). One parse per file; each rule is an independent,
-  self-contained visitor.
-- The heuristics are deliberately deterministic and tunable: word-overlap
-  thresholds, stop-word/synonym tables, and ban lists live in one place and in
-  config, and every fuzzy rule (NM203, CM303) defaults to `info` severity.
-- The project dogfoods itself: the test suite fails if `cleancode check src/`
-  reports anything.

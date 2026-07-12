@@ -22,6 +22,7 @@ _HEADER = """\
 
 [tool.cleancode]
 # fail_on = "warning"   # info | warning | error: lowest severity that fails a run
+# min_severity = "info"  # info | warning | error: lowest severity to display (default: warning)
 # disable = []          # rule ids to turn off entirely, e.g. ["NM203"]
 # exclude = []          # extra glob patterns to skip, e.g. ["migrations/**"]
 """

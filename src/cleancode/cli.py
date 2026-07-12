@@ -48,6 +48,13 @@ def main() -> None:
     type=click.Choice(["info", "warning", "error"]),
     help="Lowest severity that causes a non-zero exit (default from config).",
 )
+@click.option(
+    "--min-severity",
+    default=None,
+    type=click.Choice(["info", "warning", "error"]),
+    help="Lowest severity to display (default from config, itself default "
+    "'warning'). Pass 'info' to opt in to the lowest-signal noise.",
+)
 def check(  # cleancode: disable=ST104
     paths: tuple[Path, ...],
     as_json: bool,
@@ -56,6 +63,7 @@ def check(  # cleancode: disable=ST104
     ignore: str | None,
     no_suppress: bool,
     fail_on: str | None,
+    min_severity: str | None,
 ) -> None:
     """Analyze Python files and report readability violations."""
     try:
@@ -65,21 +73,34 @@ def check(  # cleancode: disable=ST104
         raise click.UsageError(str(error)) from error
     if fail_on is not None:
         config.fail_on = Severity.from_name(fail_on)
+        config.fail_on_explicit = True
+    if min_severity is not None:
+        config.min_severity = Severity.from_name(min_severity)
+        config.min_severity_explicit = True
+    if config.fail_on_explicit and not config.min_severity_explicit:
+        # An explicit fail_on with no min_severity means the user cares about
+        # that severity; don't let the default min_severity hide it from view.
+        config.min_severity = config.fail_on
 
     file_results: list[CheckResult] = []
     for path in paths:
         file_results.extend(
             analyze_path(path, config, honor_suppressions=not no_suppress)
         )
-
     if as_json:
+        shown_results = _filter_by_severity(file_results, config.min_severity)
+        shown_results = [
+            file_result
+            for file_result in shown_results
+            if file_result.violations or file_result.parse_error
+        ]
         click.echo(
             json.dumps(
-                [file_result.to_dict() for file_result in file_results], indent=2
+                [file_result.to_dict() for file_result in shown_results], indent=2
             )
         )
     else:
-        _print_human(file_results)
+        _print_human(file_results, config.min_severity)
 
     sys.exit(_exit_code(file_results, config.fail_on))
 
@@ -143,14 +164,34 @@ def _apply_ignore(config: Config, ignore: str) -> None:
         config.rules[rule_id].enabled = False
 
 
-def _print_human(file_results: list[CheckResult]) -> None:
+def _filter_by_severity(
+    file_results: list[CheckResult], min_severity: Severity
+) -> list[CheckResult]:
+    """Violations at or above ``min_severity`` for display, exit code unaffected."""
+    return [
+        CheckResult(
+            path=file_result.path,
+            violations=[
+                violation
+                for violation in file_result.violations
+                if violation.severity >= min_severity
+            ],
+            parse_error=file_result.parse_error,
+        )
+        for file_result in file_results
+    ]
+
+
+def _print_human(file_results: list[CheckResult], min_severity: Severity) -> None:
     counts = {severity: 0 for severity in Severity}
     for file_result in file_results:
-        _print_file_result(file_result, counts)
-    _print_summary(file_results, counts)
+        _print_file_result(file_result, counts, min_severity)
+    _print_summary(file_results, counts, min_severity)
 
 
-def _print_file_result(file_result: CheckResult, counts: dict[Severity, int]) -> None:
+def _print_file_result(
+    file_result: CheckResult, counts: dict[Severity, int], min_severity: Severity
+) -> None:
     if file_result.parse_error:
         click.echo(
             f"{file_result.path}: "
@@ -159,33 +200,50 @@ def _print_file_result(file_result: CheckResult, counts: dict[Severity, int]) ->
         return
     for violation in file_result.violations:
         counts[violation.severity] += 1
-        _print_violation(file_result.path, violation)
+    shown = [
+        violation
+        for violation in file_result.violations
+        if violation.severity >= min_severity
+    ]
+    if not shown:
+        return
+    click.echo(f"{file_result.path}:")
+    for violation in shown:
+        _print_violation(violation)
 
 
-def _print_violation(path: str, violation: Violation) -> None:
+def _print_violation(violation: Violation) -> None:
     severity_label = click.style(
         violation.severity.name.lower(), fg=_SEVERITY_COLORS[violation.severity]
     )
     click.echo(
-        f"{path}:{violation.line}:{violation.col}: {severity_label} "
-        f"{violation.rule_id} [{violation.rule_name}] {violation.message}"
+        f"  {violation.line}:{violation.col}: {severity_label} "
+        f"{violation.rule_id} {violation.message}"
     )
     if violation.suggestion:
-        click.echo(f"    fix: {violation.suggestion}")
+        click.echo(f"      fix: {violation.suggestion}")
 
 
 def _print_summary(
-    file_results: list[CheckResult], counts: dict[Severity, int]
+    file_results: list[CheckResult],
+    counts: dict[Severity, int],
+    min_severity: Severity,
 ) -> None:
     total = sum(counts.values())
     files = len(file_results)
     if total == 0 and not any(file_result.parse_error for file_result in file_results):
         click.echo(click.style(f"✓ {files} file(s) clean", fg="green"))
-    else:
+        return
+    click.echo(
+        f"\n{total} violation(s) in {files} file(s): "
+        f"{counts[Severity.ERROR]} error(s), {counts[Severity.WARNING]} warning(s), "
+        f"{counts[Severity.INFO]} info(s)"
+    )
+    hidden = sum(count for severity, count in counts.items() if severity < min_severity)
+    if hidden:
         click.echo(
-            f"\n{total} violation(s) in {files} file(s): "
-            f"{counts[Severity.ERROR]} error(s), {counts[Severity.WARNING]} warning(s), "
-            f"{counts[Severity.INFO]} info(s)"
+            f"({hidden} hidden below --min-severity {min_severity.name.lower()}; "
+            "pass a lower --min-severity to see them)"
         )
 
 

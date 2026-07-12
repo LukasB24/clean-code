@@ -27,6 +27,9 @@ class RuleConfig:
 class Config:
     rules: dict[str, RuleConfig] = field(default_factory=dict)
     fail_on: Severity = Severity.WARNING
+    min_severity: Severity = Severity.WARNING
+    fail_on_explicit: bool = False
+    min_severity_explicit: bool = False
     exclude: list[str] = field(default_factory=lambda: list(DEFAULT_EXCLUDES))
 
     @classmethod
@@ -76,6 +79,10 @@ class Config:
                 self._rule_config(rule_id).enabled = False
         elif key == "fail_on":
             self.fail_on = Severity.from_name(_expect_str(key, value))
+            self.fail_on_explicit = True
+        elif key == "min_severity":
+            self.min_severity = Severity.from_name(_expect_str(key, value))
+            self.min_severity_explicit = True
         elif key == "exclude":
             self.exclude = list(DEFAULT_EXCLUDES) + _expect_str_list(key, value)
         elif key in rules_by_id:
