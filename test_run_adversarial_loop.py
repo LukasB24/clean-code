@@ -152,7 +152,7 @@ def test_create_worktree_issues_git_worktree_add(monkeypatch):
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
     monkeypatch.setattr(subprocess, "run", _run)
-    loop.create_worktree("adversarial/test-branch")
+    loop.create_worktree("adversarial/test-branch", "x = 1", "")
     assert seen_commands[0][:3] == ["git", "worktree", "add"]
     assert "adversarial/test-branch" in seen_commands[0]
 
@@ -165,7 +165,9 @@ def test_remove_worktree_deletes_branch_when_discarding(monkeypatch):
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
     monkeypatch.setattr(subprocess, "run", _run)
-    target = loop.IterationBranch(worktree=Path("/tmp/fake"), branch="adversarial/test-branch")
+    target = loop.IterationBranch(
+        worktree=Path("/tmp/fake"), branch="adversarial/test-branch", code="x = 1", baseline_output=""
+    )
     loop.remove_worktree(target, keep_branch=False)
     assert seen_commands[0][:3] == ["git", "worktree", "remove"]
     assert seen_commands[1][:2] == ["git", "branch"]
@@ -176,7 +178,9 @@ def test_remove_worktree_keeps_branch_when_requested(monkeypatch):
     monkeypatch.setattr(
         subprocess, "run", lambda cmd, **kwargs: seen_commands.append(cmd) or subprocess.CompletedProcess(cmd, 0)
     )
-    target = loop.IterationBranch(worktree=Path("/tmp/fake"), branch="adversarial/x")
+    target = loop.IterationBranch(
+        worktree=Path("/tmp/fake"), branch="adversarial/x", code="x = 1", baseline_output=""
+    )
     loop.remove_worktree(target, keep_branch=True)
     assert len(seen_commands) == 1
     assert seen_commands[0][:3] == ["git", "worktree", "remove"]
@@ -189,8 +193,8 @@ def test_verify_worktree_fails_when_pytest_fails(monkeypatch, tmp_path):
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
     monkeypatch.setattr(subprocess, "run", _run)
-    target = loop.IterationBranch(worktree=tmp_path, branch="adversarial/x")
-    passed, message = loop.verify_worktree(target, "x = 1", "")
+    target = loop.IterationBranch(worktree=tmp_path, branch="adversarial/x", code="x = 1", baseline_output="")
+    passed, message = loop.verify_worktree(target)
     assert not passed
     assert "pytest failed" in message
 
@@ -202,8 +206,10 @@ def test_verify_worktree_fails_when_no_new_rule_fires(monkeypatch, tmp_path):
         return subprocess.CompletedProcess(cmd, 1, stdout="1:0: warning SM611 ...\n", stderr="")
 
     monkeypatch.setattr(subprocess, "run", _run)
-    target = loop.IterationBranch(worktree=tmp_path, branch="adversarial/x")
-    passed, message = loop.verify_worktree(target, "x = 1", "1:0: warning SM611 ...\n")
+    target = loop.IterationBranch(
+        worktree=tmp_path, branch="adversarial/x", code="x = 1", baseline_output="1:0: warning SM611 ...\n"
+    )
+    passed, message = loop.verify_worktree(target)
     assert not passed
     assert "no new rule fired" in message
 
@@ -215,8 +221,8 @@ def test_verify_worktree_passes_when_new_rule_fires(monkeypatch, tmp_path):
         return subprocess.CompletedProcess(cmd, 1, stdout="1:0: warning SM612 ...\n", stderr="")
 
     monkeypatch.setattr(subprocess, "run", _run)
-    target = loop.IterationBranch(worktree=tmp_path, branch="adversarial/x")
-    passed, _ = loop.verify_worktree(target, "x = 1", "")
+    target = loop.IterationBranch(worktree=tmp_path, branch="adversarial/x", code="x = 1", baseline_output="")
+    passed, _ = loop.verify_worktree(target)
     assert passed
 
 
@@ -228,13 +234,55 @@ def test_finalize_pr_issues_expected_command_sequence(monkeypatch, tmp_path):
         return subprocess.CompletedProcess(cmd, 0, stdout="https://github.com/x/y/pull/1\n", stderr="")
 
     monkeypatch.setattr(subprocess, "run", _run)
-    target = loop.IterationBranch(worktree=tmp_path, branch="adversarial/x")
+    target = loop.IterationBranch(worktree=tmp_path, branch="adversarial/x", code="x = 1", baseline_output="")
     pr_url = loop.finalize_pr(target, "title", "body")
 
     assert pr_url == "https://github.com/x/y/pull/1"
     git_commands = [(cmd[1], cmd[3]) for cmd in seen_commands[:3]]
     assert git_commands == [("-C", "add"), ("-C", "commit"), ("-C", "push")]
     assert seen_commands[3][:3] == ["gh", "pr", "create"]
+
+
+def test_verify_with_repairs_recovers_after_one_repair(monkeypatch, tmp_path):
+    lint_calls = {"count": 0}
+
+    def _run(cmd, **kwargs):
+        if cmd[0] == "claude":
+            return subprocess.CompletedProcess(
+                cmd, 0, stdout=json.dumps({"result": "fixed", "is_error": False}), stderr=""
+            )
+        if "pytest" in cmd:
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+        lint_calls["count"] += 1
+        stdout = "1:0: warning SM611 ...\n" if lint_calls["count"] == 1 else "1:0: warning SM612 ...\n"
+        return subprocess.CompletedProcess(cmd, 1, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(subprocess, "run", _run)
+    target = loop.IterationBranch(
+        worktree=tmp_path, branch="adversarial/x", code="x = 1", baseline_output="1:0: warning SM611 ...\n"
+    )
+    passed, _ = loop.verify_with_repairs(target, "plan", loop.ClaudeInvocation(model="sonnet"))
+    assert passed
+    assert lint_calls["count"] == 2  # one failing check, one repair, one passing recheck
+
+
+def test_verify_with_repairs_gives_up_after_max_attempts(monkeypatch, tmp_path):
+    def _run(cmd, **kwargs):
+        if cmd[0] == "claude":
+            return subprocess.CompletedProcess(
+                cmd, 0, stdout=json.dumps({"result": "still broken", "is_error": False}), stderr=""
+            )
+        if "pytest" in cmd:
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+        return subprocess.CompletedProcess(cmd, 1, stdout="1:0: warning SM611 ...\n", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", _run)
+    target = loop.IterationBranch(
+        worktree=tmp_path, branch="adversarial/x", code="x = 1", baseline_output="1:0: warning SM611 ...\n"
+    )
+    passed, message = loop.verify_with_repairs(target, "plan", loop.ClaudeInvocation(model="sonnet"))
+    assert not passed
+    assert "no new rule fired" in message
 
 
 if __name__ == "__main__":

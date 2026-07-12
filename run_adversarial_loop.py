@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import random
 import re
@@ -34,6 +35,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent
+MAX_REPAIR_ATTEMPTS = 2
+
+logging.basicConfig(
+    filename=str(REPO_ROOT / "adversarial_loop.log"),
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -48,6 +57,9 @@ class ClaudeInvocation:
 class IterationBranch:
     worktree: Path
     branch: str
+    code: str
+    baseline_output: str
+
 
 DOMAINS = [
     "a PyTorch training / data-loading pipeline",
@@ -117,6 +129,10 @@ Output a concise implementation plan (no code) covering:
 
 IMPLEMENTER_SYSTEM_PROMPT = """\
 You are a senior maintainer of a Python AST-based linter (the "clean-code" tool).
+Your current working directory already IS the repository root. Reference every
+file as a plain relative path (e.g. `src/cleancode/rules/semantic.py`) — never
+invent or prefix an absolute root like `/repo/...`; no such path exists.
+
 You are given an implementation plan for one or more new lint rules. Implement
 it exactly:
 - Add each new Rule subclass to src/cleancode/rules/semantic.py, following the
@@ -129,11 +145,22 @@ it exactly:
 - Add a matching row to the rule table in README.md and a matching prose
   clause to the "SM6xx catches structural smells..." paragraph below it.
 
+This repo dogfoods its own linter against its own source — your new code will
+be checked by the same rules it implements, so it must itself comply:
+- No more than 2 sequential guard-clause returns in one block — extract a
+  helper instead of a third.
+- No cryptic abbreviations in names (e.g. write `statement`, not `stmt`).
+- Keep each function short, shallow, and single-purpose, following the small
+  well-named-helper-function style already used elsewhere in semantic.py.
+- No magic numbers; no unused imports or variables.
+
 Only edit these files. Do not touch tests, do not run anything, do not use git.
 """
 
 
-def call_claude(system_prompt: str, user_prompt: str, invocation: ClaudeInvocation) -> str:
+def call_claude(
+    system_prompt: str, user_prompt: str, invocation: ClaudeInvocation
+) -> str:
     command = [
         "claude",
         "-p",
@@ -158,7 +185,9 @@ def call_claude(system_prompt: str, user_prompt: str, invocation: ClaudeInvocati
         cwd=invocation.working_dir,
     )
     if cli_result.returncode != 0:
-        raise RuntimeError(f"claude CLI failed (exit {cli_result.returncode}): {cli_result.stderr}")
+        raise RuntimeError(
+            f"claude CLI failed (exit {cli_result.returncode}): {cli_result.stderr}"
+        )
     payload = json.loads(cli_result.stdout)
     if payload.get("is_error"):
         raise RuntimeError(f"claude CLI returned an error: {payload}")
@@ -177,7 +206,9 @@ def _strip_code_fence(text: str) -> str:
 
 
 def generate_code(domain: str, model: str) -> str:
-    raw = call_claude(GENERATOR_SYSTEM_PROMPT, f"Domain: {domain}", ClaudeInvocation(model=model))
+    raw = call_claude(
+        GENERATOR_SYSTEM_PROMPT, f"Domain: {domain}", ClaudeInvocation(model=model)
+    )
     return _strip_code_fence(raw)
 
 
@@ -203,7 +234,9 @@ def critique(code: str, linter_output: str, model: str) -> str:
         f"Source file:\n```python\n{code}\n```\n\n"
         f"Linter output for this file:\n```\n{linter_output}\n```"
     )
-    return call_claude(CRITIC_SYSTEM_PROMPT, user_prompt, ClaudeInvocation(model=model)).strip()
+    return call_claude(
+        CRITIC_SYSTEM_PROMPT, user_prompt, ClaudeInvocation(model=model)
+    ).strip()
 
 
 def build_todo_section(domain: str, code: str, critic_md: str) -> str:
@@ -236,16 +269,49 @@ def plan_rule(critic_md: str, next_rule_id: int, invocation: ClaudeInvocation) -
         f"Allocate new rule ID(s) starting at SM{next_rule_id}.\n\n"
         f"Finding to address:\n{critic_md}"
     )
-    planner_invocation = replace(invocation, tools="Read Grep Glob", permission_mode="plan")
+    planner_invocation = replace(
+        invocation, tools="Read Grep Glob", permission_mode="plan"
+    )
     return call_claude(PLANNER_SYSTEM_PROMPT, user_prompt, planner_invocation).strip()
 
 
-def implement_rule(plan_md: str, invocation: ClaudeInvocation) -> str:
-    implementer_invocation = replace(invocation, tools="Read Write Edit", permission_mode="acceptEdits")
-    return call_claude(IMPLEMENTER_SYSTEM_PROMPT, plan_md, implementer_invocation).strip()
+def implement_rule(user_prompt: str, invocation: ClaudeInvocation) -> str:
+    implementer_invocation = replace(
+        invocation, tools="Read Write Edit", permission_mode="acceptEdits"
+    )
+    return call_claude(
+        IMPLEMENTER_SYSTEM_PROMPT, user_prompt, implementer_invocation
+    ).strip()
 
 
-def create_worktree(branch: str) -> IterationBranch:
+def build_repair_prompt(plan_md: str, failure_message: str) -> str:
+    return (
+        "Your previous implementation of this plan failed verification. Do "
+        "not start over — read the files you already wrote in this working "
+        "directory and fix them.\n\n"
+        f"Verification failure:\n{failure_message}\n\n"
+        f"Original plan:\n{plan_md}"
+    )
+
+
+def verify_with_repairs(
+    target: IterationBranch, plan_md: str, invocation: ClaudeInvocation
+) -> tuple[bool, str]:
+    passed, message = verify_worktree(target)
+    attempt = 0
+    while not passed and attempt < MAX_REPAIR_ATTEMPTS:
+        attempt += 1
+        logger.info(
+            f"[repair {attempt}/{MAX_REPAIR_ATTEMPTS}] verification failed, "
+            f"asking Claude to fix its own implementation instead of "
+            f"restarting the iteration:\n{message}"
+        )
+        implement_rule(build_repair_prompt(plan_md, message), invocation)
+        passed, message = verify_worktree(target)
+    return passed, message
+
+
+def create_worktree(branch: str, code: str, baseline_output: str) -> IterationBranch:
     worktree_path = Path(tempfile.mkdtemp(prefix="adversarial-"))
     subprocess.run(
         ["git", "worktree", "add", str(worktree_path), "-b", branch, "main"],
@@ -254,7 +320,12 @@ def create_worktree(branch: str) -> IterationBranch:
         capture_output=True,
         text=True,
     )
-    return IterationBranch(worktree=worktree_path, branch=branch)
+    return IterationBranch(
+        worktree=worktree_path,
+        branch=branch,
+        code=code,
+        baseline_output=baseline_output,
+    )
 
 
 def remove_worktree(target: IterationBranch, keep_branch: bool) -> None:
@@ -266,11 +337,14 @@ def remove_worktree(target: IterationBranch, keep_branch: bool) -> None:
     )
     if not keep_branch:
         subprocess.run(
-            ["git", "branch", "-D", target.branch], cwd=REPO_ROOT, capture_output=True, text=True
+            ["git", "branch", "-D", target.branch],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
         )
 
 
-def verify_worktree(target: IterationBranch, fixture_code: str, baseline_output: str) -> tuple[bool, str]:
+def verify_worktree(target: IterationBranch) -> tuple[bool, str]:
     env = {**os.environ, "PYTHONPATH": str(target.worktree / "src")}
 
     test_result = subprocess.run(
@@ -283,13 +357,22 @@ def verify_worktree(target: IterationBranch, fixture_code: str, baseline_output:
     if test_result.returncode != 0:
         return False, f"pytest failed:\n{test_result.stdout}\n{test_result.stderr}"
 
-    with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False) as fixture_file:
-        fixture_file.write(fixture_code)
+    with tempfile.NamedTemporaryFile(
+        suffix=".py", mode="w", delete=False
+    ) as fixture_file:
+        fixture_file.write(target.code)
         fixture_path = Path(fixture_file.name)
     try:
         lint_result = subprocess.run(
-            [sys.executable, "-c", "from cleancode.cli import main; main()", "check",
-             str(fixture_path), "--min-severity", "info"],
+            [
+                sys.executable,
+                "-c",
+                "from cleancode.cli import main; main()",
+                "check",
+                str(fixture_path),
+                "--min-severity",
+                "info",
+            ],
             capture_output=True,
             text=True,
             env=env,
@@ -298,7 +381,7 @@ def verify_worktree(target: IterationBranch, fixture_code: str, baseline_output:
         fixture_path.unlink(missing_ok=True)
 
     new_rule_ids = set(re.findall(r"\b(SM6\d\d)\b", lint_result.stdout))
-    old_rule_ids = set(re.findall(r"\b(SM6\d\d)\b", baseline_output))
+    old_rule_ids = set(re.findall(r"\b(SM6\d\d)\b", target.baseline_output))
     if not (new_rule_ids - old_rule_ids):
         return False, f"no new rule fired on the fixture:\n{lint_result.stdout}"
     return True, "verified"
@@ -307,10 +390,26 @@ def verify_worktree(target: IterationBranch, fixture_code: str, baseline_output:
 def finalize_pr(target: IterationBranch, title: str, body: str) -> str:
     worktree, branch = target.worktree, target.branch
     subprocess.run(["git", "-C", str(worktree), "add", "-A"], check=True)
-    subprocess.run(["git", "-C", str(worktree), "commit", "-m", title, "-m", body], check=True)
-    subprocess.run(["git", "-C", str(worktree), "push", "-u", "origin", branch], check=True)
+    subprocess.run(
+        ["git", "-C", str(worktree), "commit", "-m", title, "-m", body], check=True
+    )
+    subprocess.run(
+        ["git", "-C", str(worktree), "push", "-u", "origin", branch], check=True
+    )
     pr_result = subprocess.run(
-        ["gh", "pr", "create", "--base", "main", "--head", branch, "--title", title, "--body", body],
+        [
+            "gh",
+            "pr",
+            "create",
+            "--base",
+            "main",
+            "--head",
+            branch,
+            "--title",
+            title,
+            "--body",
+            body,
+        ],
         cwd=worktree,
         capture_output=True,
         text=True,
@@ -321,7 +420,9 @@ def finalize_pr(target: IterationBranch, title: str, body: str) -> str:
 
 def _diff_summary(worktree: Path) -> str:
     status = subprocess.run(
-        ["git", "-C", str(worktree), "status", "--short"], capture_output=True, text=True
+        ["git", "-C", str(worktree), "status", "--short"],
+        capture_output=True,
+        text=True,
     )
     diff = subprocess.run(
         ["git", "-C", str(worktree), "diff"], capture_output=True, text=True
@@ -331,39 +432,43 @@ def _diff_summary(worktree: Path) -> str:
 
 def run_iteration(model: str, iteration_index: int, next_rule_id: int) -> int:
     domain = random.choice(DOMAINS)
-    print(f"[generate] {domain} ...")
+    logger.info(f"[generate] {domain} ...")
     code = generate_code(domain, model)
 
-    print("[lint] running clean-code ...")
+    logger.info("[lint] running clean-code ...")
     baseline_output = run_linter(code)
 
-    print("[critique] comparing source to linter output ...")
+    logger.info("[critique] comparing source to linter output ...")
     critic_md = critique(code, baseline_output, model)
 
     if not critic_md:
-        print("[skip] critic found nothing the linter missed")
+        logger.info("[skip] critic found nothing the linter missed")
         return next_rule_id
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     branch = f"adversarial/iter{iteration_index}-{timestamp}"
-    print(f"[worktree] creating {branch} from main ...")
-    target = create_worktree(branch)
+    logger.info(f"[worktree] creating {branch} from main ...")
+    target = create_worktree(branch, code, baseline_output)
 
     try:
-        append_todo(target.worktree / "todo.md", build_todo_section(domain, code, critic_md))
+        append_todo(
+            target.worktree / "todo.md", build_todo_section(domain, code, critic_md)
+        )
 
-        print(f"[plan] asking Claude to plan rule(s) starting at SM{next_rule_id} ...")
+        logger.info(
+            f"[plan] asking Claude to plan rule(s) starting at SM{next_rule_id} ..."
+        )
         invocation = ClaudeInvocation(model=model, working_dir=target.worktree)
         plan_md = plan_rule(critic_md, next_rule_id, invocation)
 
-        print("[implement] asking Claude to implement the plan ...")
+        logger.info("[implement] asking Claude to implement the plan ...")
         implement_rule(plan_md, invocation)
 
-        print("[verify] running the worktree's own tests + linter ...")
-        passed, message = verify_worktree(target, code, baseline_output)
+        logger.info("[verify] running the worktree's own tests + linter ...")
+        passed, message = verify_with_repairs(target, plan_md, invocation)
         if not passed:
-            print(f"[fail] verification failed, skipping PR:\n{message}")
-            print(_diff_summary(target.worktree))
+            logger.warning(f"[fail] verification failed, skipping PR:\n{message}")
+            logger.warning(_diff_summary(target.worktree))
             remove_worktree(target, keep_branch=False)
             return next_rule_id
 
@@ -371,18 +476,18 @@ def run_iteration(model: str, iteration_index: int, next_rule_id: int) -> int:
         added = max(new_max_id - (next_rule_id - 1), 1)
         title = f"Add adversarial-loop rule(s) starting at SM{next_rule_id}"
         pr_url = finalize_pr(target, title, plan_md)
-        print(f"[done] opened PR: {pr_url}")
+        logger.info(f"[done] opened PR: {pr_url}")
         remove_worktree(target, keep_branch=True)
         return next_rule_id + added
     except Exception as error:
-        print(f"[fail] iteration errored, skipping PR: {error}")
+        logger.error(f"[fail] iteration errored, skipping PR: {error}")
         remove_worktree(target, keep_branch=False)
         return next_rule_id
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--iterations", type=int, default=3)
+    parser.add_argument("--iterations", type=int, default=1)
     parser.add_argument("--model", default="sonnet")
     args = parser.parse_args()
 
@@ -394,7 +499,7 @@ def main() -> None:
 
     next_rule_id = _highest_semantic_rule_id(REPO_ROOT / "src") + 1
     for i in range(args.iterations):
-        print(f"=== iteration {i + 1}/{args.iterations} ===")
+        logger.info(f"=== iteration {i + 1}/{args.iterations} ===")
         next_rule_id = run_iteration(args.model, i + 1, next_rule_id)
 
 
