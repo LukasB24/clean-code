@@ -8,7 +8,20 @@ from cleancode.rules.comments import (
     DocstringRestatesName,
 )
 from cleancode.rules.hints import UninformativeAny
-from cleancode.rules.naming import CrypticAbbreviation, MeaninglessName, SingleLetterName
+from cleancode.rules.naming import CrypticAbbreviation, MeaninglessName, ShortName
+from cleancode.rules.semantic import (
+    AnonymousTupleIndexing,
+    ComprehensionDensity,
+    EagerDatasetLoading,
+    MagicNumber,
+    MagicStringBranching,
+    NonIdiomaticEmptinessCheck,
+    PrematureDevicePlacement,
+    ReduceInsteadOfSum,
+    RedundantBooleanTernary,
+    RedundantIsinstanceCheck,
+    RepeatedCollectionIteration,
+)
 from cleancode.rules.slicing import ChainedSubscript, ComplexSubscript
 from cleancode.rules.structure import (
     DoOneThing,
@@ -28,7 +41,7 @@ ALL_RULES: list[type[Rule]] = [
     MaxComplexity,
     DoOneThing,
     TooManyGuardClauses,
-    SingleLetterName,
+    ShortName,
     MeaninglessName,
     CrypticAbbreviation,
     DocstringRestatesName,
@@ -38,6 +51,17 @@ ALL_RULES: list[type[Rule]] = [
     ComplexSubscript,
     ChainedSubscript,
     UninformativeAny,
+    ComprehensionDensity,
+    AnonymousTupleIndexing,
+    MagicStringBranching,
+    RedundantBooleanTernary,
+    ReduceInsteadOfSum,
+    RepeatedCollectionIteration,
+    MagicNumber,
+    NonIdiomaticEmptinessCheck,
+    EagerDatasetLoading,
+    PrematureDevicePlacement,
+    RedundantIsinstanceCheck,
 ]
 
 RULES_BY_ID: dict[str, type[Rule]] = {rule.id: rule for rule in ALL_RULES}

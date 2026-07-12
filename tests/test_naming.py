@@ -5,7 +5,7 @@ def rule_lines(violations):
     return [(violation.rule_id, violation.line) for violation in violations]
 
 
-class TestSingleLetterName:
+class TestShortName:
     def test_allows_i_in_for_loop(self, check):
         assert check("for i in range(3):\n    print(i)\n", "NM201") == []
 
@@ -36,6 +36,23 @@ class TestSingleLetterName:
 
     def test_underscore_is_always_fine(self, check):
         assert check("_ = ignored()\nfor _ in range(3):\n    pass\n", "NM201") == []
+
+    def test_flags_two_letter_cryptic_names(self, check):
+        violations = check("ab = 1\nbc = 2\ndf = load()\n", "NM201")
+        assert rule_lines(violations) == [("NM201", 1), ("NM201", 2), ("NM201", 3)]
+
+    def test_allows_known_short_words_by_default(self, check):
+        assert check("id = get_id()\nok = True\nfh = open(path)\n", "NM201") == []
+
+    def test_short_word_allowlist_is_configurable(self, check):
+        assert check("ab = 1\n", "NM201", allowed=["ab"]) == []
+
+    def test_three_letter_names_pass_by_default(self, check):
+        assert check("cfg = 1\n", "NM201") == []
+
+    def test_min_length_is_configurable(self, check):
+        violations = check("cfg = 1\n", "NM201", min_length=4)
+        assert rule_lines(violations) == [("NM201", 1)]
 
 
 class TestMeaninglessName:

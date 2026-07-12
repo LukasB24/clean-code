@@ -47,10 +47,11 @@
 # [tool.cleancode.ST107]
 # max_guards = 2
 
-# NM201  single-letter-name  [warning]
-#   Flags single-character names. Conventional letters (i, j, k, n, x, y) are tolerated as loop/comprehension/lambda targets and `e` for exceptions; functions, classes, and ordinary variables always need real names.
+# NM201  short-name  [warning]
+#   Flags names shorter than `min_length` characters (default 3) — cryptic pairs like `ab`/`bc`/`df` as much as bare letters. Conventional loop/comprehension/lambda letters (i, j, k, n, x, y) and known short words (id, ok, fh, ...) are allowlisted and configurable; functions, classes, and ordinary variables otherwise always need real names.
 # [tool.cleancode.NM201]
-# allowed = ["i", "j", "k", "n", "x", "y", "_"]
+# min_length = 3
+# allowed = ["i", "j", "k", "n", "x", "y", "_", "id", "ok", "fh"]
 
 # NM202  meaningless-name  [warning]
 #   Flags names that say nothing about their content (tmp, data, foo, do_stuff) and numbered generics like `data2` or `result1`.
@@ -70,7 +71,7 @@
 # overlap = 0.8
 
 # CM302  comment-restates-code  [warning]
-#   Flags comments that paraphrase the code line they annotate (`x = x + 1  # increment x by 1`). TODO/FIXME/NOTE and tool directives are exempt.
+#   Flags comments that paraphrase the code line they annotate (`x = x + 1  # increment x by 1`, `for k in range(3):  # iterate three times`). TODO/FIXME/NOTE, tool directives, and comments carrying a causal/justification marker (because, since, workaround, ...) are exempt.
 # [tool.cleancode.CM302]
 # overlap = 0.7
 # min_words = 2
@@ -99,4 +100,49 @@
 # TY501  uninformative-any  [warning]
 #   Rejects annotations that reduce to bare `Any` (including `Optional[Any]` and `Any | None`) on parameters and return types. `Any` nested in a container such as `dict[str, Any]` is permitted as a justified exception.
 # [tool.cleancode.TY501]
+
+# SM601  comprehension-density  [warning]
+#   Flags a comprehension that nests another comprehension whose filter condition is itself an inline ternary — logical over-compression that's nearly impossible to read at a glance.
+# [tool.cleancode.SM601]
+
+# SM602  anonymous-tuple-indexing  [warning]
+#   Flags integer-constant indexing (`bounds[0]`) into a parameter annotated as a fixed multi-element tuple — primitive obsession that hides what each position means. Variadic `tuple[T, ...]` parameters are exempt.
+# [tool.cleancode.SM602]
+
+# SM603  magic-string-branching  [warning]
+#   Flags inline ternaries (`a if x.startswith('...') else b`) whose branch is chosen by a hardcoded string prefix/suffix/substring check — the domain rule hides inside a string literal instead of a named condition.
+# [tool.cleancode.SM603]
+
+# SM604  redundant-boolean-ternary  [warning]
+#   Flags ternaries that return explicit `True`/`False` literals for a condition that already evaluates to a boolean (`True if x == y else False`) — the ternary itself is the redundant part.
+# [tool.cleancode.SM604]
+
+# SM605  reduce-instead-of-sum  [warning]
+#   Flags `functools.reduce(lambda a, b: a + b, xs)` — a built-in `sum(xs)` does the same thing, faster and without the lambda indirection.
+# [tool.cleancode.SM605]
+
+# SM606  repeated-collection-iteration  [warning]
+#   Flags a comprehension that iterates over a collection expression (`item["metrics"]`, `self.rows`, `get_data()`) already iterated by an earlier comprehension in the same function — two passes where one would do.
+# [tool.cleancode.SM606]
+
+# SM607  magic-number  [warning]
+#   Flags numeric literals embedded directly in a binary operation or comparison (`threshold * 1.2`) instead of a named, typed constant. A configurable `ignore` list (default 0, 1, -1, 2, 10) exempts domain-agnostic values.
+# [tool.cleancode.SM607]
+# ignore = [0, 1, -1, 2, 10]
+
+# SM608  non-idiomatic-emptiness-check  [warning]
+#   Flags `len(x) > 0` / `len(x) == 0` style checks — Python sequences are already truthy/falsy, so PEP 8 prefers `if x:` / `if not x:`.
+# [tool.cleancode.SM608]
+
+# SM609  eager-dataset-loading  [warning]
+#   Flags file/array loading calls (`np.load`, `open`, `Image.open`, `cv2.imread`, `torch.load`, ...) inside `__init__` of a `Dataset` subclass — eagerly loading every sample's payload at construction time defeats lazy loading and can OOM on realistic dataset sizes.
+# [tool.cleancode.SM609]
+
+# SM610  premature-device-placement  [warning]
+#   Flags `.cuda()`/`.to(device=...)` calls inside `__init__` or `__getitem__` of a `Dataset` subclass — initializing a CUDA context before DataLoader workers fork corrupts the context across processes, causing deadlocks or segfaults.
+# [tool.cleancode.SM610]
+
+# SM611  redundant-isinstance-check  [warning]
+#   Flags `isinstance(x, T)` where `x` already carries a simple static annotation of exactly `T` — the runtime check is hallucinated safety that a type checker already guarantees.
+# [tool.cleancode.SM611]
 

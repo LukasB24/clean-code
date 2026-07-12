@@ -34,6 +34,39 @@ EXPECTED_DIRTY_RULES = {
         "TY501",  # payload: Any, -> Any
         "ST106",  # validate_and_store
         "ST107",  # process_items: 3 sequential guards
+        "SM607",  # item > 100
+    },
+    "short_names_and_comments.py": {
+        "ST101",  # three levels of nested for-loops
+        "NM201",  # ac, bc, df
+        "CM302",  # '# increase a number', '# decrease the variable', '# iterate three times'
+        "CM303",  # comment-heavy body
+    },
+    "llm_style_semantics.py": {
+        "NM201",  # single-letter comprehension target `v`
+        "SM601",  # dict-comp nests a list-comp filtered by a ternary
+        "SM602",  # bounds[0]/bounds[1]/bounds[2] anonymous tuple access
+        "SM603",  # k.startswith('tx_') ternary branch
+    },
+    "llm_style_metrics.py": {
+        "ST101",  # seven levels of nested if/for
+        "ST105",  # cyclomatic complexity 19
+        "ST106",  # process_and_export_user_metrics
+        "NM201",  # comprehension target `m`, lambda params `a`/`b`
+        "SM604",  # `True if ... else False` (x2)
+        "SM605",  # reduce(lambda a, b: a + b, ...)
+        "SM606",  # item["metrics"] iterated twice
+        "SM607",  # threshold * 1.2
+        "SM608",  # len(valid_scores) > 0
+    },
+    "pytorch_dataset.py": {
+        "NM202",  # data (x2)
+        "ST101",  # nested for/if inside __init__
+        "SM607",  # 1e-08
+        "SM609",  # np.load(file_path) inside __init__
+        "SM610",  # .cuda() inside __init__
+        "CM303",  # comment-heavy __getitem__
+        "SM611",  # isinstance(spec, torch.Tensor)
     },
 }
 

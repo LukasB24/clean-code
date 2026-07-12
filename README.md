@@ -65,7 +65,7 @@ exclude = ["migrations/**"]   # globs to skip entirely
 max_depth = 3                 # loosen the default nesting limit
 
 [tool.cleancode.NM201]
-allowed = ["i", "j", "k", "n", "x", "y", "_", "df"]  # your short names are fine
+allowed = ["i", "j", "k", "n", "x", "y", "_", "id", "ok", "fh", "df"]  # your short names are fine
 ```
 
 clean-code finds this automatically by walking up from whatever path you
@@ -142,7 +142,7 @@ override that.
 | ST105 | max-complexity | `max_complexity=10` | error |
 | ST106 | do-one-thing | `conjunctions=[and, or]` | warning |
 | ST107 | too-many-guard-clauses | `max_guards=2` | info |
-| NM201 | single-letter-name | `allowed=[i,j,k,n,x,y,_]` | warning |
+| NM201 | short-name | `min_length=3, allowed=[i,j,k,n,x,y,_,id,ok,fh]` | warning |
 | NM202 | meaningless-name | configurable ban lists | warning |
 | NM203 | cryptic-abbreviation | `known_abbrevs=[cfg,ctx,idx,…]` | info |
 | CM301 | docstring-restates-name | `overlap=0.8` | warning |
@@ -152,6 +152,17 @@ override that.
 | SL401 | complex-subscript | `max_score=5` | warning |
 | SL402 | chained-subscript | `max_chain=2` | warning |
 | TY501 | uninformative-any | — | warning |
+| SM601 | comprehension-density | — | warning |
+| SM602 | anonymous-tuple-indexing | — | warning |
+| SM603 | magic-string-branching | — | warning |
+| SM604 | redundant-boolean-ternary | — | warning |
+| SM605 | reduce-instead-of-sum | — | warning |
+| SM606 | repeated-collection-iteration | — | warning |
+| SM607 | magic-number | `ignore=[0,1,-1,2,10]` | warning |
+| SM608 | non-idiomatic-emptiness-check | — | warning |
+| SM609 | eager-dataset-loading | — | warning |
+| SM610 | premature-device-placement | — | warning |
+| SM611 | redundant-isinstance-check | — | warning |
 
 `cleancode rules` prints the same list with full descriptions.
 
@@ -161,13 +172,47 @@ A few details worth knowing:
   loop targets) — a bad name is reported once, where it is introduced.
   `i`/`x` are fine as loop, comprehension, and lambda targets; `except ... as e`
   is fine; `T = TypeVar("T")` and `ALL_CAPS` constants are exempt.
+- **NM201 flags names under `min_length` characters**, not just single
+  letters — `ab`, `bc`, and `df` are cryptic even though they're not bare
+  letters. Single-character names keep the old loop/comprehension/lambda-only
+  exemption; short multi-letter names (`id`, `ok`, `fh`, ...) are exempt via
+  the same `allowed` list regardless of where they're bound.
 - **CM301/CM302 are deterministic**, not LLM-judged: they compare the
   informative words of a docstring/comment against the identifier words (plus
   an operator-synonym table) of the code it annotates. `x = x + 1  # increment
-  x by 1` is flagged; a comment explaining *why* is not. `TODO`/`FIXME`/`NOTE`
-  and tool directives are always exempt.
+  x by 1` is flagged; a comment explaining *why* is not. Generic filler nouns
+  ("number", "value", "variable", ...) are ignored on the comment side so they
+  can't dilute the overlap score — `x += 1  # increase a number` is flagged.
+  `TODO`/`FIXME`/`NOTE` and tool directives are always exempt.
 - **SL401 scores subscripts** (+1 per dimension, step, `None`/`...`, negative
   index, arithmetic, or call in the index; +2 per nested subscript; negative
   steps count double) and ignores type annotations like `dict[str, int]`.
+- **SM6xx catches structural smells that node-counting misses**: SM601 flags
+  a comprehension nesting another comprehension whose filter is a ternary;
+  SM602 flags integer-constant indexing (`bounds[0]`) into a parameter typed
+  as a fixed multi-element tuple (`tuple[T, ...]` variadic tuples are exempt);
+  SM603 flags inline ternaries whose branch is chosen by a hardcoded
+  `.startswith()`/`.endswith()`/`.find()`/`.rfind()` string check — plain
+  `if`/`elif` statements using the same methods are not flagged, since that's
+  ordinary, idiomatic control flow. SM604 flags ternaries that return
+  explicit `True`/`False` literals for an already-boolean condition; SM605
+  flags `reduce(lambda a, b: a + b, xs)` in favor of `sum(xs)`; SM606 flags a
+  comprehension re-iterating a `Subscript`/`Attribute`/`Call` collection
+  (`item["metrics"]`) already iterated earlier in the same function — bare
+  variable names are exempt, since consuming an already-computed local in a
+  second comprehension is an ordinary filter-then-map step, not a repeated
+  pass over a shared source; SM607 flags numeric literals embedded directly
+  in a `BinOp`/`Compare` (not literals assigned straight to a name), exempting
+  a configurable `ignore` list; SM608 flags `len(x) > 0`/`len(x) == 0` style
+  checks in favor of `if x:`/`if not x:`. SM609/SM610 target
+  `torch.utils.data.Dataset` subclasses (matched syntactically by base-class
+  name, no type checker involved): SM609 flags file/array-loading calls
+  (`np.load`, `open`, `Image.open`, `cv2.imread`, `torch.load`) inside
+  `__init__` — eager loading of every sample defeats lazy loading and can OOM;
+  SM610 flags `.cuda()`/`.to(device=...)` calls inside `__init__` or
+  `__getitem__` — initializing a CUDA context before `DataLoader` workers fork
+  corrupts it across worker processes. SM611 flags `isinstance(x, T)` where
+  `x` already carries a simple (non-generic) static annotation of exactly
+  `T` — the check is hallucinated safety a type checker already guarantees.
 - `elif` chains do **not** count as nesting for ST101 (each branch still counts
   toward ST105 complexity).

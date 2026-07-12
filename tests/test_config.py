@@ -6,6 +6,7 @@ import pytest
 
 from cleancode.config import Config, ConfigError
 from cleancode.models import Severity
+from cleancode.rules import ALL_RULES
 
 
 def write_pyproject(directory: Path, body: str) -> Path:
@@ -17,7 +18,7 @@ def write_pyproject(directory: Path, body: str) -> Path:
 class TestDefaults:
     def test_default_config_has_every_rule_enabled(self):
         config = Config.default()
-        assert len(config.rules) == 17
+        assert len(config.rules) == len(ALL_RULES)
         assert all(rule.enabled for rule in config.rules.values())
         assert config.fail_on == Severity.WARNING
         assert config.min_severity == Severity.WARNING

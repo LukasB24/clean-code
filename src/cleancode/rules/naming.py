@@ -70,39 +70,57 @@ def _store_kind(name: ast.Name) -> str:
     return KIND_VARIABLE
 
 
-class SingleLetterName(Rule):
+class ShortName(Rule):
     id = "NM201"
-    name = "single-letter-name"
+    name = "short-name"
     default_severity = Severity.WARNING
-    default_options = {"allowed": ["i", "j", "k", "n", "x", "y", "_"]}
+    default_options = {
+        "min_length": 3,
+        "allowed": ["i", "j", "k", "n", "x", "y", "_", "id", "ok", "fh"],
+    }
     description = (
-        "Flags single-character names. Conventional letters (i, j, k, n, x, y) are "
-        "tolerated as loop/comprehension/lambda targets and `e` for exceptions; "
-        "functions, classes, and ordinary variables always need real names."
+        "Flags names shorter than `min_length` characters (default 3) — cryptic pairs "
+        "like `ab`/`bc`/`df` as much as bare letters. Conventional loop/comprehension/"
+        "lambda letters (i, j, k, n, x, y) and known short words (id, ok, fh, ...) are "
+        "allowlisted and configurable; functions, classes, and ordinary variables "
+        "otherwise always need real names."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         allowed = set(ctx.config.options["allowed"])
+        min_length = ctx.config.options["min_length"]
         for binding in collect_bindings(ctx.tree):
-            if self._is_flagged(binding, allowed):
+            if self._is_flagged(binding, allowed, min_length):
                 yield self.violation(
                     ctx,
-                    f"single-letter {binding.kind} `{binding.name}`",
+                    f"short {binding.kind} `{binding.name}` ({len(binding.name)} characters)",
                     line=binding.line,
                     col=binding.col,
                     suggestion="use a descriptive name that states what the value represents",
                 )
 
     @staticmethod
-    def _is_flagged(binding: Binding, allowed: set[str]) -> bool:
-        """True unless the single-letter name is one of the conventional exemptions."""
-        is_single_letter = len(binding.name) == 1 and binding.name != "_"
-        is_exempt = (
-            binding.name.isupper()  # T = TypeVar("T") and friends are conventional
-            or (binding.kind in _RELAXED_KINDS and binding.name in allowed)
-            or (binding.kind == KIND_EXCEPT and binding.name == "e")
-        )
-        return is_single_letter and not is_exempt
+    def _is_flagged(binding: Binding, allowed: set[str], min_length: int) -> bool:
+        """True unless the short name is a conventional loop letter or known short word."""
+        name = binding.name
+        if name == "_" or len(name) >= min_length:
+            return False
+        if name.isupper() or (binding.kind == KIND_EXCEPT and name == "e"):
+            return False
+        return not ShortName._is_conventionally_short(binding, allowed)
+
+    @staticmethod
+    def _is_conventionally_short(binding: Binding, allowed: set[str]) -> bool:
+        """True for a short name that's an accepted convention, not a real violation.
+
+        Single-character names stay gated by binding kind (an ordinary variable
+        named `x` is still flagged; `x` as a loop target is not). Two-or-more-
+        character short names are exempt purely by allowlist, since their
+        legitimacy (`id`, `ok`, `fh`) doesn't depend on where they're bound.
+        """
+        if len(binding.name) == 1:
+            return binding.kind in _RELAXED_KINDS and binding.name in allowed
+        return binding.name in allowed
 
 
 class MeaninglessName(Rule):
@@ -178,6 +196,7 @@ class CrypticAbbreviation(Rule):
     )
 
     _VOWELS = frozenset("aeiouy")
+    _MIN_ABBREV_LENGTH = 3
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         known = set(ctx.config.options["known_abbrevs"])
@@ -185,7 +204,7 @@ class CrypticAbbreviation(Rule):
             cryptic = [
                 part
                 for part in split_identifier(binding.name)
-                if len(part) >= 3
+                if len(part) >= self._MIN_ABBREV_LENGTH
                 and part not in known
                 and not self._VOWELS & set(part)
                 and part.isalpha()

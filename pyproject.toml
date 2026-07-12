@@ -5,11 +5,11 @@ build-backend = "hatchling.build"
 [project]
 name = "clean-code"
 version = "0.1.0"
-description = "Readability enforcer for LLM-generated Python: static analysis plus an LLM feedback loop."
+description = "Readability enforcer for LLM-generated Python: static analysis tool plus claude skill"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
-authors = [{ name = "Lukas Burg" }]
+authors = [{ name = "LukasB24" }]
 keywords = ["lint", "readability", "llm", "code-quality", "static-analysis"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -21,7 +21,6 @@ classifiers = [
 dependencies = ["click>=8.1"]
 
 [project.optional-dependencies]
-llm = ["anthropic>=0.40"]
 dev = ["pytest>=8"]
 
 [project.scripts]

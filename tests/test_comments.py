@@ -70,6 +70,37 @@ class TestCommentRestatesCode:
         source = "def total_of(items):\n    total = sum(items)\n    return total  # return the total\n"
         assert rule_ids(check(source, "CM302")) == ["CM302"]
 
+    def test_flags_restatement_diluted_by_generic_filler_words(self, check):
+        source = "count += 1  # increase a number\ncount -= 1  # decrease the variable\n"
+        violations = check(source, "CM302")
+        assert rule_ids(violations) == ["CM302", "CM302"]
+
+    def test_flags_spelled_out_repeat_count(self, check):
+        source = "for k in range(3):  # iterate three times\n    pass\n"
+        assert rule_ids(check(source, "CM302")) == ["CM302"]
+
+    def test_flags_spelled_out_repeat_count_variant(self, check):
+        source = "for x in range(5):  # loop five times\n    pass\n"
+        assert rule_ids(check(source, "CM302")) == ["CM302"]
+
+    def test_why_signal_exempts_even_high_overlap_comment(self, check):
+        # Without the "since" why-signal this scores 0.75 overlap and would
+        # be flagged (verified) — the exemption must override that.
+        source = "# check it matches, since equal\nif x == 1:\n    pass\n"
+        assert check(source, "CM302") == []
+
+    def test_inflected_synonym_still_matches_base_dict_entry(self, check):
+        # The dict only stores "increment"; the stemmer must still match
+        # "increments" against it now that the plural entry is gone.
+        source = "score = score + 1  # increments the score\n"
+        assert rule_ids(check(source, "CM302")) == ["CM302"]
+
+    def test_inflected_why_signal_still_exempts(self, check):
+        # The dict only stores "avoid"; "avoiding" must still exempt the
+        # comment now that the "-ing" entry is gone.
+        source = "counter = counter + 1  # avoiding an off-by-one\n"
+        assert check(source, "CM302") == []
+
 
 class TestCommentDensity:
     def test_flags_comment_heavy_function(self, check):
