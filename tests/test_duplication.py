@@ -209,3 +209,28 @@ class TestDuplicateFunctionBodyIntegration:
         results = {result.path: result for result in analyze_paths([first_dir, second_dir])}
         assert [v.rule_id for v in results[str(second_dir / "b.py")].violations] == ["DP701"]
         assert results[str(first_dir / "a.py")].violations == []
+
+    def test_analyze_paths_deduplicates_overlapping_targets(self, tmp_path):
+        """`clean-code check src src/foo.py` must not analyze foo.py twice."""
+        (tmp_path / "a.py").write_text(
+            "def compute_totals(rows):\n"
+            "    total = 0\n"
+            "    count = 0\n"
+            "    for row in rows:\n"
+            "        total += row.amount\n"
+            "        count += 1\n"
+            "    return total / count\n"
+        )
+        (tmp_path / "b.py").write_text(
+            "def average_amounts(items):\n"
+            "    accumulator = 0\n"
+            "    number = 0\n"
+            "    for entry in items:\n"
+            "        accumulator += entry.amount\n"
+            "        number += 1\n"
+            "    return accumulator / number\n"
+        )
+        results = analyze_paths([tmp_path, tmp_path / "b.py"])
+        assert [result.path for result in results].count(str(tmp_path / "b.py")) == 1
+        by_path = {result.path: result for result in results}
+        assert [v.rule_id for v in by_path[str(tmp_path / "b.py")].violations] == ["DP701"]

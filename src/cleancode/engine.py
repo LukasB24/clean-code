@@ -66,6 +66,7 @@ def analyze_paths(targets: list[Path], config: Config | None = None) -> list[Che
     file_paths: list[Path] = []
     for target in targets:
         file_paths.extend([target] if target.is_file() else sorted(target.rglob("*.py")))
+    file_paths = _deduplicated(file_paths)
 
     results: list[CheckResult] = []
     parsed_files: list[ParsedFile] = []
@@ -244,3 +245,21 @@ def _is_suppressed(line: int, rule_id: str, suppressions: dict[int, set[str] | N
 def _is_excluded(file_path: Path, patterns: list[str]) -> bool:
     posix = file_path.resolve().as_posix()
     return any(fnmatch.fnmatch(posix, pattern) for pattern in patterns)
+
+
+def _deduplicated(file_paths: list[Path]) -> list[Path]:
+    """Drop repeats of the same file reached through overlapping targets.
+
+    ``clean-code check src src/foo.py`` would otherwise walk ``foo.py`` twice,
+    producing two ``CheckResult``s for one path and letting the second
+    overwrite the first in ``_ProjectIndex.by_path``.
+    """
+    seen: set[Path] = set()
+    unique: list[Path] = []
+    for file_path in file_paths:
+        resolved = file_path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        unique.append(file_path)
+    return unique
