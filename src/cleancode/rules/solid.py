@@ -285,7 +285,7 @@ class LowCohesionClass(Rule):
         if class_def.name.endswith("Mixin"):
             return None
         methods = _instance_methods(class_def)
-        if len(methods) < min_methods:
+        if len({method.name for method in methods}) < min_methods:
             return None
         clusters = [group for group in _method_groups(methods) if len(group) >= 2]
         return clusters if len(clusters) >= 2 else None

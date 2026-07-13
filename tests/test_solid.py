@@ -180,6 +180,39 @@ class TestLowCohesionClass:
             """
         assert check(source, "SD802") == []
 
+    def test_overload_stubs_fold_into_one_logical_method(self, check):
+        """@overload stubs share a name with the real implementation and must not
+        inflate the raw method count the min_methods floor is gated on. This class
+        has 6 raw method nodes (2 add_amount stubs + 1 impl + 3 others, forming 2
+        genuine clusters) but only 4 logical names — below a floor of 5, which the
+        old code (gating on the raw count) would have incorrectly let through."""
+        source = """
+            from typing import overload
+
+            class Report:
+                def __init__(self):
+                    self.total = 0
+                    self.currency = "usd"
+                    self.connection = None
+
+                @overload
+                def add_amount(self, value: int) -> None: ...
+                @overload
+                def add_amount(self, value: float) -> None: ...
+                def add_amount(self, value):
+                    self.total += value
+
+                def format_total(self):
+                    return f"{self.total} {self.currency}"
+
+                def connect_database(self):
+                    self.connection = object()
+
+                def run_query(self, sql):
+                    return self.connection.execute(sql)
+            """
+        assert check(source, "SD802", min_methods=5) == []
+
     def test_permits_mixin_classes(self, check):
         """Same shape as test_flags_class_with_two_unrelated_method_groups (two
         genuinely disjoint clusters) but the *Mixin name exempts it — mixins are
