@@ -152,9 +152,10 @@
 # min_branches = 3
 
 # SD802  low-cohesion-class  [warning]
-#   Flags a class whose instance methods split into two or more groups that share no instance attribute and never call each other — a concrete proxy for 'this class does more than one thing' (SRP), beyond the line-count check in ST103. Dunder methods and @staticmethod/@classmethod helpers are excluded from the count and the grouping.
+#   Flags a class whose instance methods split into two or more *multi-member* groups that share no instance attribute and never call each other — a concrete proxy for 'this class does more than one thing' (SRP), beyond the line-count check in ST103. A single method with no shared state (a stray pure helper) does not count as its own group — only genuine clusters of mutually-related methods do. Dunder methods and @staticmethod/@classmethod helpers are always excluded; classes whose name ends with one of `exempt_name_suffixes` (default `Mixin`, since mixins are intentionally composed from independent, reusable behavior) are exempt entirely.
 # [tool.cleancode.SD802]
 # min_methods = 4
+# exempt_name_suffixes = ["Mixin"]
 
 # DP701  duplicate-function-body  [warning]
 #   Flags two or more functions/methods, anywhere in the analyzed files, whose bodies are structurally identical once names are ignored — copy-paste DRY violations a single-file rule can't see. Stub bodies (pass/.../raise NotImplementedError), dunder methods, and bodies shorter than `min_statements` are exempt.
