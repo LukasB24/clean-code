@@ -237,6 +237,54 @@ class TestLowCohesionClass:
             """
         assert check(source, "SD802") == []
 
+    def test_exempt_name_suffixes_is_configurable(self, check):
+        """The exemption isn't hardcoded to 'Mixin' — any project-specific naming
+        convention for intentionally-composed classes can be added."""
+        source = """
+            class ReportImpl:
+                def __init__(self):
+                    self.total = 0
+                    self.currency = "usd"
+
+                def add_amount(self, value):
+                    self.total += value
+
+                def format_total(self):
+                    return f"{self.total} {self.currency}"
+
+                def connect_database(self):
+                    self.connection = object()
+
+                def run_query(self, sql):
+                    return self.connection.execute(sql)
+            """
+        assert [v.rule_id for v in check(source, "SD802")] == ["SD802"]
+        assert check(source, "SD802", exempt_name_suffixes=["Impl"]) == []
+
+    def test_clearing_exempt_name_suffixes_still_flags_mixin_classes(self, check):
+        """Confirms the *Mixin exemption is genuinely config-driven, not a
+        hardcoded fallback: clearing the list removes it."""
+        source = """
+            class SingleObjectMixin:
+                def __init__(self):
+                    self.object_source = None
+                    self.context_name = None
+
+                def get_object(self):
+                    return self.object_source
+
+                def get_queryset(self):
+                    return self.object_source
+
+                def get_context_object_name(self):
+                    return self.context_name
+
+                def get_context_data(self):
+                    return {"name": self.context_name}
+            """
+        violations = check(source, "SD802", exempt_name_suffixes=[])
+        assert [v.rule_id for v in violations] == ["SD802"]
+
     def test_ignores_static_and_class_methods(self, check):
         source = """
             class Factory:

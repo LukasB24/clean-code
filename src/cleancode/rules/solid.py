@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import ast
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import Iterable, Iterator
 
 from cleancode.models import FileContext, Severity, Violation, ViolationDetails
@@ -239,32 +240,42 @@ def _method_groups(methods: list[FunctionNode]) -> list[list[str]]:
     return list(groups.values())
 
 
+@dataclass(frozen=True)
+class _CohesionOptions:
+    min_methods: int
+    exempt_name_suffixes: tuple[str, ...]
+
+
 class LowCohesionClass(Rule):
     id = "SD802"
     name = "low-cohesion-class"
     default_severity = Severity.WARNING
-    default_options = {"min_methods": 4}
+    default_options = {"min_methods": 4, "exempt_name_suffixes": ["Mixin"]}
     description = (
         "Flags a class whose instance methods split into two or more *multi-member* "
         "groups that share no instance attribute and never call each other — a "
         "concrete proxy for 'this class does more than one thing' (SRP), beyond the "
         "line-count check in ST103. A single method with no shared state (a stray "
         "pure helper) does not count as its own group — only genuine clusters of "
-        "mutually-related methods do. Dunder methods, @staticmethod/@classmethod "
-        "helpers, and classes named `*Mixin` (intentionally composed from "
-        "independent, reusable behavior) are excluded."
+        "mutually-related methods do. Dunder methods and @staticmethod/@classmethod "
+        "helpers are always excluded; classes whose name ends with one of "
+        "`exempt_name_suffixes` (default `Mixin`, since mixins are intentionally "
+        "composed from independent, reusable behavior) are exempt entirely."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
-        min_methods = ctx.config.options["min_methods"]
+        options = _CohesionOptions(
+            min_methods=ctx.config.options["min_methods"],
+            exempt_name_suffixes=tuple(ctx.config.options["exempt_name_suffixes"]),
+        )
         for node in ast.walk(ctx.tree):
             if isinstance(node, ast.ClassDef):
-                yield from self._check_class(ctx, node, min_methods)
+                yield from self._check_class(ctx, node, options)
 
     def _check_class(
-        self, ctx: FileContext, class_def: ast.ClassDef, min_methods: int
+        self, ctx: FileContext, class_def: ast.ClassDef, options: _CohesionOptions
     ) -> Iterable[Violation]:
-        clusters = self._eligible_clusters(class_def, min_methods)
+        clusters = self._eligible_clusters(class_def, options)
         if clusters is None:
             return
         pretty = "; ".join(", ".join(sorted(cluster)) for cluster in clusters)
@@ -280,12 +291,14 @@ class LowCohesionClass(Rule):
         )
 
     @staticmethod
-    def _eligible_clusters(class_def: ast.ClassDef, min_methods: int) -> list[list[str]] | None:
+    def _eligible_clusters(
+        class_def: ast.ClassDef, options: _CohesionOptions
+    ) -> list[list[str]] | None:
         """The class's disjoint method clusters, or ``None`` if it shouldn't be flagged."""
-        if class_def.name.endswith("Mixin"):
+        if class_def.name.endswith(options.exempt_name_suffixes):
             return None
         methods = _instance_methods(class_def)
-        if len({method.name for method in methods}) < min_methods:
+        if len({method.name for method in methods}) < options.min_methods:
             return None
         clusters = [group for group in _method_groups(methods) if len(group) >= 2]
         return clusters if len(clusters) >= 2 else None

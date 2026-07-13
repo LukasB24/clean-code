@@ -200,9 +200,9 @@ A few details worth knowing:
 - **SD802 flags a class whose methods split into 2+ genuine multi-member
   clusters** sharing no state or calls — an SRP smell beyond ST103's line
   count. A lone method with no shared state doesn't count as its own cluster,
-  property getter/setter pairs are treated as one method, and `*Mixin`
-  classes are exempt (mixins are intentionally composed from independent
-  behavior).
+  property getter/setter pairs are treated as one method, and classes named
+  with a configurable `exempt_name_suffixes` (default `Mixin`) are exempt
+  entirely — mixins are intentionally composed from independent behavior.
 - **DP701 flags copy-pasted function bodies** (once names are ignored) across
   the whole run — it only catches cross-file duplicates when you check a
   directory containing both files, not one file at a time.
