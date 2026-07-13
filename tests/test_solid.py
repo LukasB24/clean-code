@@ -137,6 +137,73 @@ class TestLowCohesionClass:
             """
         assert check(source, "SD802") == []
 
+    def test_permits_lone_stray_helper_alongside_a_cohesive_cluster(self, check):
+        """A single method with no shared state isn't its own 'responsibility' —
+        only genuine clusters of mutually-related methods count."""
+        source = """
+            class Report:
+                def __init__(self):
+                    self.total = 0
+                    self.currency = "usd"
+
+                def add_amount(self, value):
+                    self.total += value
+
+                def format_total(self):
+                    return f"{self.total} {self.currency}"
+
+                def as_percentage(self, whole):
+                    return whole / 100
+            """
+        assert check(source, "SD802") == []
+
+    def test_merges_property_getter_and_setter_into_one_logical_method(self, check):
+        source = """
+            class Point:
+                def __init__(self):
+                    self._x = 0
+                    self.log = []
+
+                @property
+                def x(self):
+                    return self._x
+
+                @x.setter
+                def x(self, value):
+                    self._x = value
+
+                def record(self, event):
+                    self.log.append(event)
+
+                def history(self):
+                    return list(self.log)
+            """
+        assert check(source, "SD802") == []
+
+    def test_permits_mixin_classes(self, check):
+        """Same shape as test_flags_class_with_two_unrelated_method_groups (two
+        genuinely disjoint clusters) but the *Mixin name exempts it — mixins are
+        intentionally composed from independent, reusable behavior."""
+        source = """
+            class SingleObjectMixin:
+                def __init__(self):
+                    self.object_source = None
+                    self.context_name = None
+
+                def get_object(self):
+                    return self.object_source
+
+                def get_queryset(self):
+                    return self.object_source
+
+                def get_context_object_name(self):
+                    return self.context_name
+
+                def get_context_data(self):
+                    return {"name": self.context_name}
+            """
+        assert check(source, "SD802") == []
+
     def test_ignores_static_and_class_methods(self, check):
         source = """
             class Factory:
@@ -160,17 +227,26 @@ class TestLowCohesionClass:
         assert check(source, "SD802") == []
 
     def test_min_methods_is_configurable(self, check):
+        """Two genuine 2-member clusters is the structural minimum for this rule
+        to ever fire, so configurability is demonstrated by raising the floor
+        above that to suppress it, not lowering it."""
         source = """
             class Report:
                 def __init__(self):
                     self.total = 0
-                    self.connection = None
+                    self.currency = "usd"
 
                 def add_amount(self, value):
                     self.total += value
 
+                def format_total(self):
+                    return f"{self.total} {self.currency}"
+
                 def connect_database(self):
                     self.connection = object()
+
+                def run_query(self, sql):
+                    return self.connection.execute(sql)
             """
-        violations = check(source, "SD802", min_methods=2)
-        assert [v.rule_id for v in violations] == ["SD802"]
+        assert [v.rule_id for v in check(source, "SD802")] == ["SD802"]
+        assert check(source, "SD802", min_methods=5) == []

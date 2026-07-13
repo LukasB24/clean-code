@@ -197,8 +197,12 @@ A few details worth knowing:
 - **SD801 flags a same-variable type-switch** (`isinstance`/`type()` chain) —
   an Open/Closed Principle smell. Dispatching on Python's own `ast.*` node
   types is exempt, since that's routine AST tooling, not the smell targeted.
-- **SD802 flags a class whose methods split into disjoint groups** sharing no
-  state or calls — an SRP smell beyond ST103's line count.
+- **SD802 flags a class whose methods split into 2+ genuine multi-member
+  clusters** sharing no state or calls — an SRP smell beyond ST103's line
+  count. A lone method with no shared state doesn't count as its own cluster,
+  property getter/setter pairs are treated as one method, and `*Mixin`
+  classes are exempt (mixins are intentionally composed from independent
+  behavior).
 - **DP701 flags copy-pasted function bodies** (once names are ignored) across
   the whole run — it only catches cross-file duplicates when you check a
   directory containing both files, not one file at a time.

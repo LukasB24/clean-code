@@ -191,21 +191,21 @@ def _self_called_methods(method: FunctionNode, self_name: str, sibling_names: se
 
 
 class _UnionFind:
-    def __init__(self, items: Iterable[FunctionNode]) -> None:
+    def __init__(self, items: Iterable[str]) -> None:
         self.parent = {item: item for item in items}
-        self.attr_owner: dict[str, FunctionNode] = {}
+        self.attr_owner: dict[str, str] = {}
 
-    def find(self, item: FunctionNode) -> FunctionNode:
+    def find(self, item: str) -> str:
         while self.parent[item] != item:
             item = self.parent[item]
         return item
 
-    def union(self, first: FunctionNode, second: FunctionNode) -> None:
+    def union(self, first: str, second: str) -> None:
         root_first, root_second = self.find(first), self.find(second)
         if root_first != root_second:
             self.parent[root_first] = root_second
 
-    def link_via_attr(self, method: FunctionNode, attr: str) -> None:
+    def link_via_attr(self, method: str, attr: str) -> None:
         """Union ``method`` with whichever earlier method first touched ``attr``."""
         owner = self.attr_owner.get(attr)
         if owner is None:
@@ -214,23 +214,28 @@ class _UnionFind:
             self.union(method, owner)
 
 
-def _method_groups(methods: list[FunctionNode]) -> list[list[FunctionNode]]:
-    """Connected components of ``methods``, linked by shared attributes or calls."""
-    by_name = {method.name: method for method in methods}
-    union_find = _UnionFind(methods)
+def _method_groups(methods: list[FunctionNode]) -> list[list[str]]:
+    """Connected components of method names, linked by shared attributes or calls.
+
+    Nodes sharing a name — a ``@property``/``@x.setter``/``@x.deleter`` trio, or
+    ``@overload`` stubs — are folded into one logical method first, so a getter/
+    setter pair isn't miscounted as two unrelated methods with nothing in common.
+    """
+    names = sorted({method.name for method in methods})
+    union_find = _UnionFind(names)
     for method in methods:
         self_name = _self_param_name(method)
         if self_name is None:
             continue
         for attr in _self_data_attrs(method, self_name):
-            union_find.link_via_attr(method, attr)
-        sibling_names = by_name.keys() - {method.name}
+            union_find.link_via_attr(method.name, attr)
+        sibling_names = set(names) - {method.name}
         for called_name in _self_called_methods(method, self_name, sibling_names):
-            union_find.union(method, by_name[called_name])
+            union_find.union(method.name, called_name)
 
-    groups: dict[FunctionNode, list[FunctionNode]] = defaultdict(list)
-    for method in methods:
-        groups[union_find.find(method)].append(method)
+    groups: dict[str, list[str]] = defaultdict(list)
+    for name in names:
+        groups[union_find.find(name)].append(name)
     return list(groups.values())
 
 
@@ -240,11 +245,14 @@ class LowCohesionClass(Rule):
     default_severity = Severity.WARNING
     default_options = {"min_methods": 4}
     description = (
-        "Flags a class whose instance methods split into two or more groups that "
-        "share no instance attribute and never call each other — a concrete proxy "
-        "for 'this class does more than one thing' (SRP), beyond the line-count "
-        "check in ST103. Dunder methods and @staticmethod/@classmethod helpers are "
-        "excluded from the count and the grouping."
+        "Flags a class whose instance methods split into two or more *multi-member* "
+        "groups that share no instance attribute and never call each other — a "
+        "concrete proxy for 'this class does more than one thing' (SRP), beyond the "
+        "line-count check in ST103. A single method with no shared state (a stray "
+        "pure helper) does not count as its own group — only genuine clusters of "
+        "mutually-related methods do. Dunder methods, @staticmethod/@classmethod "
+        "helpers, and classes named `*Mixin` (intentionally composed from "
+        "independent, reusable behavior) are excluded."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
@@ -256,22 +264,28 @@ class LowCohesionClass(Rule):
     def _check_class(
         self, ctx: FileContext, class_def: ast.ClassDef, min_methods: int
     ) -> Iterable[Violation]:
-        methods = _instance_methods(class_def)
-        if len(methods) < min_methods:
+        clusters = self._eligible_clusters(class_def, min_methods)
+        if clusters is None:
             return
-        groups = _method_groups(methods)
-        if len(groups) < 2:
-            return
-        pretty = "; ".join(
-            ", ".join(sorted(method.name for method in group)) for group in groups
-        )
+        pretty = "; ".join(", ".join(sorted(cluster)) for cluster in clusters)
         yield self.violation(
             ctx,
             class_def,
             ViolationDetails(
-                message=f"class `{class_def.name}` splits into {len(groups)} unrelated "
-                f"method groups sharing no instance attribute or call: {pretty}",
-                suggestion="split the class along its disjoint method groups",
+                message=f"class `{class_def.name}` splits into {len(clusters)} unrelated "
+                f"method clusters sharing no instance attribute or call: {pretty}",
+                suggestion="split the class along its disjoint method clusters",
                 symbol=class_def.name,
             ),
         )
+
+    @staticmethod
+    def _eligible_clusters(class_def: ast.ClassDef, min_methods: int) -> list[list[str]] | None:
+        """The class's disjoint method clusters, or ``None`` if it shouldn't be flagged."""
+        if class_def.name.endswith("Mixin"):
+            return None
+        methods = _instance_methods(class_def)
+        if len(methods) < min_methods:
+            return None
+        clusters = [group for group in _method_groups(methods) if len(group) >= 2]
+        return clusters if len(clusters) >= 2 else None
