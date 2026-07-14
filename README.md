@@ -33,8 +33,7 @@ arising from the use of this software.
 
 Bug reports, new rule proposals, and PRs are welcome — see
 [`CONTRIBUTING.md`](CONTRIBUTING.md) for the dev setup and a walkthrough of
-adding a rule. See [`CHANGELOG.md`](CHANGELOG.md) for what's shipped,
-[`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) for community expectations, and
+adding a rule, [`CHANGELOG.md`](CHANGELOG.md) for what's shipped, and
 [`RELEASING.md`](RELEASING.md) for how versions get published.
 
 ## Install

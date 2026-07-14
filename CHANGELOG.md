@@ -25,8 +25,7 @@ shift before the API is called stable.
 - Repository infrastructure for outside contributors: GitHub Actions CI
   (test matrix across Python 3.11–3.13, `ruff` lint, and a `clean-code`
   self-check job), `CONTRIBUTING.md`, issue templates (bug report, feature
-  request, new-rule proposal), a pull request template, `CODE_OF_CONDUCT.md`,
-  and `SECURITY.md`.
+  request, new-rule proposal), a pull request template, and `SECURITY.md`.
 - `PY901` `bare-except` — flags a bare `except:` that swallows
   `KeyboardInterrupt`/`SystemExit` along with genuine bugs.
 - `PY902` `empty-exception-handler` — flags a handler whose body is entirely
