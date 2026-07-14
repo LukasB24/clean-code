@@ -11,10 +11,12 @@ from __future__ import annotations
 
 import ast
 import re
+import builtins
 from typing import Iterable, Iterator
 
 from cleancode.models import FileContext, Severity, Violation, ViolationDetails
 from cleancode.rules.base import FunctionNode, Rule, functions, subscript_base_name
+from cleancode.rules.naming import collect_bindings
 
 _COMP_TYPES = (ast.ListComp, ast.DictComp, ast.SetComp, ast.GeneratorExp)
 
@@ -741,6 +743,31 @@ def _own_scope_walk(function: FunctionNode) -> Iterator[ast.AST]:
 
 
 def _unpack_element_name(element: ast.expr) -> ast.Name | None:
+_DEFAULT_WATCHED_BUILTINS = (
+    "id", "type", "list", "dict", "str", "input", "format", "filter",
+    "min", "max", "sum", "hash", "object", "property", "map", "next", "iter",
+)
+
+
+def _class_body_field_positions(tree: ast.Module) -> set[tuple[int, int]]:
+    """(lineno, col_offset) of names declared directly in a class body.
+
+    ``id: ClassVar[str]`` and ``id = \"SM601\"`` are field names, not
+    scope-shadowing locals — only a binding's *position* survives through
+    ``collect_bindings``, so positions (not the AST nodes themselves) are
+    what gets matched against later.
+    """
+    positions: set[tuple[int, int]] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        for statement in node.body:
+            targets = _class_body_statement_targets(statement)
+            positions.update((target.lineno, target.col_offset) for target in targets)
+    return positions
+
+
+def _unpack_target_name(element: ast.expr) -> ast.Name | None:
     inner = element.value if isinstance(element, ast.Starred) else element
     return inner if isinstance(inner, ast.Name) else None
 
@@ -855,3 +882,56 @@ class UnusedBinding(Rule):
                         symbol=function.name,
                     ),
                 )
+def _class_body_assign_names(target: ast.expr) -> Iterator[ast.Name]:
+    """Name leaves of a class-body assignment target, including tuple/list unpacking."""
+    if isinstance(target, ast.Name):
+        yield target
+    elif isinstance(target, (ast.Tuple, ast.List)):
+        names = (_unpack_target_name(element) for element in target.elts)
+        yield from (name for name in names if name is not None)
+
+
+def _class_body_statement_targets(statement: ast.stmt) -> Iterator[ast.Name]:
+    if isinstance(statement, ast.AnnAssign) and isinstance(statement.target, ast.Name):
+        yield statement.target
+    elif isinstance(statement, ast.Assign):
+        for target in statement.targets:
+            yield from _class_body_assign_names(target)
+
+
+class BuiltinShadowing(Rule):
+    id = "SM613"
+    name = "builtin-shadowing"
+    default_severity = Severity.WARNING
+    default_options: dict = {"watched": list(_DEFAULT_WATCHED_BUILTINS)}
+    description = (
+        "Flags a binding site (parameter, assignment target, `for`/`with ... as`/"
+        "comprehension target, function/class name) whose identifier shadows a "
+        "Python builtin (`id`, `type`, `list`, ...), which can cause confusing bugs "
+        "if the original builtin is needed later in the same scope. A configurable "
+        "`watched` list (default: the builtins most often reused as domain terms) "
+        "limits noise; every entry is still checked against the live `builtins` "
+        "module rather than a hardcoded copy, so it stays correct across Python "
+        "versions. Class-body field declarations (`id: ClassVar[str]`, "
+        "`id = \"SM601\"`) are exempt — they're field names, not shadowing locals."
+    )
+
+    def check(self, ctx: FileContext) -> Iterable[Violation]:
+        watched = set(ctx.config.options["watched"]) & vars(builtins).keys()
+        exempt_positions = _class_body_field_positions(ctx.tree)
+        for binding in collect_bindings(ctx.tree):
+            if binding.name not in watched:
+                continue
+            if (binding.lineno, binding.col_offset) in exempt_positions:
+                continue
+            yield self.violation(
+                ctx,
+                binding,
+                ViolationDetails(
+                    message=f"{binding.kind} `{binding.name}` shadows the builtin `{binding.name}`",
+                    suggestion=(
+                        f"rename to avoid shadowing the builtin `{binding.name}` — "
+                        "use a domain-specific name instead"
+                    ),
+                ),
+            )

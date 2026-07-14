@@ -172,6 +172,7 @@ override that.
 | SM610 | premature-device-placement | — | warning |
 | SM611 | redundant-isinstance-check | — | warning |
 | SM612 | unused-binding | — | warning |
+| SM613 | builtin-shadowing | `watched=[id,type,list,dict,str,…]` | warning |
 | SD801 | type-switch-violates-ocp | `min_branches=3` | warning |
 | SD802 | low-cohesion-class | `min_methods=4` | warning |
 | DP701 | duplicate-function-body | `min_statements=4` | warning |
@@ -200,6 +201,14 @@ A few details worth knowing:
   (`ctx: "FileContext"`), only flags a multi-target unpack (`a, b = pair()`)
   when *every* target in it is unused, and bails out of the unused-variable
   check entirely for a function that calls `locals`/`eval`/`exec`.
+  and builtin-shadowing binding sites.
+- **SM613 reuses the same binding-site collection as the `NM2xx` naming
+  rules** (parameters, assignment/`for`/`with ... as`/comprehension targets,
+  function/class names), so class/instance attributes (`self.id`), dict keys,
+  and call-site keyword arguments are never flagged — only genuine scope
+  shadowing. The default `watched` list narrows the check to builtins most
+  often reused as domain terms (`id`, `type`, `list`, ...); every entry is
+  still verified against the live `builtins` module, not a hardcoded copy.
 - **`elif` chains don't count as nesting** for ST101 (they still count toward
   ST105 complexity).
 - **SD801 flags a same-variable type-switch** (`isinstance`/`type()` chain) —

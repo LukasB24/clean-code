@@ -13,6 +13,7 @@ from cleancode.rules.naming import CrypticAbbreviation, MeaninglessName, ShortNa
 from cleancode.rules.solid import LowCohesionClass, TypeSwitchViolatesOCP
 from cleancode.rules.semantic import (
     AnonymousTupleIndexing,
+    BuiltinShadowing,
     ComprehensionDensity,
     EagerDatasetLoading,
     MagicNumber,
@@ -66,6 +67,7 @@ ALL_RULES: list[type[Rule] | type[ProjectRule]] = [
     PrematureDevicePlacement,
     RedundantIsinstanceCheck,
     UnusedBinding,
+    BuiltinShadowing,
     TypeSwitchViolatesOCP,
     LowCohesionClass,
     DuplicateFunctionBody,
