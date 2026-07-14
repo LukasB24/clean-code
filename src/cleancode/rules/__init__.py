@@ -7,6 +7,7 @@ from cleancode.rules.comments import (
     CommentRestatesCode,
     DocstringRestatesName,
 )
+from cleancode.rules.correctness import BareExcept
 from cleancode.rules.duplication import DuplicateFunctionBody
 from cleancode.rules.hints import UninformativeAny
 from cleancode.rules.naming import CrypticAbbreviation, MeaninglessName, ShortName
@@ -67,6 +68,7 @@ ALL_RULES: list[type[Rule] | type[ProjectRule]] = [
     TypeSwitchViolatesOCP,
     LowCohesionClass,
     DuplicateFunctionBody,
+    BareExcept,
 ]
 
 RULES_BY_ID: dict[str, type[Rule] | type[ProjectRule]] = {rule.id: rule for rule in ALL_RULES}
