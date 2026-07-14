@@ -13,7 +13,7 @@
 <rect x="0.5" y="0.5" width="699" height="279" fill="none" stroke="#2a2e38" stroke-width="1"></rect>
 
 
-<rect x="0" y="0" width="700" height="2" fill="#7fb88a" opacity="0.55"></rect>
+
 
 
 <text x="46" y="52" font-family="&#39;SF Mono&#39;, &#39;JetBrains Mono&#39;, Consolas, monospace" font-size="10.5" letter-spacing="1.5" fill="#5b6270">AGENT OUTPUT</text>
