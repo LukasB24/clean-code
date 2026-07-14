@@ -256,3 +256,60 @@ class TestRedundantIsinstanceCheck:
             return items[0]
         """
         assert check(source, "SM611") == []
+
+
+class TestBuiltinShadowing:
+    def test_flags_shadowing_parameters(self, check):
+        source = """
+        def get_user(id, type, format):
+            return id, type, format
+        """
+        assert rule_ids(check(source, "SM613")) == ["SM613", "SM613", "SM613"]
+
+    def test_flags_shadowing_assignment(self, check):
+        source = "list = fetch_items()\n"
+        assert rule_ids(check(source, "SM613")) == ["SM613"]
+
+    def test_flags_shadowing_function_name(self, check):
+        source = "def type():\n    return None\n"
+        assert rule_ids(check(source, "SM613")) == ["SM613"]
+
+    def test_flags_shadowing_for_target(self, check):
+        source = "for id in range(10):\n    print(id)\n"
+        assert rule_ids(check(source, "SM613")) == ["SM613"]
+
+    def test_flags_shadowing_with_target(self, check):
+        source = "with open('f') as str:\n    print(str)\n"
+        assert rule_ids(check(source, "SM613")) == ["SM613"]
+
+    def test_flags_shadowing_comprehension_target(self, check):
+        source = "values = [str for str in range(10)]\n"
+        assert rule_ids(check(source, "SM613")) == ["SM613"]
+
+    def test_self_attribute_is_not_flagged(self, check):
+        source = """
+        class Record:
+            def __init__(self, id):
+                self.id = id
+        """
+        assert rule_ids(check(source, "SM613")) == ["SM613"]
+
+    def test_dict_key_is_not_flagged(self, check):
+        source = "record = {'id': 1, 'type': 'user'}\n"
+        assert check(source, "SM613") == []
+
+    def test_keyword_argument_at_call_site_is_not_flagged(self, check):
+        source = "result = render(id=1, type='user')\n"
+        assert check(source, "SM613") == []
+
+    def test_non_watched_builtin_is_not_flagged_by_default(self, check):
+        source = "copyright = 'mine'\n"
+        assert check(source, "SM613") == []
+
+    def test_ordinary_name_passes(self, check):
+        source = "user_id = fetch_id()\n"
+        assert check(source, "SM613") == []
+
+    def test_custom_watched_list_narrows_scope(self, check):
+        source = "list = fetch_items()\n"
+        assert check(source, "SM613", watched=["id"]) == []

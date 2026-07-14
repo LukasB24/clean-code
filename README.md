@@ -171,6 +171,7 @@ override that.
 | SM609 | eager-dataset-loading | — | warning |
 | SM610 | premature-device-placement | — | warning |
 | SM611 | redundant-isinstance-check | — | warning |
+| SM613 | builtin-shadowing | `watched=[id,type,list,dict,str,…]` | warning |
 | SD801 | type-switch-violates-ocp | `min_branches=3` | warning |
 | SD802 | low-cohesion-class | `min_methods=4` | warning |
 | DP701 | duplicate-function-body | `min_statements=4` | warning |
@@ -190,8 +191,16 @@ A few details worth knowing:
 - **SM6xx catches structural smells node-counting misses**: nested
   comprehensions, anonymous tuple indexing, magic-string branching, redundant
   ternaries, `reduce` instead of `sum`, repeated iteration, magic numbers,
-  non-idiomatic emptiness checks, and PyTorch `Dataset` pitfalls (eager
-  loading, premature `.cuda()`, redundant `isinstance` on an annotated type).
+  non-idiomatic emptiness checks, PyTorch `Dataset` pitfalls (eager
+  loading, premature `.cuda()`, redundant `isinstance` on an annotated type),
+  and builtin-shadowing binding sites.
+- **SM613 reuses the same binding-site collection as the `NM2xx` naming
+  rules** (parameters, assignment/`for`/`with ... as`/comprehension targets,
+  function/class names), so class/instance attributes (`self.id`), dict keys,
+  and call-site keyword arguments are never flagged — only genuine scope
+  shadowing. The default `watched` list narrows the check to builtins most
+  often reused as domain terms (`id`, `type`, `list`, ...); every entry is
+  still verified against the live `builtins` module, not a hardcoded copy.
 - **`elif` chains don't count as nesting** for ST101 (they still count toward
   ST105 complexity).
 - **SD801 flags a same-variable type-switch** (`isinstance`/`type()` chain) —
