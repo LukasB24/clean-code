@@ -1,47 +1,45 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 220" width="800" height="220" role="img" aria-labelledby="title desc">
-  <title id="title">clean-code: before and after</title>
-  <desc id="desc">A messy, deeply-nested LLM-generated function on the left becomes a short, well-named function on the right after clean-code's suggested fixes are applied.</desc>
-  <defs>
-    <style>
-      .panel { fill: #1e1e2e; stroke: #45475a; stroke-width: 1.5; }
-      .code { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 13px; }
-      .dim { fill: #7f849c; }
-      .fg { fill: #cdd6f4; }
-      .warn { fill: #f9a825; }
-      .bad-underline { stroke: #f38ba8; stroke-width: 2; fill: none; }
-      .good-underline { stroke: #a6e3a1; stroke-width: 2; fill: none; }
-      .arrow { stroke: #cdd6f4; stroke-width: 2.5; fill: none; }
-      .arrowhead { fill: #cdd6f4; }
-      .label { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; }
-      .label-bad { fill: #f38ba8; }
-      .label-good { fill: #a6e3a1; }
-    </style>
-  </defs>
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="280" viewBox="0 0 700 280">
+<defs>
+  <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#111318"></stop>
+    <stop offset="1" stop-color="#0b0d11"></stop>
+  </linearGradient>
+  <linearGradient id="pathFade" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#c97a72" stop-opacity="0.95"></stop>
+    <stop offset="1" stop-color="#c97a72" stop-opacity="0.55"></stop>
+  </linearGradient>
+</defs>
+<rect width="700" height="280" fill="url(#bgGrad)"></rect>
+<rect x="0.5" y="0.5" width="699" height="279" fill="none" stroke="#2a2e38" stroke-width="1"></rect>
 
-  <!-- left panel: messy -->
-  <rect class="panel" x="16" y="16" width="330" height="188" rx="10"/>
-  <text class="label label-bad" x="34" y="40">BEFORE</text>
-  <text class="code fg" x="34" y="66">def process_data(data):</text>
-  <text class="code dim" x="50" y="86">for item in data:</text>
-  <text class="code dim" x="66" y="106">if item is not None:</text>
-  <text class="code dim" x="82" y="126">if item.qty &gt; 0:</text>
-  <text class="code fg" x="98" y="146">result.append(item.price)</text>
-  <path class="bad-underline" d="M 30 71 h 130"/>
-  <text class="code dim" x="34" y="176">return result</text>
-  <path class="bad-underline" d="M 232 171 h 46"/>
 
-  <!-- arrow -->
-  <path class="arrow" d="M 358 110 h 66"/>
-  <path class="arrowhead" d="M 424 110 l -12 -7 v 14 z"/>
-  <text class="label fg" x="358" y="96" text-anchor="middle" style="fill:#7f849c;">clean-code check</text>
+<rect x="0" y="0" width="700" height="2" fill="#7fb88a" opacity="0.55"></rect>
 
-  <!-- right panel: clean -->
-  <rect class="panel" x="454" y="16" width="330" height="188" rx="10"/>
-  <text class="label label-good" x="472" y="40">AFTER</text>
-  <text class="code fg" x="472" y="66">def positive_priced_items(rows):</text>
-  <text class="code dim" x="488" y="86">return [</text>
-  <text class="code dim" x="504" y="106">row.price for row in rows</text>
-  <text class="code dim" x="504" y="126">if row and row.qty &gt; 0</text>
-  <text class="code dim" x="488" y="146">]</text>
-  <path class="good-underline" d="M 468 71 h 190"/>
+
+<text x="46" y="52" font-family="&#39;SF Mono&#39;, &#39;JetBrains Mono&#39;, Consolas, monospace" font-size="10.5" letter-spacing="1.5" fill="#5b6270">AGENT OUTPUT</text>
+<text x="46" y="68" font-family="-apple-system, &#39;Helvetica Neue&#39;, Helvetica, Arial, sans-serif" font-size="13" fill="#8a8f9a">works — almost impossible to follow</text>
+
+<path d="M 46 140&#xA;  C 70 90, 95 190, 118 130&#xA;  C 138 80, 158 195, 182 120&#xA;  C 202 65, 222 175, 248 140&#xA;  C 258 128, 266 150, 276 140" fill="none" stroke="url(#pathFade)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"></path>
+<circle cx="46" cy="140" r="4.5" fill="#c97a72"></circle>
+<circle cx="276" cy="140" r="4.5" fill="#c97a72" opacity="0.6"></circle>
+
+
+<g transform="translate(350,140)">
+  <circle r="30" fill="#181b22" stroke="#2a2e38" stroke-width="1.5"></circle>
+  <circle r="30" fill="none" stroke="#7fb88a" stroke-width="1.5" opacity="0.35"></circle>
+  <path d="M -6 -12 L 12 0 L -6 12 Z" fill="#7fb88a"></path>
+</g>
+<text x="350" y="196" font-family="-apple-system, &#39;Helvetica Neue&#39;, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#eef0f3" text-anchor="middle">clean-code</text>
+
+
+<text x="424" y="52" font-family="&#39;SF Mono&#39;, &#39;JetBrains Mono&#39;, Consolas, monospace" font-size="10.5" letter-spacing="1.5" fill="#5b6270">SAME LOGIC</text>
+<text x="424" y="68" font-family="-apple-system, &#39;Helvetica Neue&#39;, Helvetica, Arial, sans-serif" font-size="13" fill="#8a8f9a">effortless to read</text>
+<line x1="424" y1="140" x2="656" y2="140" stroke="#7fb88a" stroke-width="3" stroke-linecap="round"></line>
+<circle cx="424" cy="140" r="4.5" fill="#7fb88a"></circle>
+<circle cx="656" cy="140" r="4.5" fill="#7fb88a"></circle>
+
+
+<line x1="46" y1="234" x2="656" y2="234" stroke="#2a2e38" stroke-width="1"></line>
+<text x="46" y="258" font-family="-apple-system, &#39;Helvetica Neue&#39;, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#eef0f3">clean-code</text>
+<text x="656" y="258" font-family="-apple-system, &#39;Helvetica Neue&#39;, Helvetica, Arial, sans-serif" font-size="12" fill="#5b6270" text-anchor="end">deterministic fixes for what agents leave behind</text>
 </svg>
