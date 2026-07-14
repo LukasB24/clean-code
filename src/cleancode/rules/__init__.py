@@ -7,7 +7,7 @@ from cleancode.rules.comments import (
     CommentRestatesCode,
     DocstringRestatesName,
 )
-from cleancode.rules.correctness import EmptyExceptionHandler
+from cleancode.rules.correctness import BareExcept, EmptyExceptionHandler
 from cleancode.rules.duplication import DuplicateFunctionBody
 from cleancode.rules.hints import UninformativeAny
 from cleancode.rules.naming import CrypticAbbreviation, MeaninglessName, ShortName
@@ -72,6 +72,7 @@ ALL_RULES: list[type[Rule] | type[ProjectRule]] = [
     TypeSwitchViolatesOCP,
     LowCohesionClass,
     DuplicateFunctionBody,
+    BareExcept,
     EmptyExceptionHandler,
 ]
 

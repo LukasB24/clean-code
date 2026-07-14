@@ -743,6 +743,10 @@ def _own_scope_walk(function: FunctionNode) -> Iterator[ast.AST]:
 
 
 def _unpack_element_name(element: ast.expr) -> ast.Name | None:
+    inner = element.value if isinstance(element, ast.Starred) else element
+    return inner if isinstance(inner, ast.Name) else None
+
+
 _DEFAULT_WATCHED_BUILTINS = (
     "id", "type", "list", "dict", "str", "input", "format", "filter",
     "min", "max", "sum", "hash", "object", "property", "map", "next", "iter",
@@ -882,6 +886,8 @@ class UnusedBinding(Rule):
                         symbol=function.name,
                     ),
                 )
+
+
 def _class_body_assign_names(target: ast.expr) -> Iterator[ast.Name]:
     """Name leaves of a class-body assignment target, including tuple/list unpacking."""
     if isinstance(target, ast.Name):
