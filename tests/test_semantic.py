@@ -258,6 +258,142 @@ class TestRedundantIsinstanceCheck:
         assert check(source, "SM611") == []
 
 
+class TestUnusedBinding:
+    def test_flags_unused_import(self, check):
+        source = """
+        import json
+
+        def add(a, b):
+            return a + b
+        """
+        assert rule_ids(check(source, "SM612")) == ["SM612"]
+
+    def test_flags_unused_from_import(self, check):
+        source = """
+        from collections import OrderedDict
+
+        def add(a, b):
+            return a + b
+        """
+        assert rule_ids(check(source, "SM612")) == ["SM612"]
+
+    def test_used_import_passes(self, check):
+        source = """
+        import json
+
+        def load(raw):
+            return json.loads(raw)
+        """
+        assert check(source, "SM612") == []
+
+    def test_import_used_only_in_forward_ref_annotation_passes(self, check):
+        source = """
+        from typing import TYPE_CHECKING
+
+        if TYPE_CHECKING:
+            from mymod import Config
+
+        def build(cfg: "Config") -> None:
+            return None
+        """
+        assert check(source, "SM612") == []
+
+    def test_import_listed_in_dunder_all_passes(self, check):
+        source = """
+        import json
+
+        __all__ = ["json"]
+        """
+        assert check(source, "SM612") == []
+
+    def test_init_module_imports_are_exempt(self, analyze):
+        from cleancode.config import Config
+
+        source = """
+        import json
+        """
+        config = Config.default()
+        for other_id, rule_config in config.rules.items():
+            rule_config.enabled = other_id == "SM612"
+        assert analyze(source, config=config, path="__init__.py").violations == []
+
+    def test_flags_unused_local_variable(self, check):
+        source = """
+        def load_config(path):
+            raw = read(path)
+            parsed_data = parse(raw)
+            return raw
+        """
+        assert rule_ids(check(source, "SM612")) == ["SM612"]
+
+    def test_used_local_variable_passes(self, check):
+        source = """
+        def load_config(path):
+            raw = read(path)
+            parsed_data = parse(raw)
+            return parsed_data
+        """
+        assert check(source, "SM612") == []
+
+    def test_underscore_prefixed_variable_passes(self, check):
+        source = """
+        def run():
+            _ignored = compute()
+            return None
+        """
+        assert check(source, "SM612") == []
+
+    def test_partial_tuple_unpack_with_one_used_passes(self, check):
+        source = """
+        def run():
+            key, value = pair()
+            return key
+        """
+        assert check(source, "SM612") == []
+
+    def test_tuple_unpack_all_unused_is_flagged(self, check):
+        source = """
+        def run():
+            key, value = pair()
+            return None
+        """
+        assert rule_ids(check(source, "SM612")) == ["SM612", "SM612"]
+
+    def test_closure_use_in_nested_function_passes(self, check):
+        source = """
+        def outer():
+            value = compute()
+            def inner():
+                return value
+            return inner
+        """
+        assert check(source, "SM612") == []
+
+    def test_function_calling_locals_is_exempt(self, check):
+        source = """
+        def run():
+            secret = compute()
+            return locals()
+        """
+        assert check(source, "SM612") == []
+
+    def test_walrus_target_unused_is_flagged(self, check):
+        source = """
+        def run(items):
+            if (count := len(items)) > 100:
+                return True
+            return False
+        """
+        assert rule_ids(check(source, "SM612")) == ["SM612"]
+
+    def test_walrus_target_reused_passes(self, check):
+        source = """
+        def run(items):
+            if (count := len(items)) > 100:
+                return count
+            return 0
+        """
+        assert check(source, "SM612") == []
 class TestBuiltinShadowing:
     def test_flags_shadowing_parameters(self, check):
         source = """

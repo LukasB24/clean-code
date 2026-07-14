@@ -24,6 +24,7 @@ from cleancode.rules.semantic import (
     RedundantBooleanTernary,
     RedundantIsinstanceCheck,
     RepeatedCollectionIteration,
+    UnusedBinding,
 )
 from cleancode.rules.slicing import ChainedSubscript, ComplexSubscript
 from cleancode.rules.structure import (
@@ -65,6 +66,7 @@ ALL_RULES: list[type[Rule] | type[ProjectRule]] = [
     EagerDatasetLoading,
     PrematureDevicePlacement,
     RedundantIsinstanceCheck,
+    UnusedBinding,
     BuiltinShadowing,
     TypeSwitchViolatesOCP,
     LowCohesionClass,

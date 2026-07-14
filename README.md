@@ -171,6 +171,7 @@ override that.
 | SM609 | eager-dataset-loading | — | warning |
 | SM610 | premature-device-placement | — | warning |
 | SM611 | redundant-isinstance-check | — | warning |
+| SM612 | unused-binding | — | warning |
 | SM613 | builtin-shadowing | `watched=[id,type,list,dict,str,…]` | warning |
 | SD801 | type-switch-violates-ocp | `min_branches=3` | warning |
 | SD802 | low-cohesion-class | `min_methods=4` | warning |
@@ -193,6 +194,13 @@ A few details worth knowing:
   ternaries, `reduce` instead of `sum`, repeated iteration, magic numbers,
   non-idiomatic emptiness checks, PyTorch `Dataset` pitfalls (eager
   loading, premature `.cuda()`, redundant `isinstance` on an annotated type),
+  and unused imports/local variables.
+- **SM612 skips `__init__.py`** for the unused-import half (imports there are
+  usually deliberate re-exports), exempts `__all__`-exported names,
+  `global`/`nonlocal` names, and forward-reference string annotations
+  (`ctx: "FileContext"`), only flags a multi-target unpack (`a, b = pair()`)
+  when *every* target in it is unused, and bails out of the unused-variable
+  check entirely for a function that calls `locals`/`eval`/`exec`.
   and builtin-shadowing binding sites.
 - **SM613 reuses the same binding-site collection as the `NM2xx` naming
   rules** (parameters, assignment/`for`/`with ... as`/comprehension targets,

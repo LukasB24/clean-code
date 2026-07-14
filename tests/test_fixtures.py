@@ -41,6 +41,7 @@ EXPECTED_DIRTY_RULES = {
         "NM201",  # ac, bc, df
         "CM302",  # '# increase a number', '# decrease the variable', '# iterate three times'
         "CM303",  # comment-heavy body
+        "SM612",  # `df` is assigned but never read
     },
     "llm_style_semantics.py": {
         "NM201",  # single-letter comprehension target `v`
