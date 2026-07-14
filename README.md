@@ -1,40 +1,39 @@
-# clean-code
+<p align="center">
+  <img src="assets/banner.svg" alt="clean-code: a messy LLM-generated function on the left becomes a short, well-named function on the right" width="700">
+</p>
 
-[![CI](https://github.com/LukasB24/clean-code/actions/workflows/ci.yml/badge.svg)](https://github.com/LukasB24/clean-code/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/clean-code.svg)](https://pypi.org/project/clean-code/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
+<h1 align="center">clean-code</h1>
 
-You ask an LLM for a function and it hands back something that runs — buried
-five `if`s deep, 90 lines long, with a variable called `data2` and a comment
-that just repeats the line under it. It works. Nobody wants to review it.
+<p align="center">
+  <strong>Your agent solved the hard problem. The code never explains how.<br>
+  clean-code does that part — deterministically, so the next person to read it can tell.</strong>
+</p>
 
-clean-code is a linter built for exactly that mess. Two things make it
-different from asking an LLM to review its own code:
+<p align="center">
+  <a href="https://github.com/LukasB24/clean-code/actions/workflows/ci.yml"><img src="https://github.com/LukasB24/clean-code/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://pypi.org/project/clean-code/"><img src="https://img.shields.io/pypi/v/clean-code.svg" alt="PyPI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+"></a>
+  <img src="https://img.shields.io/badge/deps-click_only-informational.svg" alt="Only dependency: click">
+  <img src="https://img.shields.io/badge/analysis-100%25_deterministic-informational.svg" alt="No LLM calls, no API key">
+</p>
 
-- **Finding violations costs nothing and never hallucinates.** It's plain
-  `ast` parsing under the hood, not another model — deterministic, instant,
-  and reproducible. No API key, no tokens burned, no judgment call you can't
-  trace back to a rule.
-- **Every violation ships a fix an LLM can act on directly.** Not just "line
-  12: too complex," but a concrete instruction — rename this, extract that,
-  flatten this branch — so you (or the agent that wrote the code) can feed
-  the output straight back in and get a real correction, not another guess.
+---
 
-## Disclaimer
+Agents get the hard logic right. They don't make it easy to follow — deep
+nesting, terse names, comments that just restate the code. It works -
+nobody understands why.
 
-The software is provided "as is", without warranty of any kind, express or
-implied, including but not limited to the warranties of merchantability,
-fitness for a particular purpose, completeness, or correctness. In no event
-shall the authors be liable for any claim, damages, or other liability
-arising from the use of this software.
+clean-code closes that gap. Two things make it different from asking an LLM
+to review its own code:
 
-## Contributing
-
-Bug reports, new rule proposals, and PRs are welcome — see
-[`CONTRIBUTING.md`](CONTRIBUTING.md) for the dev setup and a walkthrough of
-adding a rule, [`CHANGELOG.md`](CHANGELOG.md) for what's shipped, and
-[`RELEASING.md`](RELEASING.md) for how versions get published.
+- **Finding violations is free and deterministic.** It's plain `ast` parsing,
+  not another model — same input, same output, every time, and every result
+  traces back to the exact rule that raised it.
+- **Every violation comes with an actual fix.** Instead of a vague "too
+  complex," you get a specific instruction — rename this, extract that,
+  flatten this branch — that you, or the agent that wrote the code, can act
+  on right away.
 
 ## Install
 
@@ -47,6 +46,8 @@ only dependency is `click`.
 
 Working on clean-code itself? See [`CONTRIBUTING.md`](CONTRIBUTING.md) for
 an editable install (`pip install -e ".[dev]"`).
+
+## Quickstart
 
 Point it at your code:
 
@@ -63,15 +64,69 @@ the bundled skill into your user skills folder once:
 mkdir -p ~/.claude/skills/ && cp -r .claude/skills/clean-code ~/.claude/skills/
 ```
 
-### Usage
-
-Once installed, trigger the tool directly within your Claude Code CLI or VS Code extension:
+Then trigger it directly within your Claude Code CLI or VS Code extension:
 
 ```text
 /clean-code [instruction or target_path]
 ```
 
-## Set it up for your project
+## See it catch something real
+
+Given `checkout.py`, fresh out of an LLM:
+
+```python
+def calc(u, o):
+    if u.active:
+        if o.total > 500:
+            discount = o.total * 0.15
+        else:
+            discount = o.total * 0.05
+    try:
+        charge(o, o.total - discount)
+    except:
+        pass
+    return discount
+```
+
+```text
+$ clean-code check checkout.py
+checkout.py:
+  1:9: warning NM201 short parameter `u` (1 characters)
+      fix: use a descriptive name that states what the value represents
+  1:12: warning NM201 short parameter `o` (1 characters)
+      fix: use a descriptive name that states what the value represents
+  3:21: warning SM607 magic number `500` — extract it to a named, typed constant
+      fix: e.g. `SOME_DESCRIPTIVE_NAME = 500`
+  4:33: warning SM607 magic number `0.15` — extract it to a named, typed constant
+      fix: e.g. `SOME_DESCRIPTIVE_NAME = 0.15`
+  6:33: warning SM607 magic number `0.05` — extract it to a named, typed constant
+      fix: e.g. `SOME_DESCRIPTIVE_NAME = 0.05`
+  9:4: warning PY901 bare `except:` catches everything, including KeyboardInterrupt and SystemExit
+      fix: name the expected exception(s), e.g. `except (ValueError, KeyError):`
+  9:4: warning PY902 exception silently discarded — handler body does nothing to acknowledge the failure
+      fix: log it, return an explicit fallback, or re-raise — anything that leaves a trace
+
+7 violation(s) in 1 file(s): 0 error(s), 7 warning(s), 0 info(s)
+```
+
+Nothing exotic — a couple of one-letter parameters, some magic numbers, and
+a swallowed exception. Exactly the kind of thing that slips through a quick
+glance at an LLM's output, and exactly what clean-code is for.
+
+Violations are grouped by file (the path is printed once, not repeated per
+line) and each carries a concrete fix suggestion — both cut tokens when the
+tool is driven by an LLM. The `rule_name` is still available via `--json` or
+`cleancode rules`, just not repeated inline since the message already says
+what the rule name would.
+
+By default `info`-severity violations (the fuzziest, lowest-signal rules) are
+hidden — pass `--min-severity info` to see everything. `--min-severity` never
+hides a violation that `--fail-on`/`fail_on` would fail the run on: setting
+`fail_on` without `min_severity` lowers the display floor to match, so you
+always see what can fail your build. Set `min_severity` explicitly to
+override that.
+
+## Configure it for your project
 
 Out of the box the defaults are strict (max nesting depth 2, max 3
 function params, etc.) — good for shaking out problems, but you'll likely
@@ -101,149 +156,41 @@ the config:
 legacy_tmp = migrate(rows)  # cleancode: disable=NM202
 ```
 
-That's the whole setup. Everything below is reference material — the demo
-and the full rule list — for when you need it.
-
-## 30-second demo
-
-Given `trades.py`, fresh out of an LLM:
-
-```python
-def process_data(data):
-    """Process the data."""
-    result = []
-    for item in data:
-        if item is not None:
-            if item.symbol:
-                if item.qty > 0:
-                    for x in range(item.qty):
-                        # append the price to result
-                        result.append(item.price)
-    return result
-```
-
-```text
-$ cleancode check trades.py
-trades.py:
-  1:0: warning NM202 meaningless function name `process_data`
-      fix: rename to describe the content or role, e.g. `raw_rows`, `user_totals`, `parse_trades`
-  1:17: warning NM202 meaningless parameter name `data`
-      fix: rename to describe the content or role, e.g. `raw_rows`, `user_totals`, `parse_trades`
-  2:4: warning CM301 docstring of `process_data` only restates the function signature
-      fix: delete it, or document what the name cannot say: why, edge cases, units, invariants
-  3:4: warning NM202 meaningless variable name `result`
-      fix: rename to describe the content or role, e.g. `raw_rows`, `user_totals`, `parse_trades`
-  6:12: error ST101 nesting depth 5 exceeds the maximum of 2
-      fix: extract the inner block into a well-named helper function, or flatten with early returns / guard clauses
-  9:24: warning CM302 comment restates the code it annotates: `# append the price to result`
-      fix: delete it; comments should explain *why*, not repeat *what*
-
-6 violation(s) in 1 file(s): 1 error(s), 5 warning(s), 0 info(s)
-```
-
-Violations are grouped by file (the path is printed once, not repeated per
-line) and each carries a concrete fix suggestion — both cut tokens when the
-tool is driven by an LLM. The `rule_name` is still available via `--json` or
-`cleancode rules`, just not repeated inline since the message already says
-what the rule name would.
-
-By default `info`-severity violations (the fuzziest, lowest-signal rules) are
-hidden — pass `--min-severity info` to see everything. `--min-severity` never
-hides a violation that `--fail-on`/`fail_on` would fail the run on: setting
-`fail_on` without `min_severity` lowers the display floor to match, so you
-always see what can fail your build. Set `min_severity` explicitly to
-override that.
-
 ## The rules
 
-| ID | Name | Default | Severity |
-|----|------|---------|----------|
-| ST101 | max-nesting-depth | `max_depth=2` | error |
-| ST102 | max-function-length | `max_lines=60` | warning |
-| ST103 | max-class-length | `max_lines=200` | warning |
-| ST104 | max-parameters | `max_params=3` | warning |
-| ST105 | max-complexity | `max_complexity=10` | error |
-| ST106 | do-one-thing | `conjunctions=[and, or]` | warning |
-| ST107 | too-many-guard-clauses | `max_guards=2` | info |
-| NM201 | short-name | `min_length=3, allowed=[i,j,k,n,x,y,_,id,ok,fh]` | warning |
-| NM202 | meaningless-name | configurable ban lists | warning |
-| NM203 | cryptic-abbreviation | `known_abbrevs=[cfg,ctx,idx,…]` | info |
-| CM301 | docstring-restates-name | `overlap=0.8` | warning |
-| CM302 | comment-restates-code | `overlap=0.7, min_words=2` | warning |
-| CM303 | comment-density | `max_ratio=0.3, min_code_lines=5` | info |
-| CM304 | boilerplate-param-docs | `min_uninformative=0.5` | warning |
-| SL401 | complex-subscript | `max_score=5` | warning |
-| SL402 | chained-subscript | `max_chain=2` | warning |
-| TY501 | uninformative-any | — | warning |
-| SM601 | comprehension-density | — | warning |
-| SM602 | anonymous-tuple-indexing | — | warning |
-| SM603 | magic-string-branching | — | warning |
-| SM604 | redundant-boolean-ternary | — | warning |
-| SM605 | reduce-instead-of-sum | — | warning |
-| SM606 | repeated-collection-iteration | — | warning |
-| SM607 | magic-number | `ignore=[0,1,-1,2,10]` | warning |
-| SM608 | non-idiomatic-emptiness-check | — | warning |
-| SM609 | eager-dataset-loading | — | warning |
-| SM610 | premature-device-placement | — | warning |
-| SM611 | redundant-isinstance-check | — | warning |
-| SM612 | unused-binding | — | warning |
-| SM613 | builtin-shadowing | `watched=[id,type,list,dict,str,…]` | warning |
-| SD801 | type-switch-violates-ocp | `min_branches=3` | warning |
-| SD802 | low-cohesion-class | `min_methods=4` | warning |
-| DP701 | duplicate-function-body | `min_statements=4` | warning |
-| PY901 | bare-except | — | warning |
-| PY902 | empty-exception-handler | — | warning |
+35 rules across 9 categories, each with a default severity you can override:
 
-`cleancode rules` prints the same list with full descriptions.
+| Category | IDs | Count | Catches |
+|----------|-----|-------|---------|
+| Structure | ST101–ST107 | 7 | nesting, length, params, complexity, mixed responsibilities |
+| Naming | NM201–NM203 | 3 | single-letter names, `data`/`tmp`/`process_data`, cryptic abbreviations |
+| Comments & docstrings | CM301–CM304 | 4 | docstrings/comments that just restate the code |
+| Subscripts | SL401–SL402 | 2 | `x[i][j][k]`-style complexity and chaining |
+| Types | TY501 | 1 | uninformative `Any` |
+| Structural smells | SM601–SM613 | 13 | magic numbers, nested comprehensions, redundant ternaries, PyTorch pitfalls, unused bindings, builtin shadowing, and more |
+| SOLID | SD801–SD802 | 2 | type-switches violating OCP, low-cohesion classes |
+| Duplication | DP701 | 1 | copy-pasted function bodies |
+| Correctness | PY901–PY902 | 2 | bare `except:`, silently-discarded exceptions |
 
-A few details worth knowing:
+`cleancode rules` prints the full list from the CLI. For every rule's exact
+default options, severity, and the edge cases each one accounts for (what's
+exempt and why), see **[docs/RULES.md](docs/RULES.md)**.
 
-- **Naming rules look at binding sites only** — a bad name is reported once,
-  where it's introduced. Loop/comprehension/lambda letters, `except ... as e`,
-  `TypeVar`, and `ALL_CAPS` constants are exempt.
-- **CM301/CM302 are deterministic, not LLM-judged** — they compare word
-  overlap between a docstring/comment and the code it annotates. Comments
-  explaining *why* (not *what*) are always exempt.
-- **SL401/SL402 score subscript complexity** (dimensions, steps, nesting,
-  chaining) and ignore type annotations like `dict[str, int]`.
-- **SM6xx catches structural smells node-counting misses**: nested
-  comprehensions, anonymous tuple indexing, magic-string branching, redundant
-  ternaries, `reduce` instead of `sum`, repeated iteration, magic numbers,
-  non-idiomatic emptiness checks, PyTorch `Dataset` pitfalls (eager
-  loading, premature `.cuda()`, redundant `isinstance` on an annotated type),
-  and unused imports/local variables.
-- **SM612 skips `__init__.py`** for the unused-import half (imports there are
-  usually deliberate re-exports), exempts `__all__`-exported names,
-  `global`/`nonlocal` names, and forward-reference string annotations
-  (`ctx: "FileContext"`), only flags a multi-target unpack (`a, b = pair()`)
-  when *every* target in it is unused, and bails out of the unused-variable
-  check entirely for a function that calls `locals`/`eval`/`exec`.
-  and builtin-shadowing binding sites.
-- **SM613 reuses the same binding-site collection as the `NM2xx` naming
-  rules** (parameters, assignment/`for`/`with ... as`/comprehension targets,
-  function/class names), so class/instance attributes (`self.id`), dict keys,
-  and call-site keyword arguments are never flagged — only genuine scope
-  shadowing. The default `watched` list narrows the check to builtins most
-  often reused as domain terms (`id`, `type`, `list`, ...); every entry is
-  still verified against the live `builtins` module, not a hardcoded copy.
-- **`elif` chains don't count as nesting** for ST101 (they still count toward
-  ST105 complexity).
-- **SD801 flags a same-variable type-switch** (`isinstance`/`type()` chain) —
-  an Open/Closed Principle smell. Dispatching on Python's own `ast.*` node
-  types is exempt, since that's routine AST tooling, not the smell targeted.
-- **SD802 flags a class whose methods split into 2+ genuine multi-member
-  clusters** sharing no state or calls — an SRP smell beyond ST103's line
-  count. A lone method with no shared state doesn't count as its own cluster,
-  property getter/setter pairs are treated as one method, and classes named
-  with a configurable `exempt_name_suffixes` (default `Mixin`) are exempt
-  entirely — mixins are intentionally composed from independent behavior.
-- **DP701 flags copy-pasted function bodies** (once names are ignored) across
-  the whole run — it only catches cross-file duplicates when you check a
-  directory containing both files, not one file at a time.
-- **PY901 flags a bare `except:`** — it catches `KeyboardInterrupt` and
-  `SystemExit` along with genuine bugs. `except Exception:` is merely broad,
-  not bare, and is not flagged.
-- **PY902 flags a handler whose body is entirely inert** (`pass`, `...`, or a
-  lone string literal) — the exception is discarded with no log, fallback, or
-  re-raise. A handler that `continue`s/`return`s/`break`s, logs, or re-raises
-  is a real control-flow decision and is not flagged.
+## Disclaimer
+
+The software is provided "as is", without warranty of any kind, express or
+implied, including but not limited to the warranties of merchantability,
+fitness for a particular purpose, completeness, or correctness. In no event
+shall the authors be liable for any claim, damages, or other liability
+arising from the use of this software.
+
+## Contributing
+
+Bug reports, new rule proposals, and PRs are welcome — see
+[`CONTRIBUTING.md`](CONTRIBUTING.md) for the dev setup and a walkthrough of
+adding a rule, [`CHANGELOG.md`](CHANGELOG.md) for what's shipped, and
+[`RELEASING.md`](RELEASING.md) for how versions get published.
+
+## License
+
+[MIT](LICENSE).
