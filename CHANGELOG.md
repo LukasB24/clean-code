@@ -1,14 +1,20 @@
 # Changelog
 
 All notable changes to clean-code are documented here. Format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.0.0/); this project has
-not yet made a tagged/PyPI release, so everything below is grouped under
-`[Unreleased]` against the `0.1.0` version in `pyproject.toml`.
+[Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project
+follows [Semantic Versioning](https://semver.org/) starting at `1.0.0`.
 
-Rule IDs are stable once shipped (a rule keeps its ID across releases); a
-rule's default severity or default options may still change pre-1.0.
+Rule IDs are stable once shipped (a rule keeps its ID across releases). As
+of `1.0.0`, a rule's default severity and default options are also
+considered part of the public API and will only change in a major release.
 
 ## [Unreleased]
+
+Nothing yet.
+
+## [1.0.0] - 2026-07-14
+
+First stable release, published to PyPI.
 
 ### Added
 
