@@ -176,6 +176,7 @@ override that.
 | SD801 | type-switch-violates-ocp | `min_branches=3` | warning |
 | SD802 | low-cohesion-class | `min_methods=4` | warning |
 | DP701 | duplicate-function-body | `min_statements=4` | warning |
+| PY902 | empty-exception-handler | — | warning |
 
 `cleancode rules` prints the same list with full descriptions.
 
@@ -223,3 +224,7 @@ A few details worth knowing:
 - **DP701 flags copy-pasted function bodies** (once names are ignored) across
   the whole run — it only catches cross-file duplicates when you check a
   directory containing both files, not one file at a time.
+- **PY902 flags a handler whose body is entirely inert** (`pass`, `...`, or a
+  lone string literal) — the exception is discarded with no log, fallback, or
+  re-raise. A handler that `continue`s/`return`s/`break`s, logs, or re-raises
+  is a real control-flow decision and is not flagged.
