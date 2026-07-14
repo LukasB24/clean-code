@@ -4,33 +4,44 @@ build-backend = "hatchling.build"
 
 [project]
 name = "clean-code"
-version = "0.1.0"
-description = "Readability enforcer for LLM-generated Python: static analysis tool plus claude skill"
+version = "0.2.0"
+description = "Deterministic ast-based linter for LLM-generated Python that catches readability and SOLID/DRY smells, pairing every violation with a concrete fix instead of a vague warning"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 authors = [{ name = "LukasB24" }]
 keywords = ["lint", "readability", "llm", "code-quality", "static-analysis"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Quality Assurance",
 ]
 dependencies = ["click>=8.1"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "ruff>=0.6"]
 
 [project.scripts]
 clean-code = "cleancode.cli:main"
 
 [project.urls]
-Repository = "https://github.com/LukasB24/CleanCode"
+Repository = "https://github.com/LukasB24/clean-code"
+Issues = "https://github.com/LukasB24/clean-code/issues"
+Changelog = "https://github.com/LukasB24/clean-code/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/cleancode"]
 
 [tool.cleancode]
 fail_on = "info"
+
+[tool.ruff]
+line-length = 125
+target-version = "py311"
+extend-exclude = ["tests/fixtures/dirty"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]

@@ -10,8 +10,8 @@ rather than counting nodes.
 from __future__ import annotations
 
 import ast
-import re
 import builtins
+import re
 from typing import Iterable, Iterator
 
 from cleancode.models import FileContext, Severity, Violation, ViolationDetails

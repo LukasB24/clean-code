@@ -4,7 +4,7 @@ from cleancode.config import Config, ConfigError, RuleConfig
 from cleancode.engine import analyze_path, analyze_source
 from cleancode.models import CheckResult, Severity, Violation
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "CheckResult",
