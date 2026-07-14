@@ -1,20 +1,24 @@
 # Changelog
 
 All notable changes to clean-code are documented here. Format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project
-follows [Semantic Versioning](https://semver.org/) starting at `1.0.0`.
+[Keep a Changelog](https://keepachangelog.com/en/1.0.0/). The project
+follows [Semantic Versioning](https://semver.org/); while pre-1.0 (`0.x`),
+a minor version bump may still change a rule's default severity or default
+options, not just add new ones — check the entry below before upgrading.
+`1.0.0` will mark the point where that stops.
 
-Rule IDs are stable once shipped (a rule keeps its ID across releases). As
-of `1.0.0`, a rule's default severity and default options are also
-considered part of the public API and will only change in a major release.
+Rule IDs are stable once shipped (a rule keeps its ID across releases,
+whether pre- or post-1.0).
 
 ## [Unreleased]
 
 Nothing yet.
 
-## [1.0.0] - 2026-07-14
+## [0.2.0] - 2026-07-14
 
-First stable release, published to PyPI.
+First release published to PyPI. Still pre-1.0: functional and
+dogfooded on its own source, but the rule set and defaults may still
+shift before the API is called stable.
 
 ### Added
 

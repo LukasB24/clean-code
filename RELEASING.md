@@ -44,7 +44,14 @@ approval even after a release is published.
 
 ## Version policy
 
-Semantic Versioning from `1.0.0` onward:
+Pre-1.0 (`0.x`), a minor bump (`0.x.0`) may include new rules, changed
+rule defaults, or other behavior changes on existing code — read the
+CHANGELOG entry before upgrading. A patch (`0.x.y`) stays limited to bug
+fixes and docs.
+
+`1.0.0` marks rule IDs, default severities, default options, and the
+CLI/config surface as stable. From there, Semantic Versioning applies
+as usual:
 
 - **Patch** (`1.0.x`): bug fixes, false-positive/negative fixes on existing
   rules, docs.
