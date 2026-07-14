@@ -1,5 +1,9 @@
 # clean-code
 
+[![CI](https://github.com/LukasB24/clean-code/actions/workflows/ci.yml/badge.svg)](https://github.com/LukasB24/clean-code/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
+
 You ask an LLM for a function and it hands back something that runs — buried
 five `if`s deep, 90 lines long, with a variable called `data2` and a comment
 that just repeats the line under it. It works. Nobody wants to review it.
@@ -23,6 +27,13 @@ without warranty of any kind, express or implied, including but not limited
 to the warranties of merchantability, fitness for a particular purpose,
 completeness, or correctness. In no event shall the authors be liable for
 any claim, damages, or other liability arising from the use of this software.
+
+## Contributing
+
+Bug reports, new rule proposals, and PRs are welcome — see
+[`CONTRIBUTING.md`](CONTRIBUTING.md) for the dev setup and a walkthrough of
+adding a rule. See [`CHANGELOG.md`](CHANGELOG.md) for what's shipped, and
+[`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) for community expectations.
 
 ## Install
 
