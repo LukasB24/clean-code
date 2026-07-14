@@ -171,6 +171,7 @@ override that.
 | SM609 | eager-dataset-loading | — | warning |
 | SM610 | premature-device-placement | — | warning |
 | SM611 | redundant-isinstance-check | — | warning |
+| SM612 | unused-binding | — | warning |
 | SD801 | type-switch-violates-ocp | `min_branches=3` | warning |
 | SD802 | low-cohesion-class | `min_methods=4` | warning |
 | DP701 | duplicate-function-body | `min_statements=4` | warning |
@@ -190,8 +191,15 @@ A few details worth knowing:
 - **SM6xx catches structural smells node-counting misses**: nested
   comprehensions, anonymous tuple indexing, magic-string branching, redundant
   ternaries, `reduce` instead of `sum`, repeated iteration, magic numbers,
-  non-idiomatic emptiness checks, and PyTorch `Dataset` pitfalls (eager
-  loading, premature `.cuda()`, redundant `isinstance` on an annotated type).
+  non-idiomatic emptiness checks, PyTorch `Dataset` pitfalls (eager
+  loading, premature `.cuda()`, redundant `isinstance` on an annotated type),
+  and unused imports/local variables.
+- **SM612 skips `__init__.py`** for the unused-import half (imports there are
+  usually deliberate re-exports), exempts `__all__`-exported names,
+  `global`/`nonlocal` names, and forward-reference string annotations
+  (`ctx: "FileContext"`), only flags a multi-target unpack (`a, b = pair()`)
+  when *every* target in it is unused, and bails out of the unused-variable
+  check entirely for a function that calls `locals`/`eval`/`exec`.
 - **`elif` chains don't count as nesting** for ST101 (they still count toward
   ST105 complexity).
 - **SD801 flags a same-variable type-switch** (`isinstance`/`type()` chain) —
