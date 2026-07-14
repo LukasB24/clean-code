@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/LukasB24/clean-code/actions/workflows/ci.yml"><img src="https://github.com/LukasB24/clean-code/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://pypi.org/project/clean-code/"><img src="https://img.shields.io/pypi/v/clean-code.svg" alt="PyPI"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+"></a>
   <img src="https://img.shields.io/badge/deps-click_only-informational.svg" alt="Only dependency: click">
   <img src="https://img.shields.io/badge/analysis-100%25_deterministic-informational.svg" alt="No LLM calls, no API key">
@@ -193,4 +193,4 @@ adding a rule, [`CHANGELOG.md`](CHANGELOG.md) for what's shipped, and
 
 ## License
 
-[MIT](LICENSE).
+[Apache 2.0](LICENSE).
