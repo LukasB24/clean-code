@@ -128,10 +128,11 @@ of a recent real one (`PY901` bare-except):
    Cover the positive case, the obvious near-miss that should *not* fire,
    and any documented exemption.
 
-6. **Document it** in the rule table in `README.md` (ID, name, default,
+6. **Document it** in the rule table in `docs/RULES.md` (ID, name, default,
    severity), and add a bullet under "A few details worth knowing" if the
-   rule has non-obvious exemptions or edge cases — this is where most of the
-   README's existing detail comes from.
+   rule has non-obvious exemptions or edge cases — this is where most of
+   that file's existing detail comes from. Also update the category count
+   in `README.md`'s "The rules" table if your rule starts a new category.
 
 7. **Run the full loop** before opening a PR: `pytest -q`, `ruff check src
    tests`, and `clean-code check src` (the tool should stay clean on its own
