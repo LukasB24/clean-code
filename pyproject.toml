@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "clean-code"
 version = "0.2.0"
-description = "Readability enforcer for LLM-generated Python: static analysis tool plus claude skill"
+description = "Deterministic ast-based linter for LLM-generated Python that catches readability and SOLID/DRY smells, pairing every violation with a concrete fix instead of a vague warning"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
