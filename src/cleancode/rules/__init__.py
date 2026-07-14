@@ -7,13 +7,14 @@ from cleancode.rules.comments import (
     CommentRestatesCode,
     DocstringRestatesName,
 )
-from cleancode.rules.correctness import BareExcept
+from cleancode.rules.correctness import BareExcept, EmptyExceptionHandler
 from cleancode.rules.duplication import DuplicateFunctionBody
 from cleancode.rules.hints import UninformativeAny
 from cleancode.rules.naming import CrypticAbbreviation, MeaninglessName, ShortName
 from cleancode.rules.solid import LowCohesionClass, TypeSwitchViolatesOCP
 from cleancode.rules.semantic import (
     AnonymousTupleIndexing,
+    BuiltinShadowing,
     ComprehensionDensity,
     EagerDatasetLoading,
     MagicNumber,
@@ -24,6 +25,7 @@ from cleancode.rules.semantic import (
     RedundantBooleanTernary,
     RedundantIsinstanceCheck,
     RepeatedCollectionIteration,
+    UnusedBinding,
 )
 from cleancode.rules.slicing import ChainedSubscript, ComplexSubscript
 from cleancode.rules.structure import (
@@ -65,10 +67,13 @@ ALL_RULES: list[type[Rule] | type[ProjectRule]] = [
     EagerDatasetLoading,
     PrematureDevicePlacement,
     RedundantIsinstanceCheck,
+    UnusedBinding,
+    BuiltinShadowing,
     TypeSwitchViolatesOCP,
     LowCohesionClass,
     DuplicateFunctionBody,
     BareExcept,
+    EmptyExceptionHandler,
 ]
 
 RULES_BY_ID: dict[str, type[Rule] | type[ProjectRule]] = {rule.id: rule for rule in ALL_RULES}
