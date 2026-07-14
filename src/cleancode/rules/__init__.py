@@ -11,7 +11,6 @@ from cleancode.rules.correctness import BareExcept, EmptyExceptionHandler
 from cleancode.rules.duplication import DuplicateFunctionBody
 from cleancode.rules.hints import UninformativeAny
 from cleancode.rules.naming import CrypticAbbreviation, MeaninglessName, ShortName
-from cleancode.rules.solid import LowCohesionClass, TypeSwitchViolatesOCP
 from cleancode.rules.semantic import (
     AnonymousTupleIndexing,
     BuiltinShadowing,
@@ -28,6 +27,7 @@ from cleancode.rules.semantic import (
     UnusedBinding,
 )
 from cleancode.rules.slicing import ChainedSubscript, ComplexSubscript
+from cleancode.rules.solid import LowCohesionClass, TypeSwitchViolatesOCP
 from cleancode.rules.structure import (
     DoOneThing,
     MaxClassLength,
