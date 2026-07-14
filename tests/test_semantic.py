@@ -313,3 +313,24 @@ class TestBuiltinShadowing:
     def test_custom_watched_list_narrows_scope(self, check):
         source = "list = fetch_items()\n"
         assert check(source, "SM613", watched=["id"]) == []
+
+    def test_class_body_annotated_field_is_not_flagged(self, check):
+        source = """
+        class Rule:
+            id: str
+        """
+        assert check(source, "SM613") == []
+
+    def test_class_body_plain_assignment_field_is_not_flagged(self, check):
+        source = """
+        class MyRule:
+            id = "SM601"
+        """
+        assert check(source, "SM613") == []
+
+    def test_class_body_tuple_target_fields_are_not_flagged(self, check):
+        source = """
+        class Spec:
+            id, type = "a", "b"
+        """
+        assert check(source, "SM613") == []

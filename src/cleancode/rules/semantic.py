@@ -660,11 +660,26 @@ def _class_body_field_positions(tree: ast.Module) -> set[tuple[int, int]]:
     return positions
 
 
+def _unpack_target_name(element: ast.expr) -> ast.Name | None:
+    inner = element.value if isinstance(element, ast.Starred) else element
+    return inner if isinstance(inner, ast.Name) else None
+
+
+def _class_body_assign_names(target: ast.expr) -> Iterator[ast.Name]:
+    """Name leaves of a class-body assignment target, including tuple/list unpacking."""
+    if isinstance(target, ast.Name):
+        yield target
+    elif isinstance(target, (ast.Tuple, ast.List)):
+        names = (_unpack_target_name(element) for element in target.elts)
+        yield from (name for name in names if name is not None)
+
+
 def _class_body_statement_targets(statement: ast.stmt) -> Iterator[ast.Name]:
     if isinstance(statement, ast.AnnAssign) and isinstance(statement.target, ast.Name):
         yield statement.target
     elif isinstance(statement, ast.Assign):
-        yield from (target for target in statement.targets if isinstance(target, ast.Name))
+        for target in statement.targets:
+            yield from _class_body_assign_names(target)
 
 
 class BuiltinShadowing(Rule):
