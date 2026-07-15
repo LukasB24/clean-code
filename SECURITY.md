@@ -23,5 +23,7 @@ public advisory is published.
 
 ## Supported Versions
 
-This project is pre-1.0 (`0.x`) and not yet on PyPI. Only the latest commit
-on `main` is supported — please reproduce against that before reporting.
+This project is pre-1.0 (`0.x`). Only the latest release on
+[PyPI](https://pypi.org/project/clean-code/) and the latest commit on
+`main` are supported — please reproduce against one of those before
+reporting.
