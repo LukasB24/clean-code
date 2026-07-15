@@ -12,7 +12,16 @@ whether pre- or post-1.0).
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- `scripts/benchmark.py`, a dev-only before/after benchmark: pairs each
+  `tests/fixtures/benchmark/before/*.py` fixture with a hand-fixed
+  `after/*.py` counterpart and reports the violation-count and
+  severity-weighted score delta, so "clean-code's suggestions make code
+  better" is a measured number instead of a claim. Runs as a `benchmark`
+  job in CI and is enforced as a regression net by `tests/test_benchmark.py`
+  (an `after` fixture that starts tripping violations again fails the
+  build). See the README's "How much does it actually help?" section.
 
 ## [0.2.1] - 2026-07-15
 

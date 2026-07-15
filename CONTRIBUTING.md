@@ -19,11 +19,12 @@ That installs the package in editable mode plus `pytest` and `ruff`.
 
 ```bash
 pytest -q                    # run the test suite
-ruff check src tests         # lint (imports, unused names, obvious mistakes)
+ruff check src tests scripts # lint (imports, unused names, obvious mistakes)
 clean-code check src         # dogfood: the tool checking its own source
+python scripts/benchmark.py  # before/after score over the benchmark fixtures
 ```
 
-All three run in CI on every PR (`.github/workflows/ci.yml`, matrix over
+All four run in CI on every PR (`.github/workflows/ci.yml`, matrix over
 Python 3.11–3.13). A PR won't merge with any of them red.
 
 ## Project layout
@@ -138,6 +139,24 @@ of a recent real one (`PY901` bare-except):
    tests`, and `clean-code check src` (the tool should stay clean on its own
    source — if your new rule flags something in `src/cleancode`, fix that
    code too, don't suppress it).
+
+## Adding a benchmark pair
+
+`scripts/benchmark.py` measures how much applying `clean-code`'s
+suggestions actually improves a file — see the README's "How much does it
+actually help?" section for the pitch. If your new rule (or a particularly
+good real-world catch) deserves a before/after demonstration:
+
+1. Drop the messy version at `tests/fixtures/benchmark/before/<name>.py`.
+2. Hand-fix every violation it trips, following the rule's own `fix:`
+   suggestion, and save the result at
+   `tests/fixtures/benchmark/after/<name>.py`.
+3. Run `python scripts/benchmark.py` and confirm the `after` file scores
+   `0/0` — `tests/test_benchmark.py` enforces this in CI, so a fixture that
+   still trips a violation fails the build.
+
+Keep `before/` fixtures realistic (the kind of thing an LLM actually
+produces) rather than synthetic worst cases built to maximize the score.
 
 ## Fixing an existing rule
 

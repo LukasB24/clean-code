@@ -176,6 +176,42 @@ legacy_tmp = migrate(rows)  # cleancode: disable=NM202
 default options, severity, and the edge cases each one accounts for (what's
 exempt and why), see **[docs/RULES.md](docs/RULES.md)**.
 
+## How much does it actually help?
+
+`clean-code` finds violations for free, but the real question is what
+happens once those `fix:` suggestions get applied. `scripts/benchmark.py`
+answers that with numbers instead of a claim: it pairs each `before/*.py`
+fixture in `tests/fixtures/benchmark/` with an `after/*.py` counterpart —
+the same file with every reported violation fixed by hand, following the
+tool's own suggestions — and reports the violation-count and
+severity-weighted score delta for each pair.
+
+```bash
+python scripts/benchmark.py
+```
+
+```text
+fixture          before (viol/score)  after (viol/score)  score reduction
+---------------  -------------------  ------------------  ---------------
+checkout         7/140                0/0                 100%
+metrics          13/280               0/0                 100%
+pytorch_dataset  8/160                0/0                 100%
+solid_shapes     5/90                 0/0                 100%
+tensor           5/100                0/0                 100%
+
+total: 38 -> 0 violation(s), score 770 -> 0 (100% reduction)
+```
+
+The score weights each violation by severity (`error`=30, `warning`=20,
+`info`=10), so a handful of `error`-level structural fixes count for more
+than a pile of `info`-level naming nits. This runs in CI on every PR (see
+the `benchmark` job in `.github/workflows/ci.yml`) and doubles as a
+regression net: `tests/test_benchmark.py` fails the build if an `after`
+fixture ever trips a violation again, which usually means a rule change
+introduced a false positive. It's dev-only tooling — these fixtures aren't
+shipped in the published package — so it lives in `scripts/`, not as a
+`clean-code` subcommand.
+
 ## Disclaimer
 
 The software is provided "as is", without warranty of any kind, express or

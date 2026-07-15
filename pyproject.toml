@@ -41,7 +41,7 @@ fail_on = "info"
 [tool.ruff]
 line-length = 125
 target-version = "py311"
-extend-exclude = ["tests/fixtures/dirty"]
+extend-exclude = ["tests/fixtures/dirty", "tests/fixtures/benchmark"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]

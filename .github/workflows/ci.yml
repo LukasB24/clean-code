@@ -58,3 +58,18 @@ jobs:
       - run: pip install -e .
 
       - run: clean-code check src --min-severity info
+
+  benchmark:
+    name: benchmark (before/after)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -e ".[dev]"
+
+      - run: python scripts/benchmark.py
