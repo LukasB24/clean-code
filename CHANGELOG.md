@@ -14,6 +14,19 @@ whether pre- or post-1.0).
 
 Nothing yet.
 
+## [0.2.1] - 2026-07-15
+
+### Fixed
+
+- README preview image renamed from `assets/banner.svg` to
+  `assets/preview.svg` — the old filename matched the ad-network
+  pattern in default ad-blocker filter lists, so the image was
+  silently blocked for some readers.
+- The preview image now uses an absolute `raw.githubusercontent.com`
+  URL instead of a relative path, so it renders correctly on the PyPI
+  project page as well as on GitHub (PyPI's README renderer doesn't
+  resolve relative paths against the repo the way GitHub does).
+
 ## [0.2.0] - 2026-07-14
 
 First release published to PyPI. Still pre-1.0: functional and
