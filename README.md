@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.svg" alt="clean-code: a messy LLM-generated function on the left becomes a short, well-named function on the right" width="700">
+  <img src="assets/preview.svg" alt="clean-code: a messy LLM-generated function on the left becomes a short, well-named function on the right" width="700">
 </p>
 
 <h1 align="center">clean-code</h1>
