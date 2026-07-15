@@ -12,7 +12,10 @@ whether pre- or post-1.0).
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- `.pre-commit-hooks.yaml` — clean-code can now be added as a
+  [pre-commit](https://pre-commit.com) hook.
 
 ## [0.2.1] - 2026-07-15
 

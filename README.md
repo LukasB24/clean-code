@@ -70,6 +70,18 @@ Then trigger it directly within your Claude Code CLI or VS Code extension:
 /clean-code [instruction or target_path]
 ```
 
+### Using it with pre-commit
+
+Add it to `.pre-commit-config.yaml`:
+
+```yaml
+repos:
+  - repo: https://github.com/LukasB24/clean-code
+    rev: v0.2.1
+    hooks:
+      - id: clean-code
+```
+
 ## See it catch something real
 
 Given `checkout.py`, fresh out of an LLM:
