@@ -107,14 +107,7 @@ def _run_file_rules(parsed: ParsedFile, config: Config) -> list[Violation]:
         rule_config = config.rules[rule_class.id]
         if not rule_config.enabled:
             continue
-        ctx = FileContext(
-            path=parsed.path,
-            source=parsed.source,
-            lines=parsed.lines,
-            tree=parsed.tree,
-            comments=parsed.comments,
-            config=rule_config,
-        )
+        ctx = FileContext(parsed=parsed, config=rule_config)
         violations.extend(rule_class().check(ctx))
     return violations
 

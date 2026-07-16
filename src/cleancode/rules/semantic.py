@@ -13,7 +13,7 @@ import ast
 from typing import Iterable, Iterator
 
 from cleancode.models import FileContext, Severity, Violation, ViolationDetails
-from cleancode.rules.base import FunctionNode, Rule, functions, subscript_base_name
+from cleancode.rules.base import FunctionNode, Rule, subscript_base_name
 
 _COMP_TYPES = (ast.ListComp, ast.DictComp, ast.SetComp, ast.GeneratorExp)
 
@@ -102,7 +102,7 @@ class AnonymousTupleIndexing(Rule):
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
-        for function in functions(ctx.tree):
+        for function in ctx.functions:
             tracked = _tuple_annotated_params(function)
             if not tracked:
                 continue
@@ -294,7 +294,7 @@ class RepeatedCollectionIteration(Rule):
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
-        for function in functions(ctx.tree):
+        for function in ctx.functions:
             yield from self._check_function(ctx, function)
 
     def _check_function(self, ctx: FileContext, function: FunctionNode) -> Iterator[Violation]:

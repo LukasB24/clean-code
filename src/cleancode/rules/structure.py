@@ -10,7 +10,6 @@ from cleancode.models import FileContext, Severity, Violation, ViolationDetails
 from cleancode.rules.base import (
     FunctionNode,
     Rule,
-    functions,
     is_dunder,
     is_elif_branch,
     own_scope_walk,
@@ -69,7 +68,7 @@ class MaxNestingDepth(Rule):
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         max_depth = ctx.config.options["max_depth"]
-        for function in functions(ctx.tree):
+        for function in ctx.functions:
             if _enclosing_function(function) is not None:
                 continue  # measured by the outermost function, depth inherited (not reset)
             deepest, first_offender = self._measure(function, max_depth)
@@ -167,7 +166,7 @@ class MaxParameters(Rule):
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         max_params = ctx.config.options["max_params"]
-        for function in functions(ctx.tree):
+        for function in ctx.functions:
             parameters = [
                 *function.args.posonlyargs,
                 *function.args.args,
@@ -204,7 +203,7 @@ class MaxComplexity(Rule):
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         max_complexity = ctx.config.options["max_complexity"]
-        for function in functions(ctx.tree):
+        for function in ctx.functions:
             complexity = self._complexity(function)
             if complexity > max_complexity:
                 yield self.violation(
@@ -258,7 +257,7 @@ class DoOneThing(Rule):
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         conjunctions = set(ctx.config.options["conjunctions"])
         allowed = set(ctx.config.options["allowed_names"])
-        for function in functions(ctx.tree):
+        for function in ctx.functions:
             word = self._conjunction(function, conjunctions, allowed)
             if word is not None:
                 yield self.violation(
@@ -377,7 +376,7 @@ class TooManyGuardClauses(Rule):
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         max_guards = ctx.config.options["max_guards"]
-        for function in functions(ctx.tree):
+        for function in ctx.functions:
             count = self._max_guard_count(function)
             if count > max_guards:
                 yield self.violation(

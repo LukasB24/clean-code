@@ -18,11 +18,9 @@ from cleancode.rules.base import (
     IDENTIFIER,
     FunctionNode,
     Rule,
-    functions,
     import_aliases,
     own_scope_walk,
 )
-from cleancode.rules.naming import collect_bindings
 
 
 def _dotted_name(node: ast.expr | None) -> str | None:
@@ -78,7 +76,7 @@ class RedundantIsinstanceCheck(Rule):
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
-        for function in functions(ctx.tree):
+        for function in ctx.functions:
             tracked = _annotated_names(function)
             if not tracked:
                 continue
@@ -291,7 +289,7 @@ class UnusedBinding(Rule):
             )
 
     def _check_local_variables(self, ctx: FileContext) -> Iterator[Violation]:
-        for function in functions(ctx.tree):
+        for function in ctx.functions:
             yield from self._check_function(ctx, function)
 
     def _check_function(self, ctx: FileContext, function: FunctionNode) -> Iterator[Violation]:
@@ -357,7 +355,7 @@ class BuiltinShadowing(Rule):
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         watched = set(ctx.config.options["watched"]) & vars(builtins).keys()
         exempt_positions = _class_body_field_positions(ctx.tree)
-        for binding in collect_bindings(ctx.tree):
+        for binding in ctx.bindings:
             if binding.name not in watched:
                 continue
             if (binding.lineno, binding.col_offset) in exempt_positions:

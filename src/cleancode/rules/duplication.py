@@ -8,84 +8,91 @@ copy-pasted into another module (or another class in the same file).
 from __future__ import annotations
 
 import ast
-import copy
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING, Callable, ClassVar, Iterable
 
 from cleancode.models import Location, ParsedFile, Severity, Violation, ViolationDetails
-from cleancode.rules.base import FunctionNode, ProjectRule, functions, import_aliases, is_dunder
+from cleancode.rules.base import FunctionNode, ProjectRule, import_aliases, is_dunder
 
 if TYPE_CHECKING:
     from cleancode.config import Config
 
 
-class _Anonymizer(ast.NodeTransformer):
-    """Blanks variable/parameter/attribute names in a (copied) AST in place.
+def _preserved_nodes(statement: ast.AST, imported_names: set[str]) -> set[ast.AST]:
+    """The nodes whose identifiers survive anonymization: call targets.
 
-    Call targets are preserved: two bodies that call different functions
-    (``json.dumps(x)`` vs ``pickle.loads(x)``) are doing different things,
-    not copy-pasting each other. A call's receiver chain is preserved too
-    when it is rooted at an imported name — ``json.dumps`` and ``yaml.dumps``
-    name different APIs — while a variable receiver stays blanked, because
-    ``fh.write`` vs ``out.write`` is just a rename.
+    Two bodies that call different functions (``json.dumps(x)`` vs
+    ``pickle.loads(x)``) are doing different things, not copy-pasting each
+    other. A call's receiver chain survives too when it is rooted at an
+    imported name — ``json.dumps`` and ``yaml.dumps`` name different APIs —
+    while a variable receiver stays anonymized, because ``fh.write`` vs
+    ``out.write`` is just a rename.
+    """
+    preserved: set[ast.AST] = set()
+    for node in ast.walk(statement):
+        if isinstance(node, ast.Call) and isinstance(node.func, (ast.Name, ast.Attribute)):
+            preserved.add(node.func)
+            _extend_with_imported_receiver(preserved, node.func, imported_names)
+    return preserved
+
+
+def _extend_with_imported_receiver(
+    preserved: set[ast.AST], func: ast.expr, imported_names: set[str]
+) -> None:
+    chain: list[ast.AST] = []
+    current = func.value if isinstance(func, ast.Attribute) else None
+    while isinstance(current, ast.Attribute):
+        chain.append(current)
+        current = current.value
+    if isinstance(current, ast.Name) and current.id in imported_names:
+        preserved.add(current)
+        preserved.update(chain)
+
+
+# Identifier-carrying fields that anonymization blanks (unless preserved).
+_IDENTIFIER_FIELDS = {(ast.Name, "id"), (ast.Attribute, "attr"), (ast.arg, "arg"), (ast.keyword, "arg")}
+
+
+@dataclass(frozen=True)
+class _Renderer:
+    """``ast.dump``-style rendering with identifier fields blanked in place.
+
+    Reads the tree without copying or mutating it. ``copy.deepcopy`` is off
+    the table here: the engine attaches a ``parent`` back-reference to every
+    node, so deep-copying one statement would drag the entire module graph
+    into every copy — quadratic, and the dominant cost of a whole check run.
     """
 
-    def __init__(self, imported_names: set[str]) -> None:
-        self._imported_names = imported_names
-        self._call_targets: set[ast.AST] = set()
+    preserved: set[ast.AST]
 
-    def visit_Call(self, node: ast.Call) -> ast.AST:
-        if isinstance(node.func, (ast.Name, ast.Attribute)):
-            self._call_targets.add(node.func)
-            self._preserve_imported_receiver(node.func)
-        self.generic_visit(node)
-        return node
+    def render(self, node: object) -> str:
+        if isinstance(node, list):
+            return "[" + ", ".join(self.render(item) for item in node) + "]"
+        if not isinstance(node, ast.AST):
+            return repr(node)
+        fields = ", ".join(
+            f"{name}={self.render(self._field_value(node, name, value))}"
+            for name, value in ast.iter_fields(node)
+        )
+        return f"{type(node).__name__}({fields})"
 
-    def _preserve_imported_receiver(self, func: ast.expr) -> None:
-        chain: list[ast.AST] = []
-        current = func.value if isinstance(func, ast.Attribute) else None
-        while isinstance(current, ast.Attribute):
-            chain.append(current)
-            current = current.value
-        if isinstance(current, ast.Name) and current.id in self._imported_names:
-            self._call_targets.add(current)
-            self._call_targets.update(chain)
-
-    def visit_Name(self, node: ast.Name) -> ast.AST:
-        if node not in self._call_targets:
-            node.id = "_"
-        return node
-
-    def visit_Attribute(self, node: ast.Attribute) -> ast.AST:
-        if node not in self._call_targets:
-            node.attr = "_"
-        self.generic_visit(node)
-        return node
-
-    def visit_arg(self, node: ast.arg) -> ast.AST:
-        node.arg = "_"
-        self.generic_visit(node)
-        return node
-
-    def visit_keyword(self, node: ast.keyword) -> ast.AST:
-        if node.arg is not None:
-            node.arg = "_"
-        self.generic_visit(node)
-        return node
+    def _field_value(self, node: ast.AST, name: str, value: object) -> object:
+        """The field's value, blanked to ``"_"`` when it is an anonymized identifier."""
+        is_identifier = (type(node), name) in _IDENTIFIER_FIELDS and value is not None
+        return "_" if is_identifier and node not in self.preserved else value
 
 
 def _normalized_dump(node: ast.AST, imported_names: set[str]) -> str:
-    """``ast.dump`` with variable/parameter/attribute names blanked out.
+    """Renders ``node`` with variable/parameter/attribute names blanked out.
 
     Two statements with identical control flow and literals but different
-    names (``rows`` vs ``items``) dump to the same string; called function/
-    method names (with any imported-module receiver), and literal constants
+    names (``rows`` vs ``items``) render to the same string; called function/
+    method names (with any imported-module receiver) and literal constants
     still tell them apart, so this stays conservative.
     """
-    anonymized = _Anonymizer(imported_names).visit(copy.deepcopy(node))
-    return ast.dump(anonymized, annotate_fields=True, include_attributes=False)
+    return _Renderer(_preserved_nodes(node, imported_names)).render(node)
 
 
 def _is_docstring_expr(statement: ast.stmt) -> bool:
@@ -173,7 +180,7 @@ def _comparable_members(
 def _file_members(
     parsed: ParsedFile, min_statements: int, fingerprint: _Fingerprint
 ) -> Iterable[tuple[str, _Member]]:
-    for function in functions(parsed.tree):
+    for function in parsed.functions:
         key = _body_fingerprint(function, min_statements, fingerprint)
         if key is not None:
             yield key, (parsed, function)

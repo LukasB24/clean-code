@@ -43,6 +43,13 @@ whether pre- or post-1.0).
 
 ### Fixed
 
+- Checking a medium project no longer takes double-digit seconds
+  (`clean-code check src` on this repo: 13.5s → 0.9s). `DP701`'s
+  fingerprinting deep-copied each statement's AST, and the `parent`
+  back-reference every node carries dragged the entire module graph into
+  every copy; fingerprints are now rendered from the tree in place, with
+  no copy. Per-file rules also share one cached function/binding walk per
+  file instead of re-walking the tree per rule.
 - `ST105` no longer counts a nested function's branches toward the
   enclosing function's cyclomatic complexity (each function scores its own
   body; lambdas still count toward their enclosing function).

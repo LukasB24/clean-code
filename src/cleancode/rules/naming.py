@@ -89,7 +89,7 @@ class ShortName(Rule):
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         allowed = set(ctx.config.options["allowed"])
         min_length = ctx.config.options["min_length"]
-        for binding in collect_bindings(ctx.tree):
+        for binding in ctx.bindings:
             if self._is_flagged(binding, allowed, min_length):
                 yield self.violation(
                     ctx,
@@ -155,7 +155,7 @@ class MeaninglessName(Rule):
         banned = set(ctx.config.options["banned"])
         banned_functions = set(ctx.config.options["banned_functions"])
         allowed_in_loops = set(ctx.config.options["allowed_in_loops"])
-        for binding in collect_bindings(ctx.tree):
+        for binding in ctx.bindings:
             if binding.name.isupper():
                 continue  # ALL_CAPS constants like INFO or DEFAULT are named by convention
             name = binding.name.lower()
@@ -203,7 +203,7 @@ class CrypticAbbreviation(Rule):
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         known = set(ctx.config.options["known_abbrevs"])
-        for binding in collect_bindings(ctx.tree):
+        for binding in ctx.bindings:
             cryptic = [
                 part
                 for part in split_identifier(binding.name)
