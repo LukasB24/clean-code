@@ -59,10 +59,10 @@ _IDENTIFIER_FIELDS = {(ast.Name, "id"), (ast.Attribute, "attr"), (ast.arg, "arg"
 class _Renderer:
     """``ast.dump``-style rendering with identifier fields blanked in place.
 
-    Reads the tree without copying or mutating it. ``copy.deepcopy`` is off
-    the table here: the engine attaches a ``parent`` back-reference to every
-    node, so deep-copying one statement would drag the entire module graph
-    into every copy — quadratic, and the dominant cost of a whole check run.
+    Walks the tree read-only via ``ast.iter_fields``, which only visits a
+    node's declared ``_fields`` — the ``parent`` back-reference the engine
+    attaches to every node is never one of those, so it's never touched and
+    can't pull the rest of the module into the render.
     """
 
     preserved: set[ast.AST]
