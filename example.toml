@@ -166,6 +166,23 @@
 # [tool.cleancode.SM613]
 # watched = ["id", "type", "list", "dict", "str", "input", "format", "filter", "min", "max", "sum", "hash", "object", "property", "map", "next", "iter"]
 
+# SM614  bool-arithmetic  [warning]
+#   Flags an augmented assignment whose right-hand side is a bare comparison or membership test (`count += value in seen`) — a boolean used as a number makes the reader do the int-cast in their head. Deliberately narrow (augmented assignments only), so numpy/torch mask arithmetic is untouched.
+# [tool.cleancode.SM614]
+
+# SM615  nested-ternary  [warning]
+#   Flags a conditional expression nested inside another conditional expression (`a if x else (b if y else c)`). One ternary reads fine; two levels always need a second pass. Only the outermost ternary of a chain is reported.
+# [tool.cleancode.SM615]
+
+# SM616  callable-indirection  [warning]
+#   Flags a function that manufactures a callable instead of doing work: it returns a `lambda`, returns a `functools.partial(...)`, or its whole body is `return <name of another function>`. Each is a hop the reviewer must chase to find the actual logic. Returning a nested `def` is not flagged — that's the decorator shape.
+# [tool.cleancode.SM616]
+
+# SM617  deep-expression  [warning]
+#   Flags a statement whose expression tree nests operations (calls, arithmetic, ternaries, comprehensions, f-strings) deeper than `max_depth` (default 4). A flat chain of conditions reads fine at any length; five layers of calls-inside-f-strings-inside-comprehensions on one line do not. Module-level statements (constant tables) are exempt. Complements ST101, which limits statement nesting rather than expression nesting.
+# [tool.cleancode.SM617]
+# max_depth = 4
+
 # SD801  type-switch-violates-ocp  [warning]
 #   Flags an if/elif chain of `min_branches`-or-more (default 3) branches that each test `isinstance(x, ...)`/`type(x) is ...` against the same variable — adding a new type means editing this chain instead of extending via polymorphism, the classic Open/Closed Principle violation.
 # [tool.cleancode.SD801]

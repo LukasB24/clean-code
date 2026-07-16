@@ -6,6 +6,12 @@ from cleancode.rules.bindings import (
     RedundantIsinstanceCheck,
     UnusedBinding,
 )
+from cleancode.rules.clarity import (
+    BoolArithmetic,
+    CallableIndirection,
+    DeepExpression,
+    NestedTernary,
+)
 from cleancode.rules.comments import (
     CommentDensity,
     CommentRestatesCode,
@@ -73,6 +79,10 @@ ALL_RULES: list[type[Rule] | type[ProjectRule]] = [
     RedundantIsinstanceCheck,
     UnusedBinding,
     BuiltinShadowing,
+    BoolArithmetic,
+    NestedTernary,
+    CallableIndirection,
+    DeepExpression,
     TypeSwitchViolatesOCP,
     LowCohesionClass,
     DuplicateFunctionBody,

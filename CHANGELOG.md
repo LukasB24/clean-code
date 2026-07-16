@@ -25,12 +25,27 @@ whether pre- or post-1.0).
   that per-function `CM303` misses. Directive comments and docstrings don't
   count; the suggestion instructs the fixer to analyze every comment in the
   file and keep only those that say something the code cannot.
+- `SM614`–`SM617`, the expression clarity family — catches complexity that
+  was *compressed* to satisfy the structural limits instead of removed:
+  `SM614` `bool-arithmetic` (a comparison added to a counter), `SM615`
+  `nested-ternary`, `SM616` `callable-indirection` (returning a `lambda`/
+  `functools.partial`/bare function reference instead of doing work), and
+  `SM617` `deep-expression` (expressions nested more than `max_depth`
+  levels in one statement; flat condition chains and module-level constant
+  tables stay exempt).
 - Suppression directives now also work from the line above: a standalone
   `# cleancode: disable[=IDS]` comment suppresses the next code line below
   it (inline directives stay same-line-only).
 
 ### Changed
 
+- The new clarity rules forced their own cleanup of this codebase (the
+  dogfood gate at work): `DP701`/`DP702`'s fingerprint-factory layer is
+  replaced by two dump functions with a shared signature passed directly
+  (`SM616`), boolean-counting in `CM305` became explicit `if`s (`SM614`),
+  and three depth-5 one-liners in `duplication.py`/`structure.py`/
+  `template.py` were unpacked into named intermediates (`SM617`).
+  Duplicate-detection output is byte-identical before and after.
 - `rules/semantic.py` split by concern: `SM609`/`SM610` moved to
   `rules/pytorch.py`, `SM611`–`SM613` to `rules/bindings.py`. Rule ids,
   class names, and behavior are unchanged.
