@@ -47,6 +47,11 @@
 # [tool.cleancode.ST107]
 # max_guards = 2
 
+# ST108  max-module-length  [warning]
+#   Limits how long one module may grow (default 500 lines). A file that keeps absorbing new classes and helpers turns into a grab-bag nobody can navigate — split it into focused submodules, one concern per file, before it gets there.
+# [tool.cleancode.ST108]
+# max_lines = 500
+
 # NM201  short-name  [warning]
 #   Flags names shorter than `min_length` characters (default 3) — cryptic pairs like `ab`/`bc`/`df` as much as bare letters. Conventional loop/comprehension/lambda letters (i, j, k, n, x, y) and known short words (id, ok, fh, ...) are allowlisted and configurable; functions, classes, and ordinary variables otherwise always need real names.
 # [tool.cleancode.NM201]
@@ -146,6 +151,15 @@
 #   Flags `isinstance(x, T)` where `x` already carries a simple static annotation of exactly `T` — the runtime check is hallucinated safety that a type checker already guarantees, and it costs cycles in hot loops like `__getitem__`.
 # [tool.cleancode.SM611]
 
+# SM612  unused-binding  [warning]
+#   Flags an import that's never referenced anywhere in the module, and a local variable that's assigned inside a function but never read. Names already prefixed with `_`, `__all__` exports, `__init__.py` re-exports, `global`/`nonlocal` names, multi-target unpacking where at least one target is used, and functions that call `locals`/`eval`/`exec` (which can reference locals dynamically) are all exempt.
+# [tool.cleancode.SM612]
+
+# SM613  builtin-shadowing  [warning]
+#   Flags a binding site (parameter, assignment target, `for`/`with ... as`/comprehension target, function/class name) whose identifier shadows a Python builtin (`id`, `type`, `list`, ...), which can cause confusing bugs if the original builtin is needed later in the same scope. A configurable `watched` list (default: the builtins most often reused as domain terms) limits noise; every entry is still checked against the live `builtins` module rather than a hardcoded copy, so it stays correct across Python versions. Class-body field declarations (`id: ClassVar[str]`, `id = "SM601"`) are exempt — they're field names, not shadowing locals.
+# [tool.cleancode.SM613]
+# watched = ["id", "type", "list", "dict", "str", "input", "format", "filter", "min", "max", "sum", "hash", "object", "property", "map", "next", "iter"]
+
 # SD801  type-switch-violates-ocp  [warning]
 #   Flags an if/elif chain of `min_branches`-or-more (default 3) branches that each test `isinstance(x, ...)`/`type(x) is ...` against the same variable — adding a new type means editing this chain instead of extending via polymorphism, the classic Open/Closed Principle violation.
 # [tool.cleancode.SD801]
@@ -161,4 +175,17 @@
 #   Flags two or more functions/methods, anywhere in the analyzed files, whose bodies are structurally identical once names are ignored — copy-paste DRY violations a single-file rule can't see. Stub bodies (pass/.../raise NotImplementedError), dunder methods, and bodies shorter than `min_statements` are exempt.
 # [tool.cleancode.DP701]
 # min_statements = 4
+
+# DP702  identical-function-implementation  [warning]
+#   Flags two or more functions/methods whose bodies are exactly identical, identifiers included — the same implementation pasted twice, like a private helper that drifted into a second module. Requiring identifiers to match is what lets this rule inspect much shorter bodies (default 2 statements) than DP701 without noise; bodies long enough for DP701 to report are left to DP701. Stub bodies and dunder methods are exempt.
+# [tool.cleancode.DP702]
+# min_statements = 2
+
+# PY901  bare-except  [warning]
+#   Flags `except:` with no exception type at all — it catches `KeyboardInterrupt` and `SystemExit` along with genuine bugs, silently absorbing signals that should propagate. `except Exception:` is merely broad, not bare, and is not flagged.
+# [tool.cleancode.PY901]
+
+# PY902  empty-exception-handler  [warning]
+#   Flags an exception handler whose entire body is inert (`pass`, a bare `...`, or a lone string literal, in any combination) — the failure is silently discarded with no log, fallback, or re-raise. Handlers that `continue`/`return`/`break`, log, or re-raise are real control-flow decisions and are not flagged.
+# [tool.cleancode.PY902]
 
