@@ -12,7 +12,52 @@ whether pre- or post-1.0).
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- `ST108` `max-module-length` — flags a module longer than `max_lines`
+  (default 500); a file that keeps absorbing helpers becomes a grab-bag.
+- `DP702` `identical-function-implementation` — flags function bodies that
+  are exactly identical, identifiers included (default 2+ statements).
+  Complements `DP701`; groups long enough for `DP701` are left to it so a
+  copy-paste is never reported twice.
+- Suppression directives now also work from the line above: a standalone
+  `# cleancode: disable[=IDS]` comment suppresses the next code line below
+  it (inline directives stay same-line-only).
+
+### Changed
+
+- `rules/semantic.py` split by concern: `SM609`/`SM610` moved to
+  `rules/pytorch.py`, `SM611`–`SM613` to `rules/bindings.py`. Rule ids,
+  class names, and behavior are unchanged.
+- `DP701` now preserves called function/method names when normalizing
+  bodies, so two same-shaped functions invoking different APIs no longer
+  fingerprint as duplicates.
+- `SM605`'s suggestion mentions `''.join()` for string concatenation,
+  where `sum()` would raise.
+
+### Fixed
+
+- `ST105` no longer counts a nested function's branches toward the
+  enclosing function's cyclomatic complexity (each function scores its own
+  body; lambdas still count toward their enclosing function).
+- `ST101` no longer reports the same deep block twice (once for the outer
+  function and once for a nested function); nested functions keep
+  inheriting the enclosing visual depth.
+- `ST101` no longer crashes when the first offender is a `match` case
+  (anchored at the case's pattern now).
+- A non-UTF-8 or unreadable file no longer aborts the whole run with a
+  traceback; it is reported as a per-file error (exit code 2) and the
+  remaining files are still checked.
+- Relative `exclude` patterns (`migrations/**`, as documented) now work:
+  patterns are matched against the path relative to the project root (the
+  directory of the `pyproject.toml`/`--config` file) in addition to the
+  absolute path.
+- `SM612` no longer flags a local variable that is explicitly `del`ed.
+- `example.toml` regenerated — it had drifted and was missing the four
+  0.2.0 rules (`SM612`, `SM613`, `PY901`, `PY902`); a new test now pins it
+  to the generator's output.
+- README banner uses an absolute `raw.githubusercontent.com` URL again so
+  it renders on PyPI (the 0.2.1 fix had been lost in a later edit).
 
 ## [0.2.1] - 2026-07-15
 

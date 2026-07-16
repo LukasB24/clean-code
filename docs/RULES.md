@@ -15,6 +15,7 @@ quick-start, see the [README](../README.md).
 | ST105 | max-complexity | `max_complexity=10` | error |
 | ST106 | do-one-thing | `conjunctions=[and, or]` | warning |
 | ST107 | too-many-guard-clauses | `max_guards=2` | info |
+| ST108 | max-module-length | `max_lines=500` | warning |
 | NM201 | short-name | `min_length=3, allowed=[i,j,k,n,x,y,_,id,ok,fh]` | warning |
 | NM202 | meaningless-name | configurable ban lists | warning |
 | NM203 | cryptic-abbreviation | `known_abbrevs=[cfg,ctx,idx,…]` | info |
@@ -41,6 +42,7 @@ quick-start, see the [README](../README.md).
 | SD801 | type-switch-violates-ocp | `min_branches=3` | warning |
 | SD802 | low-cohesion-class | `min_methods=4` | warning |
 | DP701 | duplicate-function-body | `min_statements=4` | warning |
+| DP702 | identical-function-implementation | `min_statements=2` | warning |
 | PY901 | bare-except | — | warning |
 | PY902 | empty-exception-handler | — | warning |
 
@@ -64,9 +66,9 @@ quick-start, see the [README](../README.md).
   usually deliberate re-exports), exempts `__all__`-exported names,
   `global`/`nonlocal` names, and forward-reference string annotations
   (`ctx: "FileContext"`), only flags a multi-target unpack (`a, b = pair()`)
-  when *every* target in it is unused, and bails out of the unused-variable
-  check entirely for a function that calls `locals`/`eval`/`exec`.
-  and builtin-shadowing binding sites.
+  when *every* target in it is unused, counts an explicit `del` as a use,
+  and bails out of the unused-variable check entirely for a function that
+  calls `locals`/`eval`/`exec`.
 - **SM613 reuses the same binding-site collection as the `NM2xx` naming
   rules** (parameters, assignment/`for`/`with ... as`/comprehension targets,
   function/class names), so class/instance attributes (`self.id`), dict keys,
@@ -87,7 +89,16 @@ quick-start, see the [README](../README.md).
   entirely — mixins are intentionally composed from independent behavior.
 - **DP701 flags copy-pasted function bodies** (once names are ignored) across
   the whole run — it only catches cross-file duplicates when you check a
-  directory containing both files, not one file at a time.
+  directory containing both files, not one file at a time. Called function/
+  method names are *not* ignored: two same-shaped bodies that invoke
+  different APIs are doing different things, not copy-pasting each other.
+- **DP702 flags exactly identical bodies, identifiers included** — the same
+  helper pasted into two places. Requiring identifiers to match lets it
+  inspect much shorter bodies (default 2 statements) than DP701 without
+  noise; a group long enough for DP701 to report is left to DP701 so one
+  copy-paste never produces two violations.
+- **ST108 counts a module's total lines** (blank lines and comments
+  included, mirroring how a reader scrolls a file) against `max_lines`.
 - **PY901 flags a bare `except:`** — it catches `KeyboardInterrupt` and
   `SystemExit` along with genuine bugs. `except Exception:` is merely broad,
   not bare, and is not flagged.
