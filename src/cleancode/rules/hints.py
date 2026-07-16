@@ -6,7 +6,7 @@ import ast
 from typing import Iterable, Iterator
 
 from cleancode.models import FileContext, Severity, Violation, ViolationDetails
-from cleancode.rules.base import FunctionNode, Rule, functions, subscript_base_name
+from cleancode.rules.base import FunctionNode, Rule, subscript_base_name
 
 
 def _annotations(function: FunctionNode) -> Iterator[tuple[ast.expr, str]]:
@@ -63,7 +63,7 @@ class UninformativeAny(Rule):
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
-        for function in functions(ctx.tree):
+        for function in ctx.functions:
             yield from self._check_function(ctx, function)
 
     def _check_function(

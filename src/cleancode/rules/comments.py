@@ -19,7 +19,6 @@ from cleancode.rules.base import (
     FunctionNode,
     Rule,
     content_words,
-    functions,
     split_identifier,
 )
 
@@ -207,7 +206,7 @@ class DocstringRestatesName(Rule):
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         overlap_threshold = ctx.config.options["overlap"]
-        for function in functions(ctx.tree):
+        for function in ctx.functions:
             docstring = ast.get_docstring(function, clean=True)
             node = _docstring_node(function)
             if docstring is None or node is None:
@@ -314,7 +313,7 @@ class CommentDensity(Rule):
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         max_ratio = ctx.config.options["max_ratio"]
         min_code_lines = ctx.config.options["min_code_lines"]
-        for function in functions(ctx.tree):
+        for function in ctx.functions:
             code_lines, comment_lines = self._count_lines(ctx, function)
             if code_lines >= min_code_lines and comment_lines / code_lines > max_ratio:
                 yield self.violation(
@@ -365,7 +364,7 @@ class BoilerplateParamDocs(Rule):
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         min_uninformative = ctx.config.options["min_uninformative"]
-        for function in functions(ctx.tree):
+        for function in ctx.functions:
             docstring = ast.get_docstring(function, clean=True)
             node = _docstring_node(function)
             if docstring is None or node is None:
