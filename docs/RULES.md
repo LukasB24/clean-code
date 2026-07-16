@@ -23,6 +23,7 @@ quick-start, see the [README](../README.md).
 | CM302 | comment-restates-code | `overlap=0.7, min_words=2` | warning |
 | CM303 | comment-density | `max_ratio=0.3, min_code_lines=5` | info |
 | CM304 | boilerplate-param-docs | `min_uninformative=0.5` | warning |
+| CM305 | file-comment-density | `max_ratio=0.2, min_code_lines=30` | warning |
 | SL401 | complex-subscript | `max_score=5` | warning |
 | SL402 | chained-subscript | `max_chain=2` | warning |
 | TY501 | uninformative-any | — | warning |
@@ -54,6 +55,14 @@ quick-start, see the [README](../README.md).
 - **CM301/CM302 are deterministic, not LLM-judged** — they compare word
   overlap between a docstring/comment and the code it annotates. Comments
   explaining *why* (not *what*) are always exempt.
+- **CM305 measures comment density file-wide** where CM303 measures it per
+  function, so it catches comment sprawl spread across module level and many
+  small functions. It counts non-blank comment lines against code lines
+  (an inline comment counts as +1 comment on its code line); directive
+  comments (TODO/FIXME, `noqa`, `cleancode:`, shebangs, ...) and docstrings
+  (CM301/CM304's territory) count toward neither side. Its suggestion is
+  written for an LLM fixer: analyze every comment in the file and keep only
+  those that say something the code cannot.
 - **SL401/SL402 score subscript complexity** (dimensions, steps, nesting,
   chaining) and ignore type annotations like `dict[str, int]`.
 - **SM6xx catches structural smells node-counting misses**: nested

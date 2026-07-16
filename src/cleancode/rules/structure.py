@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import ast
-from dataclasses import dataclass
 from typing import Iterable, Iterator
 
-from cleancode.models import FileContext, Severity, Violation, ViolationDetails
+from cleancode.models import FileContext, ModuleTop, Severity, Violation, ViolationDetails
 from cleancode.rules.base import (
     FunctionNode,
     Rule,
@@ -284,14 +283,6 @@ class DoOneThing(Rule):
         return joined[0] if joined else None
 
 
-@dataclass(frozen=True)
-class _ModuleTop:
-    """Position anchor for module-level violations (an ``ast.Module`` has none)."""
-
-    lineno: int = 1
-    col_offset: int = 0
-
-
 class MaxModuleLength(Rule):
     id = "ST108"
     name = "max-module-length"
@@ -309,7 +300,7 @@ class MaxModuleLength(Rule):
         if length > max_lines:
             yield self.violation(
                 ctx,
-                _ModuleTop(),
+                ModuleTop(),
                 ViolationDetails(
                     message=f"module is {length} lines long (maximum {max_lines})",
                     suggestion="split the module into focused submodules, one concern per file",

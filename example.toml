@@ -92,6 +92,12 @@
 # [tool.cleancode.CM304]
 # min_uninformative = 0.5
 
+# CM305  file-comment-density  [warning]
+#   Flags a file whose overall comment density exceeds `max_ratio` (default 1 comment line per 5 code lines) — file-wide comment sprawl that CM303 misses when no single function is dense enough on its own. Directive comments (TODO, noqa, `cleancode:`, ...) and docstrings (policed by CM301/CM304) don't count, and files with fewer than `min_code_lines` code lines are never flagged.
+# [tool.cleancode.CM305]
+# max_ratio = 0.2
+# min_code_lines = 30
+
 # SL401  complex-subscript  [warning]
 #   Scores each subscript expression (+1 per dimension/step/None/ellipsis/negative index/arithmetic/call, +2 per nested subscript, negative steps count double) and flags scores above the threshold.
 # [tool.cleancode.SL401]

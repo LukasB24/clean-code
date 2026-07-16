@@ -67,6 +67,7 @@ EXPECTED_DIRTY_RULES = {
         "SM609",  # np.load(file_path) inside __init__
         "SM610",  # .cuda() inside __init__
         "CM303",  # comment-heavy __getitem__
+        "CM305",  # comment-heavy file overall (7 comment lines / 32 code lines)
         "SM611",  # isinstance(spec, torch.Tensor)
     },
     "llm_style_solid.py": {

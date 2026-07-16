@@ -7,12 +7,12 @@ from cleancode.rules.bindings import (
     UnusedBinding,
 )
 from cleancode.rules.comments import (
-    BoilerplateParamDocs,
     CommentDensity,
     CommentRestatesCode,
-    DocstringRestatesName,
+    FileCommentDensity,
 )
 from cleancode.rules.correctness import BareExcept, EmptyExceptionHandler
+from cleancode.rules.docstrings import BoilerplateParamDocs, DocstringRestatesName
 from cleancode.rules.duplication import DuplicateFunctionBody, IdenticalFunctionImplementation
 from cleancode.rules.hints import UninformativeAny
 from cleancode.rules.naming import CrypticAbbreviation, MeaninglessName, ShortName
@@ -56,6 +56,7 @@ ALL_RULES: list[type[Rule] | type[ProjectRule]] = [
     CommentRestatesCode,
     CommentDensity,
     BoilerplateParamDocs,
+    FileCommentDensity,
     ComplexSubscript,
     ChainedSubscript,
     UninformativeAny,

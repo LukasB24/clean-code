@@ -1,4 +1,4 @@
-"""Tests for the comment/docstring noise rules CM301–CM304."""
+"""Tests for the comment/docstring noise rules CM301–CM305."""
 
 
 def rule_ids(violations):
@@ -179,3 +179,52 @@ class TestBoilerplateParamDocs:
             return amount, account
         '''
         assert check(source, "CM304") == []
+
+
+class TestFileCommentDensity:
+    @staticmethod
+    def _commented_module(code_lines, comment_lines):
+        code = [f"CONSTANT_{index} = {index}" for index in range(code_lines)]
+        comments = [f"# narration line number {index}" for index in range(comment_lines)]
+        return "\n".join(comments + code) + "\n"
+
+    def test_flags_comment_heavy_file(self, check):
+        source = self._commented_module(code_lines=10, comment_lines=4)
+        violations = check(source, "CM305", min_code_lines=10)
+        assert rule_ids(violations) == ["CM305"]
+        assert violations[0].line == 1
+        assert "4 comment lines for 10 code lines" in violations[0].message
+        assert "every comment" in violations[0].suggestion
+
+    def test_file_at_the_ratio_passes(self, check):
+        source = self._commented_module(code_lines=10, comment_lines=2)
+        assert check(source, "CM305", min_code_lines=10) == []
+
+    def test_small_file_passes_even_when_dense(self, check):
+        source = self._commented_module(code_lines=5, comment_lines=5)
+        assert check(source, "CM305", min_code_lines=10) == []
+
+    def test_directive_comments_do_not_count(self, check):
+        directives = "\n".join(
+            ["# TODO: revisit", "# noqa", "# cleancode: disable=NM202", "# fmt: off"]
+        )
+        code = "\n".join(f"CONSTANT_{index} = {index}" for index in range(10))
+        source = f"{directives}\n{code}\n"
+        assert check(source, "CM305", min_code_lines=10) == []
+
+    def test_docstring_lines_count_toward_neither_side(self, check):
+        docstring = '"""Module docstring.\n\n' + "\n".join("Padding." for _ in range(20)) + '\n"""'
+        source = docstring + "\n" + self._commented_module(code_lines=10, comment_lines=4)
+        violations = check(source, "CM305", min_code_lines=10)
+        assert rule_ids(violations) == ["CM305"]
+        assert "4 comment lines for 10 code lines" in violations[0].message
+
+    def test_inline_comments_count(self, check):
+        lines = [
+            f"CONSTANT_{index} = {index}  # states the value again" if index < 4 else f"CONSTANT_{index} = {index}"
+            for index in range(10)
+        ]
+        source = "\n".join(lines) + "\n"
+        violations = check(source, "CM305", min_code_lines=10)
+        assert rule_ids(violations) == ["CM305"]
+        assert "4 comment lines for 10 code lines" in violations[0].message

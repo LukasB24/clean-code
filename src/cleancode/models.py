@@ -22,6 +22,14 @@ class Positioned(Protocol):
 
 
 @dataclass(frozen=True)
+class ModuleTop:
+    """Position anchor for module-level violations (an ``ast.Module`` has none)."""
+
+    lineno: int = 1
+    col_offset: int = 0
+
+
+@dataclass(frozen=True)
 class ViolationDetails:
     """The rule-authored part of a violation, grouped so ``Rule.violation`` stays small."""
 

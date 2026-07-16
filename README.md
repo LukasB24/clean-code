@@ -162,13 +162,13 @@ retry_delay_seconds = base_delay * 1.5
 
 ## The rules
 
-37 rules across 9 categories, each with a default severity you can override:
+38 rules across 9 categories, each with a default severity you can override:
 
 | Category | IDs | Count | Catches |
 |----------|-----|-------|---------|
 | Structure | ST101–ST108 | 8 | nesting, length, params, complexity, mixed responsibilities, oversized modules |
 | Naming | NM201–NM203 | 3 | single-letter names, `data`/`tmp`/`process_data`, cryptic abbreviations |
-| Comments & docstrings | CM301–CM304 | 4 | docstrings/comments that just restate the code |
+| Comments & docstrings | CM301–CM305 | 5 | docstrings/comments that just restate the code, comment-heavy files |
 | Subscripts | SL401–SL402 | 2 | `x[i][j][k]`-style complexity and chaining |
 | Types | TY501 | 1 | uninformative `Any` |
 | Structural smells | SM601–SM613 | 13 | magic numbers, nested comprehensions, redundant ternaries, PyTorch pitfalls, unused bindings, builtin shadowing, and more |

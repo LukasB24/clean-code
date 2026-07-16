@@ -38,6 +38,20 @@ def subscript_base_name(node: ast.Subscript) -> str | None:
     return None
 
 
+def docstring_node(owner: ast.Module | ast.ClassDef | FunctionNode) -> ast.Constant | None:
+    """The string constant of ``owner``'s docstring, or ``None``."""
+    if not owner.body:
+        return None
+    first = owner.body[0]
+    if (
+        isinstance(first, ast.Expr)
+        and isinstance(first.value, ast.Constant)
+        and isinstance(first.value.value, str)
+    ):
+        return first.value
+    return None
+
+
 def import_aliases(tree: ast.Module) -> Iterator[tuple[str, ast.alias]]:
     """(bound name, alias node) for every import in the module, ``__future__`` excluded."""
     for node in ast.walk(tree):
@@ -159,6 +173,15 @@ STOPWORDS = frozenset(
     all each any some no not if then when while
     over through using per via up down out off into onto also just simply now
     here there new current
+    """.split()
+)
+
+# Generic filler that adds no information in a parameter description.
+GENERIC_PARAM_WORDS = frozenset(
+    """
+    parameter argument input output value object instance number string integer
+    int float bool boolean list dict dictionary tuple set array data item items
+    optional default variable name type
     """.split()
 )
 

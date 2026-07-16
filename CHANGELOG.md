@@ -20,6 +20,11 @@ whether pre- or post-1.0).
   are exactly identical, identifiers included (default 2+ statements).
   Complements `DP701`; groups long enough for `DP701` are left to it so a
   copy-paste is never reported twice.
+- `CM305` `file-comment-density` — flags a file whose overall comment/code
+  line ratio exceeds `max_ratio` (default 0.2), catching comment sprawl
+  that per-function `CM303` misses. Directive comments and docstrings don't
+  count; the suggestion instructs the fixer to analyze every comment in the
+  file and keep only those that say something the code cannot.
 - Suppression directives now also work from the line above: a standalone
   `# cleancode: disable[=IDS]` comment suppresses the next code line below
   it (inline directives stay same-line-only).
