@@ -14,7 +14,14 @@ import builtins
 from typing import Iterable, Iterator
 
 from cleancode.models import FileContext, Severity, Violation, ViolationDetails
-from cleancode.rules.base import IDENTIFIER, FunctionNode, Rule, functions, own_scope_walk
+from cleancode.rules.base import (
+    IDENTIFIER,
+    FunctionNode,
+    Rule,
+    functions,
+    import_aliases,
+    own_scope_walk,
+)
 from cleancode.rules.naming import collect_bindings
 
 
@@ -105,22 +112,6 @@ _DYNAMIC_SCOPE_ESCAPES = frozenset({"locals", "eval", "exec"})
 
 def _is_exempt_name(name: str) -> bool:
     return name.startswith("_")
-
-
-def _aliases_of(node: ast.stmt) -> Iterator[tuple[str, ast.alias]]:
-    """Bound names introduced by one import statement, ``__future__`` excluded."""
-    if isinstance(node, ast.Import):
-        aliases = node.names
-        return ((alias.asname or alias.name.split(".")[0], alias) for alias in aliases)
-    if isinstance(node, ast.ImportFrom) and node.module != "__future__":
-        aliases = node.names
-        return ((alias.asname or alias.name, alias) for alias in aliases if alias.name != "*")
-    return iter(())
-
-
-def _import_aliases(tree: ast.Module) -> Iterator[tuple[str, ast.alias]]:
-    for node in ast.walk(tree):
-        yield from _aliases_of(node)
 
 
 def _dunder_all_exports(tree: ast.Module) -> set[str]:
@@ -287,7 +278,7 @@ class UnusedBinding(Rule):
         if ctx.path.endswith("__init__.py"):
             return
         used = _referenced_names(ctx.tree) | _forward_ref_tokens(ctx.tree) | _dunder_all_exports(ctx.tree)
-        for bound_name, alias in _import_aliases(ctx.tree):
+        for bound_name, alias in import_aliases(ctx.tree):
             if bound_name in used or _is_exempt_name(bound_name):
                 continue
             yield self.violation(

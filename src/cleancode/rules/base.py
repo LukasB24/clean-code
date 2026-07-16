@@ -38,6 +38,22 @@ def subscript_base_name(node: ast.Subscript) -> str | None:
     return None
 
 
+def import_aliases(tree: ast.Module) -> Iterator[tuple[str, ast.alias]]:
+    """(bound name, alias node) for every import in the module, ``__future__`` excluded."""
+    for node in ast.walk(tree):
+        yield from _aliases_of(node)
+
+
+def _aliases_of(node: ast.AST) -> Iterator[tuple[str, ast.alias]]:
+    if isinstance(node, ast.Import):
+        aliases = node.names
+        return ((alias.asname or alias.name.split(".")[0], alias) for alias in aliases)
+    if isinstance(node, ast.ImportFrom) and node.module != "__future__":
+        aliases = node.names
+        return ((alias.asname or alias.name, alias) for alias in aliases if alias.name != "*")
+    return iter(())
+
+
 SCOPE_BOUNDARIES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
 
 

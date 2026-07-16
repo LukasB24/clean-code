@@ -11,10 +11,11 @@ import ast
 import copy
 from collections import defaultdict
 from dataclasses import dataclass
+from functools import partial
 from typing import TYPE_CHECKING, Callable, ClassVar, Iterable
 
 from cleancode.models import Location, ParsedFile, Severity, Violation, ViolationDetails
-from cleancode.rules.base import FunctionNode, ProjectRule, functions, is_dunder
+from cleancode.rules.base import FunctionNode, ProjectRule, functions, import_aliases, is_dunder
 
 if TYPE_CHECKING:
     from cleancode.config import Config
@@ -25,17 +26,32 @@ class _Anonymizer(ast.NodeTransformer):
 
     Call targets are preserved: two bodies that call different functions
     (``json.dumps(x)`` vs ``pickle.loads(x)``) are doing different things,
-    not copy-pasting each other.
+    not copy-pasting each other. A call's receiver chain is preserved too
+    when it is rooted at an imported name — ``json.dumps`` and ``yaml.dumps``
+    name different APIs — while a variable receiver stays blanked, because
+    ``fh.write`` vs ``out.write`` is just a rename.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, imported_names: set[str]) -> None:
+        self._imported_names = imported_names
         self._call_targets: set[ast.AST] = set()
 
     def visit_Call(self, node: ast.Call) -> ast.AST:
         if isinstance(node.func, (ast.Name, ast.Attribute)):
             self._call_targets.add(node.func)
+            self._preserve_imported_receiver(node.func)
         self.generic_visit(node)
         return node
+
+    def _preserve_imported_receiver(self, func: ast.expr) -> None:
+        chain: list[ast.AST] = []
+        current = func.value if isinstance(func, ast.Attribute) else None
+        while isinstance(current, ast.Attribute):
+            chain.append(current)
+            current = current.value
+        if isinstance(current, ast.Name) and current.id in self._imported_names:
+            self._call_targets.add(current)
+            self._call_targets.update(chain)
 
     def visit_Name(self, node: ast.Name) -> ast.AST:
         if node not in self._call_targets:
@@ -60,15 +76,15 @@ class _Anonymizer(ast.NodeTransformer):
         return node
 
 
-def _normalized_dump(node: ast.AST) -> str:
+def _normalized_dump(node: ast.AST, imported_names: set[str]) -> str:
     """``ast.dump`` with variable/parameter/attribute names blanked out.
 
     Two statements with identical control flow and literals but different
     names (``rows`` vs ``items``) dump to the same string; called function/
-    method names and literal constants still tell them apart, so this stays
-    conservative.
+    method names (with any imported-module receiver), and literal constants
+    still tell them apart, so this stays conservative.
     """
-    anonymized = _Anonymizer().visit(copy.deepcopy(node))
+    anonymized = _Anonymizer(imported_names).visit(copy.deepcopy(node))
     return ast.dump(anonymized, annotate_fields=True, include_attributes=False)
 
 
@@ -117,6 +133,18 @@ def _exact_dump(node: ast.AST) -> str:
 
 _Member = tuple[ParsedFile, FunctionNode]
 _Fingerprint = Callable[[ast.AST], str]
+# Builds one file's fingerprint function, so a fingerprint can depend on
+# file-level facts (which names are imports) computed once per file.
+_FingerprintFactory = Callable[[ParsedFile], _Fingerprint]
+
+
+def _normalized_fingerprint(parsed: ParsedFile) -> _Fingerprint:
+    imported = {name for name, _ in import_aliases(parsed.tree)}
+    return partial(_normalized_dump, imported_names=imported)
+
+
+def _exact_fingerprint(_parsed: ParsedFile) -> _Fingerprint:
+    return _exact_dump
 
 
 def _body_fingerprint(
@@ -136,10 +164,10 @@ def _body_fingerprint(
 
 
 def _comparable_members(
-    files: list[ParsedFile], min_statements: int, fingerprint: _Fingerprint
+    files: list[ParsedFile], min_statements: int, make_fingerprint: _FingerprintFactory
 ) -> Iterable[tuple[str, _Member]]:
     for parsed in files:
-        yield from _file_members(parsed, min_statements, fingerprint)
+        yield from _file_members(parsed, min_statements, make_fingerprint(parsed))
 
 
 def _file_members(
@@ -152,11 +180,11 @@ def _file_members(
 
 
 def _grouped_by_fingerprint(
-    files: list[ParsedFile], min_statements: int, fingerprint: _Fingerprint
+    files: list[ParsedFile], min_statements: int, make_fingerprint: _FingerprintFactory
 ) -> Iterable[list[_Member]]:
     """Groups of two-or-more functions whose fingerprinted bodies collide."""
     groups: dict[str, list[_Member]] = defaultdict(list)
-    for key, member in _comparable_members(files, min_statements, fingerprint):
+    for key, member in _comparable_members(files, min_statements, make_fingerprint):
         groups[key].append(member)
     return [members for members in groups.values() if len(members) >= 2]
 
@@ -210,7 +238,7 @@ class DuplicateFunctionBody(_DuplicationRule):
 
     def check_project(self, files: list[ParsedFile], config: "Config") -> Iterable[Violation]:
         min_statements = config.rules[self.id].options["min_statements"]
-        for members in _grouped_by_fingerprint(files, min_statements, _normalized_dump):
+        for members in _grouped_by_fingerprint(files, min_statements, _normalized_fingerprint):
             yield from self._flag_group(config, members)
 
 
@@ -236,7 +264,7 @@ class IdenticalFunctionImplementation(_DuplicationRule):
     def check_project(self, files: list[ParsedFile], config: "Config") -> Iterable[Violation]:
         min_statements = config.rules[self.id].options["min_statements"]
         dp701 = config.rules[DuplicateFunctionBody.id]
-        for members in _grouped_by_fingerprint(files, min_statements, _exact_dump):
+        for members in _grouped_by_fingerprint(files, min_statements, _exact_fingerprint):
             if dp701.enabled and self._covered_by_dp701(members, dp701.options["min_statements"]):
                 continue  # DP701 already reports this group; don't double-flag
             yield from self._flag_group(config, members)
