@@ -13,7 +13,7 @@ from cleancode.rules.comments import (
     DocstringRestatesName,
 )
 from cleancode.rules.correctness import BareExcept, EmptyExceptionHandler
-from cleancode.rules.duplication import DuplicateFunctionBody
+from cleancode.rules.duplication import DuplicateFunctionBody, IdenticalFunctionImplementation
 from cleancode.rules.hints import UninformativeAny
 from cleancode.rules.naming import CrypticAbbreviation, MeaninglessName, ShortName
 from cleancode.rules.pytorch import EagerDatasetLoading, PrematureDevicePlacement
@@ -34,6 +34,7 @@ from cleancode.rules.structure import (
     MaxClassLength,
     MaxComplexity,
     MaxFunctionLength,
+    MaxModuleLength,
     MaxNestingDepth,
     MaxParameters,
     TooManyGuardClauses,
@@ -47,6 +48,7 @@ ALL_RULES: list[type[Rule] | type[ProjectRule]] = [
     MaxComplexity,
     DoOneThing,
     TooManyGuardClauses,
+    MaxModuleLength,
     ShortName,
     MeaninglessName,
     CrypticAbbreviation,
@@ -73,6 +75,7 @@ ALL_RULES: list[type[Rule] | type[ProjectRule]] = [
     TypeSwitchViolatesOCP,
     LowCohesionClass,
     DuplicateFunctionBody,
+    IdenticalFunctionImplementation,
     BareExcept,
     EmptyExceptionHandler,
 ]

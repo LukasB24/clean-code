@@ -10,8 +10,8 @@ from __future__ import annotations
 import ast
 import copy
 from collections import defaultdict
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Iterable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Callable, ClassVar, Iterable
 
 from cleancode.models import Location, ParsedFile, Severity, Violation, ViolationDetails
 from cleancode.rules.base import FunctionNode, ProjectRule, functions, is_dunder
@@ -110,15 +110,87 @@ def _is_stub_body(body: list[ast.stmt]) -> bool:
     return isinstance(statement, ast.Pass) or is_ellipsis or _raises_not_implemented(statement)
 
 
-@dataclass
-class _IndexState:
-    min_statements: int
-    groups: dict[str, list[tuple[ParsedFile, FunctionNode]]] = field(
-        default_factory=lambda: defaultdict(list)
-    )
+def _exact_dump(node: ast.AST) -> str:
+    """``ast.dump`` as written: identifiers are kept, so only true copies collide."""
+    return ast.dump(node, annotate_fields=True, include_attributes=False)
 
 
-class DuplicateFunctionBody(ProjectRule):
+_Member = tuple[ParsedFile, FunctionNode]
+_Fingerprint = Callable[[ast.AST], str]
+
+
+def _body_fingerprint(
+    function: FunctionNode, min_statements: int, fingerprint: _Fingerprint
+) -> str | None:
+    """Comparable fingerprint of a function's body, or ``None`` if exempt.
+
+    Dunder methods, stub bodies, and bodies shorter than ``min_statements``
+    are never compared; a leading docstring is stripped first.
+    """
+    if is_dunder(function.name):
+        return None
+    body = _significant_body(function)
+    if len(body) < min_statements or _is_stub_body(body):
+        return None
+    return "|".join(fingerprint(statement) for statement in body)
+
+
+def _comparable_members(
+    files: list[ParsedFile], min_statements: int, fingerprint: _Fingerprint
+) -> Iterable[tuple[str, _Member]]:
+    for parsed in files:
+        yield from _file_members(parsed, min_statements, fingerprint)
+
+
+def _file_members(
+    parsed: ParsedFile, min_statements: int, fingerprint: _Fingerprint
+) -> Iterable[tuple[str, _Member]]:
+    for function in functions(parsed.tree):
+        key = _body_fingerprint(function, min_statements, fingerprint)
+        if key is not None:
+            yield key, (parsed, function)
+
+
+def _grouped_by_fingerprint(
+    files: list[ParsedFile], min_statements: int, fingerprint: _Fingerprint
+) -> Iterable[list[_Member]]:
+    """Groups of two-or-more functions whose fingerprinted bodies collide."""
+    groups: dict[str, list[_Member]] = defaultdict(list)
+    for key, member in _comparable_members(files, min_statements, fingerprint):
+        groups[key].append(member)
+    return [members for members in groups.values() if len(members) >= 2]
+
+
+@dataclass(frozen=True)
+class _DuplicateWording:
+    """How one duplication rule phrases its violations."""
+
+    verb: str
+    suggestion: str
+
+
+class _DuplicationRule(ProjectRule):
+    """Shared reporting for rules that group functions by a body fingerprint."""
+
+    _WORDING: ClassVar[_DuplicateWording]
+
+    def _flag_group(self, config: "Config", members: list[_Member]) -> Iterable[Violation]:
+        """One violation per member after the first, pointing back at the original."""
+        first_parsed, first_function = members[0]
+        for parsed, function in members[1:]:
+            yield self.violation(
+                config,
+                Location(path=parsed.path, node=function),
+                ViolationDetails(
+                    message=f"function `{function.name}` {self._WORDING.verb} "
+                    f"`{first_function.name}` at {first_parsed.path}:{first_function.lineno}",
+                    suggestion=self._WORDING.suggestion,
+                    symbol=function.name,
+                ),
+            )
+
+
+class DuplicateFunctionBody(_DuplicationRule):
     id = "DP701"
     name = "duplicate-function-body"
     default_severity = Severity.WARNING
@@ -131,38 +203,45 @@ class DuplicateFunctionBody(ProjectRule):
         "are exempt."
     )
 
+    _WORDING = _DuplicateWording(
+        verb="duplicates the body of",
+        suggestion="extract the shared logic into a common helper function",
+    )
+
     def check_project(self, files: list[ParsedFile], config: "Config") -> Iterable[Violation]:
         min_statements = config.rules[self.id].options["min_statements"]
-        state = _IndexState(min_statements=min_statements)
-        for parsed in files:
-            for function in functions(parsed.tree):
-                self._index_function(function, parsed, state)
-        yield from self._flag_duplicates(config, state.groups)
+        for members in _grouped_by_fingerprint(files, min_statements, _normalized_dump):
+            yield from self._flag_group(config, members)
 
-    def _index_function(self, function: FunctionNode, parsed: ParsedFile, state: _IndexState) -> None:
-        if is_dunder(function.name):
-            return
-        body = _significant_body(function)
-        if len(body) < state.min_statements or _is_stub_body(body):
-            return
-        fingerprint = "|".join(_normalized_dump(statement) for statement in body)
-        state.groups[fingerprint].append((parsed, function))
 
-    def _flag_duplicates(
-        self, config: "Config", groups: dict[str, list[tuple[ParsedFile, FunctionNode]]]
-    ) -> Iterable[Violation]:
-        for members in groups.values():
-            if len(members) < 2:
-                continue
-            first_parsed, first_function = members[0]
-            for parsed, function in members[1:]:
-                yield self.violation(
-                    config,
-                    Location(path=parsed.path, node=function),
-                    ViolationDetails(
-                        message=f"function `{function.name}` duplicates the body of "
-                        f"`{first_function.name}` at {first_parsed.path}:{first_function.lineno}",
-                        suggestion="extract the shared logic into a common helper function",
-                        symbol=function.name,
-                    ),
-                )
+class IdenticalFunctionImplementation(_DuplicationRule):
+    id = "DP702"
+    name = "identical-function-implementation"
+    default_severity = Severity.WARNING
+    default_options = {"min_statements": 2}
+    description = (
+        "Flags two or more functions/methods whose bodies are exactly identical, "
+        "identifiers included — the same implementation pasted twice, like a private "
+        "helper that drifted into a second module. Requiring identifiers to match is "
+        "what lets this rule inspect much shorter bodies (default 2 statements) than "
+        "DP701 without noise; bodies long enough for DP701 to report are left to "
+        "DP701. Stub bodies and dunder methods are exempt."
+    )
+
+    _WORDING = _DuplicateWording(
+        verb="is an exact copy of",
+        suggestion="keep one copy and import/reuse it from the other location",
+    )
+
+    def check_project(self, files: list[ParsedFile], config: "Config") -> Iterable[Violation]:
+        min_statements = config.rules[self.id].options["min_statements"]
+        dp701 = config.rules[DuplicateFunctionBody.id]
+        for members in _grouped_by_fingerprint(files, min_statements, _exact_dump):
+            if dp701.enabled and self._covered_by_dp701(members, dp701.options["min_statements"]):
+                continue  # DP701 already reports this group; don't double-flag
+            yield from self._flag_group(config, members)
+
+    @staticmethod
+    def _covered_by_dp701(members: list[_Member], dp701_min_statements: int) -> bool:
+        _, first_function = members[0]
+        return len(_significant_body(first_function)) >= dp701_min_statements

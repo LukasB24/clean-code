@@ -209,6 +209,18 @@ class TestMaxComplexity:
         assert lines_of(violations) == [("ST105", 2)]
 
 
+class TestMaxModuleLength:
+    def test_flags_module_over_the_limit(self, check):
+        source = "\n".join(f"CONSTANT_{index} = {index}" for index in range(12))
+        violations = check(source, "ST108", max_lines=10)
+        assert lines_of(violations) == [("ST108", 1)]
+        assert "12 lines" in violations[0].message
+
+    def test_module_at_the_limit_passes(self, check):
+        source = "\n".join(f"CONSTANT_{index} = {index}" for index in range(10))
+        assert check(source, "ST108", max_lines=10) == []
+
+
 class TestDoOneThing:
     def test_flags_and_joined_name(self, check):
         violations = check("def load_and_save(record):\n    return record\n", "ST106")

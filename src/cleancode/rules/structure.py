@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+from dataclasses import dataclass
 from typing import Iterable, Iterator
 
 from cleancode.models import FileContext, Severity, Violation, ViolationDetails
@@ -282,6 +283,39 @@ class DoOneThing(Rule):
             return None
         joined = sorted(conjunctions.intersection(split_identifier(function.name)))
         return joined[0] if joined else None
+
+
+@dataclass(frozen=True)
+class _ModuleTop:
+    """Position anchor for module-level violations (an ``ast.Module`` has none)."""
+
+    lineno: int = 1
+    col_offset: int = 0
+
+
+class MaxModuleLength(Rule):
+    id = "ST108"
+    name = "max-module-length"
+    default_severity = Severity.WARNING
+    default_options = {"max_lines": 500}
+    description = (
+        "Limits how long one module may grow (default 500 lines). A file that keeps "
+        "absorbing new classes and helpers turns into a grab-bag nobody can navigate — "
+        "split it into focused submodules, one concern per file, before it gets there."
+    )
+
+    def check(self, ctx: FileContext) -> Iterable[Violation]:
+        max_lines = ctx.config.options["max_lines"]
+        length = len(ctx.lines)
+        if length > max_lines:
+            yield self.violation(
+                ctx,
+                _ModuleTop(),
+                ViolationDetails(
+                    message=f"module is {length} lines long (maximum {max_lines})",
+                    suggestion="split the module into focused submodules, one concern per file",
+                ),
+            )
 
 
 _GUARD_EXIT_TYPES = (ast.Continue, ast.Return, ast.Raise, ast.Break)

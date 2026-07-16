@@ -1,6 +1,6 @@
-"""Tests for DP701 (duplicate-function-body), a ProjectRule.
+"""Tests for DP701/DP702 (duplicate function bodies), both ProjectRules.
 
-Unlike the per-file rules, DP701 needs more than one parsed file to say
+Unlike the per-file rules, these need more than one parsed file to say
 anything, so these tests build ``ParsedFile``s directly via
 ``cleancode.engine.parse_file`` and call ``check_project`` rather than using
 the single-file ``check``/``analyze`` fixtures.
@@ -10,7 +10,7 @@ import textwrap
 
 from cleancode.config import Config
 from cleancode.engine import analyze_path, analyze_paths, parse_file
-from cleancode.rules.duplication import DuplicateFunctionBody
+from cleancode.rules.duplication import DuplicateFunctionBody, IdenticalFunctionImplementation
 
 
 def _parsed(source: str, path: str):
@@ -22,6 +22,13 @@ def _violations(*sources_and_paths, min_statements=4):
     config = Config.default()
     config.rules["DP701"].options["min_statements"] = min_statements
     return list(DuplicateFunctionBody().check_project(files, config))
+
+
+def _exact_violations(*sources_and_paths, dp701_enabled=True):
+    files = [_parsed(source, path) for source, path in sources_and_paths]
+    config = Config.default()
+    config.rules["DP701"].enabled = dp701_enabled
+    return list(IdenticalFunctionImplementation().check_project(files, config))
 
 
 class TestDuplicateFunctionBody:
@@ -149,6 +156,61 @@ class TestDuplicateFunctionBody:
                     self.name = "second"
             """
         assert _violations((first, "a.py"), min_statements=1) == []
+
+
+class TestIdenticalFunctionImplementation:
+    IDENTICAL_HELPER = """
+        def _is_dunder(name):
+            prefix = name.startswith("__")
+            return prefix and name.endswith("__")
+        """
+
+    def test_flags_exact_copy_across_files(self):
+        violations = _exact_violations(
+            (self.IDENTICAL_HELPER, "a.py"), (self.IDENTICAL_HELPER, "b.py")
+        )
+        assert [v.rule_id for v in violations] == ["DP702"]
+        assert violations[0].path == "b.py"
+        assert "exact copy" in violations[0].message
+        assert "a.py:2" in violations[0].message
+
+    def test_renamed_identifiers_are_not_an_exact_copy(self):
+        renamed = """
+            def _is_magic(label):
+                prefix = label.startswith("__")
+                return prefix and label.endswith("__")
+            """
+        assert _exact_violations((self.IDENTICAL_HELPER, "a.py"), (renamed, "b.py")) == []
+
+    def test_single_statement_bodies_pass_by_default(self):
+        helper = """
+            def is_dunder(name):
+                return name.startswith("__") and name.endswith("__")
+            """
+        assert _exact_violations((helper, "a.py"), (helper, "b.py")) == []
+
+    def test_group_long_enough_for_dp701_is_left_to_dp701(self):
+        body = """
+            def compute_totals(rows):
+                total = 0
+                count = 0
+                for row in rows:
+                    total += row.amount
+                    count += 1
+                return total / count
+            """
+        assert _exact_violations((body, "a.py"), (body, "b.py")) == []
+        # ... unless DP701 is disabled — then DP702 still reports the copy
+        violations = _exact_violations((body, "a.py"), (body, "b.py"), dp701_enabled=False)
+        assert [v.rule_id for v in violations] == ["DP702"]
+
+    def test_stub_bodies_pass(self):
+        stub = """
+            class Base:
+                def run(self):
+                    raise NotImplementedError
+            """
+        assert _exact_violations((stub, "a.py"), (stub, "b.py")) == []
 
 
 class TestDuplicateFunctionBodyIntegration:
