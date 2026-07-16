@@ -196,10 +196,7 @@ def _print_file_result(
     file_result: CheckResult, counts: dict[Severity, int], min_severity: Severity
 ) -> None:
     if file_result.parse_error:
-        click.echo(
-            f"{file_result.path}: "
-            f"{click.style('syntax error', fg='red')}: {file_result.parse_error}"
-        )
+        click.echo(f"{file_result.path}: {click.style(file_result.parse_error, fg='red')}")
         return
     for violation in file_result.violations:
         counts[violation.severity] += 1

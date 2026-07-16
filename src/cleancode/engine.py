@@ -40,7 +40,7 @@ def analyze_source(
     try:
         parsed = parse_file(source, path)
     except SyntaxError as error:
-        return CheckResult(path=path, parse_error=f"line {error.lineno}: {error.msg}")
+        return CheckResult(path=path, parse_error=_syntax_error_message(error))
 
     violations = _run_file_rules(parsed, config)
     violations = _finalize(violations, parsed.comments, config)
@@ -71,13 +71,21 @@ def analyze_paths(targets: list[Path], config: Config | None = None) -> list[Che
     results: list[CheckResult] = []
     parsed_files: list[ParsedFile] = []
     for file_path in file_paths:
-        if _is_excluded(file_path, config.exclude):
+        if _is_excluded(file_path, config):
             continue
         path = str(file_path)
         try:
-            parsed = parse_file(file_path.read_text(encoding="utf-8"), path)
+            source = file_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError as error:
+            results.append(CheckResult(path=path, parse_error=f"not valid UTF-8: {error.reason}"))
+            continue
+        except OSError as error:
+            results.append(CheckResult(path=path, parse_error=f"cannot read file: {error}"))
+            continue
+        try:
+            parsed = parse_file(source, path)
         except SyntaxError as error:
-            results.append(CheckResult(path=path, parse_error=f"line {error.lineno}: {error.msg}"))
+            results.append(CheckResult(path=path, parse_error=_syntax_error_message(error)))
             continue
         parsed_files.append(parsed)
         violations = _finalize(_run_file_rules(parsed, config), parsed.comments, config)
@@ -169,6 +177,10 @@ def _finalize(violations: list[Violation], comments: list[Comment], config: Conf
     return violations
 
 
+def _syntax_error_message(error: SyntaxError) -> str:
+    return f"syntax error: line {error.lineno}: {error.msg}"
+
+
 def _attach_parents(tree: ast.Module) -> None:
     for node in ast.walk(tree):
         for child in ast.iter_child_nodes(node):
@@ -242,9 +254,25 @@ def _is_suppressed(line: int, rule_id: str, suppressions: dict[int, set[str] | N
     return ids is None or rule_id in ids
 
 
-def _is_excluded(file_path: Path, patterns: list[str]) -> bool:
-    posix = file_path.resolve().as_posix()
-    return any(fnmatch.fnmatch(posix, pattern) for pattern in patterns)
+def _is_excluded(file_path: Path, config: Config) -> bool:
+    """True when any exclude pattern matches the file's absolute or project-relative path.
+
+    Matching against the path relative to the project root (the directory of
+    the ``pyproject.toml``/``--config`` file, falling back to the working
+    directory) is what makes plain patterns like ``migrations/**`` work; the
+    absolute match keeps ``**/``-style patterns working for files outside
+    the root.
+    """
+    resolved = file_path.resolve()
+    candidates = [resolved.as_posix()]
+    anchor = (config.project_root or Path.cwd()).resolve()
+    if resolved.is_relative_to(anchor):
+        candidates.append(resolved.relative_to(anchor).as_posix())
+    return any(
+        fnmatch.fnmatch(candidate, pattern)
+        for candidate in candidates
+        for pattern in config.exclude
+    )
 
 
 def _deduplicated(file_paths: list[Path]) -> list[Path]:

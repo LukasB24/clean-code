@@ -32,6 +32,9 @@ class Config:
     min_severity_explicit: bool = False
     exclude: list[str] = field(default_factory=lambda: list(DEFAULT_EXCLUDES))
     honor_suppressions: bool = True
+    # Directory of the pyproject.toml/--config file the config came from;
+    # relative `exclude` patterns are matched against paths under it.
+    project_root: Path | None = None
 
     @classmethod
     def default(cls) -> "Config":
@@ -59,6 +62,7 @@ class Config:
         toml_path = override if override is not None else _find_pyproject(start)
         if toml_path is None:
             return config
+        config.project_root = toml_path.resolve().parent
 
         with open(toml_path, "rb") as fh:
             document = tomllib.load(fh)
