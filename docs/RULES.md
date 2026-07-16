@@ -92,6 +92,9 @@ quick-start, see the [README](../README.md).
   directory containing both files, not one file at a time. Called function/
   method names are *not* ignored: two same-shaped bodies that invoke
   different APIs are doing different things, not copy-pasting each other.
+  That includes the receiver when it is an imported module (`json.dumps`
+  vs `yaml.dumps`); a variable receiver (`fh.write` vs `out.write`) is
+  ignored like any other local name, since that's just a rename.
 - **DP702 flags exactly identical bodies, identifiers included** — the same
   helper pasted into two places. Requiring identifiers to match lets it
   inspect much shorter bodies (default 2 statements) than DP701 without

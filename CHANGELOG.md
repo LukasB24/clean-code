@@ -31,7 +31,13 @@ whether pre- or post-1.0).
   class names, and behavior are unchanged.
 - `DP701` now preserves called function/method names when normalizing
   bodies, so two same-shaped functions invoking different APIs no longer
-  fingerprint as duplicates.
+  fingerprint as duplicates. A call's receiver chain is preserved too when
+  it is rooted at an imported name (`json.dumps(...)` vs `yaml.dumps(...)`
+  are different APIs), while variable receivers (`fh.write` vs `out.write`)
+  still normalize as renames.
+- `ST101` violations now attribute their symbol to the innermost
+  function/class containing the offending block, instead of always the
+  outermost function.
 - `SM605`'s suggestion mentions `''.join()` for string concatenation,
   where `sum()` would raise.
 

@@ -60,6 +60,8 @@ class TestMaxNestingDepth:
         # to `outer` and one to `inner`, for the same block
         violations = check(source, "ST101", max_depth=2)
         assert lines_of(violations) == [("ST101", 6)]
+        # the symbol names the innermost function the offending block sits in
+        assert violations[0].symbol == "outer.inner"
 
     def test_match_case_offender_reports_at_pattern_line(self, check):
         # regression: a match_case as first offender crashed (no lineno of its own)

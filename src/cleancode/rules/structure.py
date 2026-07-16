@@ -83,7 +83,7 @@ class MaxNestingDepth(Rule):
                             "extract the inner block into a well-named helper function, or "
                             "flatten with early returns / guard clauses"
                         ),
-                        symbol=ctx.enclosing_symbol(function.body[0]) or function.name,
+                        symbol=ctx.enclosing_symbol(first_offender) or function.name,
                     ),
                 )
 

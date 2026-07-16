@@ -117,6 +117,52 @@ class TestDuplicateFunctionBody:
                 return payload
             """
         assert _violations((first, "a.py"), (second, "b.py")) == []
+
+    def test_permits_same_method_name_on_different_imported_modules(self):
+        # regression: only a call target's final attribute was preserved, so
+        # `json.dumps(...)` and `yaml.dumps(...)` fingerprinted identically
+        first = """
+            import json
+
+            def persist(record, fh):
+                payload = json.dumps(record)
+                fh.write(payload)
+                fh.flush()
+                return payload
+            """
+        second = """
+            import yaml
+
+            def persist(record, fh):
+                payload = yaml.dumps(record)
+                fh.write(payload)
+                fh.flush()
+                return payload
+            """
+        assert _violations((first, "a.py"), (second, "b.py")) == []
+
+    def test_flags_renamed_variable_receivers_as_duplicates(self):
+        # a renamed *variable* receiver is still a rename, not a different API
+        first = """
+            import json
+
+            def persist(record, fh):
+                payload = json.dumps(record)
+                fh.write(payload)
+                fh.flush()
+                return payload
+            """
+        second = """
+            import json
+
+            def store(item, out):
+                blob = json.dumps(item)
+                out.write(blob)
+                out.flush()
+                return blob
+            """
+        violations = _violations((first, "a.py"), (second, "b.py"))
+        assert [violation.rule_id for violation in violations] == ["DP701"]
         first = """
             def double(value):
                 return value * 2
