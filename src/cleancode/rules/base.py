@@ -32,6 +32,28 @@ def subscript_base_name(node: ast.Subscript) -> str | None:
     return None
 
 
+SCOPE_BOUNDARIES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
+
+
+def own_scope_walk(
+    node: ast.AST, boundaries: tuple[type[ast.AST], ...] = SCOPE_BOUNDARIES
+) -> Iterator[ast.AST]:
+    """Descendants of ``node`` in its own scope — nested scopes are skipped.
+
+    Each nested function/class is checked independently when a rule reaches
+    it; walking into it here would attribute its nodes to the wrong scope.
+    Pass a narrower ``boundaries`` tuple to keep some nested scopes in the
+    walk (e.g. lambdas, which never get their own per-function score).
+    """
+    stack = list(ast.iter_child_nodes(node))
+    while stack:
+        child = stack.pop()
+        if isinstance(child, boundaries):
+            continue
+        yield child
+        stack.extend(ast.iter_child_nodes(child))
+
+
 def is_elif_branch(statement: ast.stmt) -> bool:
     """True for the `elif` branches of an if-chain, which the AST nests in orelse.
 

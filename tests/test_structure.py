@@ -46,6 +46,34 @@ class TestMaxNestingDepth:
         assert lines_of(violations) == [("ST101", 6)]
         assert "depth 4" in violations[0].message
 
+    def test_deep_nesting_inside_nested_function_is_reported_once(self, check):
+        source = """
+        def outer():
+            def inner(values):
+                for value in values:
+                    if value:
+                        if value > 1:
+                            print(value)
+            return inner
+        """
+        # regression: this used to yield two identical violations, one attributed
+        # to `outer` and one to `inner`, for the same block
+        violations = check(source, "ST101", max_depth=2)
+        assert lines_of(violations) == [("ST101", 6)]
+
+    def test_match_case_offender_reports_at_pattern_line(self, check):
+        # regression: a match_case as first offender crashed (no lineno of its own)
+        source = """
+        def dispatch(commands):
+            for command in commands:
+                if command:
+                    match command:
+                        case "start":
+                            print(command)
+        """
+        violations = check(source, "ST101", max_depth=2)
+        assert lines_of(violations) == [("ST101", 6)]
+
     def test_try_and_with_count_as_levels(self, check):
         source = """
         def risky(path):
@@ -142,6 +170,35 @@ class TestMaxComplexity:
             return None
         """
         assert check(source, "ST105") == []
+
+    def test_nested_function_branches_score_only_the_nested_function(self, check):
+        # regression: inner's branches used to count toward outer's complexity too
+        source = """
+        def outer(values):
+            def inner(value):
+                if value == 1:
+                    return "one"
+                if value == 2:
+                    return "two"
+                if value == 3:
+                    return "three"
+                return None
+            return inner
+        """
+        violations = check(source, "ST105", max_complexity=3)
+        assert lines_of(violations) == [("ST105", 3)]
+        assert "`inner`" in violations[0].message
+
+    def test_lambda_branches_count_toward_enclosing_function(self, check):
+        source = """
+        def pick(values):
+            chooser = lambda value: "big" if value > 1 else "small"
+            return [chooser(value) for value in values if value]
+        """
+        # 1 base + 1 lambda ternary + 1 comprehension filter = 3
+        violations = check(source, "ST105", max_complexity=2)
+        assert lines_of(violations) == [("ST105", 2)]
+        assert "complexity 3" in violations[0].message
 
     def test_comprehension_filters_count(self, check):
         source = """

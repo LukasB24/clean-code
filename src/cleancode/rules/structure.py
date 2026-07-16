@@ -6,7 +6,14 @@ import ast
 from typing import Iterable, Iterator
 
 from cleancode.models import FileContext, Severity, Violation, ViolationDetails
-from cleancode.rules.base import FunctionNode, Rule, functions, is_elif_branch, split_identifier
+from cleancode.rules.base import (
+    FunctionNode,
+    Rule,
+    functions,
+    is_elif_branch,
+    own_scope_walk,
+    split_identifier,
+)
 
 _NESTING_NODES = (
     ast.If,
@@ -38,6 +45,16 @@ def _clause_statements(child: ast.AST) -> Iterator[ast.stmt]:
         yield child
 
 
+def _enclosing_function(node: ast.AST) -> FunctionNode | None:
+    """The nearest function that ``node`` is nested inside, if any."""
+    current = getattr(node, "parent", None)
+    while current is not None:
+        if isinstance(current, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            return current
+        current = getattr(current, "parent", None)
+    return None
+
+
 class MaxNestingDepth(Rule):
     id = "ST101"
     name = "max-nesting-depth"
@@ -51,6 +68,8 @@ class MaxNestingDepth(Rule):
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         max_depth = ctx.config.options["max_depth"]
         for function in functions(ctx.tree):
+            if _enclosing_function(function) is not None:
+                continue  # measured by the outermost function, depth inherited (not reset)
             deepest, first_offender = self._measure(function, max_depth)
             if first_offender is not None:
                 yield self.violation(
@@ -78,12 +97,12 @@ class MaxNestingDepth(Rule):
                 depth += 1
                 deepest = max(deepest, depth)
                 if depth > max_depth and first_offender is None:
-                    first_offender = statement
+                    # a match_case carries no position of its own; anchor at its pattern
+                    first_offender = (
+                        statement.pattern if isinstance(statement, ast.match_case) else statement
+                    )
             for child in _body_statements(statement):
                 walk(child, depth)
-            for case in getattr(statement, "cases", []):
-                for child in case.body:
-                    walk(child, depth + 1)
 
         for statement in function.body:
             walk(statement, 0)
@@ -200,12 +219,14 @@ class MaxComplexity(Rule):
                     ),
                 )
 
-    @staticmethod
-    def _complexity(function: FunctionNode) -> int:
+    # Lambdas stay in the walk: they never get their own per-function score,
+    # so their branches must count toward the enclosing function.
+    _SCOPE_BOUNDARIES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+
+    @classmethod
+    def _complexity(cls, function: FunctionNode) -> int:
         complexity = 1
-        for node in ast.walk(function):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node is not function:
-                continue  # nested functions get their own score; skip their def node
+        for node in own_scope_walk(function, boundaries=cls._SCOPE_BOUNDARIES):
             if isinstance(
                 node,
                 (ast.If, ast.For, ast.AsyncFor, ast.While, ast.ExceptHandler, ast.IfExp, ast.Assert, ast.match_case),

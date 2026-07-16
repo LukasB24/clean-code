@@ -15,7 +15,7 @@ import re
 from typing import Iterable, Iterator
 
 from cleancode.models import FileContext, Severity, Violation, ViolationDetails
-from cleancode.rules.base import FunctionNode, Rule, functions, subscript_base_name
+from cleancode.rules.base import FunctionNode, Rule, functions, own_scope_walk, subscript_base_name
 from cleancode.rules.naming import collect_bindings
 
 _COMP_TYPES = (ast.ListComp, ast.DictComp, ast.SetComp, ast.GeneratorExp)
@@ -637,7 +637,6 @@ def _op_symbol(operator: ast.cmpop) -> str:
     return _OP_SYMBOLS.get(type(operator), "?")
 
 
-_SCOPE_BOUNDARY_TYPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
 _DYNAMIC_SCOPE_ESCAPES = frozenset({"locals", "eval", "exec"})
 _IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
@@ -726,22 +725,6 @@ def _loaded_names(node: ast.AST) -> set[str]:
     }
 
 
-def _own_scope_walk(function: FunctionNode) -> Iterator[ast.AST]:
-    """Descendants of ``function`` in its own scope — nested def/class/lambda skipped.
-
-    Each nested function/class is checked independently when ``functions()``
-    reaches it; walking into it here would attribute its bindings to the
-    wrong scope.
-    """
-    stack = list(ast.iter_child_nodes(function))
-    while stack:
-        node = stack.pop()
-        if isinstance(node, _SCOPE_BOUNDARY_TYPES):
-            continue
-        yield node
-        stack.extend(ast.iter_child_nodes(node))
-
-
 def _unpack_element_name(element: ast.expr) -> ast.Name | None:
     inner = element.value if isinstance(element, ast.Starred) else element
     return inner if isinstance(inner, ast.Name) else None
@@ -795,7 +778,7 @@ def _assign_target_groups(node: ast.Assign) -> Iterator[list[ast.Name]]:
 
 def _assignment_groups(function: FunctionNode) -> Iterator[list[ast.Name]]:
     """Each assignment's bound-name group: one name, or every leaf of an unpack."""
-    for node in _own_scope_walk(function):
+    for node in own_scope_walk(function):
         if isinstance(node, ast.Assign):
             yield from _assign_target_groups(node)
         elif isinstance(node, ast.AnnAssign) and node.value is not None and isinstance(node.target, ast.Name):
@@ -811,7 +794,7 @@ def _outer_scope_declared_names(function: FunctionNode) -> set[str]:
     assignment to one is never "dead" purely for going unread locally.
     """
     names: set[str] = set()
-    for node in _own_scope_walk(function):
+    for node in own_scope_walk(function):
         if isinstance(node, (ast.Global, ast.Nonlocal)):
             names.update(node.names)
     return names
