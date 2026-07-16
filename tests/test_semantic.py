@@ -335,6 +335,16 @@ class TestUnusedBinding:
         """
         assert check(source, "SM612") == []
 
+    def test_deleted_variable_counts_as_used(self, check):
+        # regression: `del cache` is a deliberate act, not a dead binding
+        source = """
+        def run():
+            cache = build()
+            del cache
+            return None
+        """
+        assert check(source, "SM612") == []
+
     def test_underscore_prefixed_variable_passes(self, check):
         source = """
         def run():

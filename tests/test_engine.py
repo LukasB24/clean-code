@@ -28,6 +28,22 @@ class TestSuppressions:
         result = analyze(source, config=config)
         assert [violation.rule_id for violation in result.violations] == ["NM202"]
 
+    def test_standalone_directive_suppresses_the_next_code_line(self, analyze):
+        source = "# cleancode: disable=NM202\ntmp = 1\n"
+        assert analyze(source).violations == []
+
+    def test_standalone_directive_skips_blank_and_comment_lines(self, analyze):
+        source = "# cleancode: disable=NM202\n\n# unrelated remark\ntmp = 1\n"
+        assert analyze(source).violations == []
+
+    def test_standalone_directive_reaches_only_the_next_code_line(self, analyze):
+        source = "# cleancode: disable=NM202\ntmp = 1\ndata = 2\n"
+        assert [violation.line for violation in analyze(source).violations] == [3]
+
+    def test_inline_directive_does_not_leak_to_the_next_line(self, analyze):
+        source = "tmp = 1  # cleancode: disable=NM202\ndata = 2\n"
+        assert [violation.line for violation in analyze(source).violations] == [2]
+
 
 class TestParseErrors:
     def test_syntax_error_is_reported_not_raised(self, analyze):

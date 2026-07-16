@@ -8,7 +8,7 @@ copy-pasted into another module (or another class in the same file).
 from __future__ import annotations
 
 import ast
-import re
+import copy
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Iterable
@@ -19,18 +19,57 @@ from cleancode.rules.base import FunctionNode, ProjectRule, functions
 if TYPE_CHECKING:
     from cleancode.config import Config
 
-_IDENTIFIER_FIELD = re.compile(r"(id|arg|attr)='[^']*'")
+
+class _Anonymizer(ast.NodeTransformer):
+    """Blanks variable/parameter/attribute names in a (copied) AST in place.
+
+    Call targets are preserved: two bodies that call different functions
+    (``json.dumps(x)`` vs ``pickle.loads(x)``) are doing different things,
+    not copy-pasting each other.
+    """
+
+    def __init__(self) -> None:
+        self._call_targets: set[ast.AST] = set()
+
+    def visit_Call(self, node: ast.Call) -> ast.AST:
+        if isinstance(node.func, (ast.Name, ast.Attribute)):
+            self._call_targets.add(node.func)
+        self.generic_visit(node)
+        return node
+
+    def visit_Name(self, node: ast.Name) -> ast.AST:
+        if node not in self._call_targets:
+            node.id = "_"
+        return node
+
+    def visit_Attribute(self, node: ast.Attribute) -> ast.AST:
+        if node not in self._call_targets:
+            node.attr = "_"
+        self.generic_visit(node)
+        return node
+
+    def visit_arg(self, node: ast.arg) -> ast.AST:
+        node.arg = "_"
+        self.generic_visit(node)
+        return node
+
+    def visit_keyword(self, node: ast.keyword) -> ast.AST:
+        if node.arg is not None:
+            node.arg = "_"
+        self.generic_visit(node)
+        return node
 
 
 def _normalized_dump(node: ast.AST) -> str:
     """``ast.dump`` with variable/parameter/attribute names blanked out.
 
     Two statements with identical control flow and literals but different
-    names (``rows`` vs ``items``) dump to the same string; different literal
-    constants still tell them apart, so this stays conservative.
+    names (``rows`` vs ``items``) dump to the same string; called function/
+    method names and literal constants still tell them apart, so this stays
+    conservative.
     """
-    dumped = ast.dump(node, annotate_fields=True, include_attributes=False)
-    return _IDENTIFIER_FIELD.sub(r"\1='_'", dumped)
+    anonymized = _Anonymizer().visit(copy.deepcopy(node))
+    return ast.dump(anonymized, annotate_fields=True, include_attributes=False)
 
 
 def _is_docstring_expr(statement: ast.stmt) -> bool:

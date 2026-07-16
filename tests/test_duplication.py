@@ -92,7 +92,24 @@ class TestDuplicateFunctionBody:
             """
         assert _violations((first, "a.py"), (second, "b.py")) == []
 
-    def test_permits_bodies_shorter_than_min_statements(self):
+    def test_permits_same_shape_calling_different_functions(self):
+        # regression: called names used to be blanked with every other
+        # identifier, so bodies invoking entirely different APIs collided
+        first = """
+            def persist(record, path):
+                payload = serialize(record)
+                handle = open(path, "w")
+                handle.write(payload)
+                return payload
+            """
+        second = """
+            def broadcast(record, path):
+                payload = encode(record)
+                handle = connect(path, "w")
+                handle.send(payload)
+                return payload
+            """
+        assert _violations((first, "a.py"), (second, "b.py")) == []
         first = """
             def double(value):
                 return value * 2

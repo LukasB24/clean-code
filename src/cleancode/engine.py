@@ -8,6 +8,7 @@ import io
 import re
 import tokenize
 from pathlib import Path
+from typing import Iterator
 
 from cleancode.config import Config
 from cleancode.models import CheckResult, Comment, FileContext, ParsedFile, Violation
@@ -43,7 +44,7 @@ def analyze_source(
         return CheckResult(path=path, parse_error=_syntax_error_message(error))
 
     violations = _run_file_rules(parsed, config)
-    violations = _finalize(violations, parsed.comments, config)
+    violations = _finalize(violations, parsed, config)
     return CheckResult(path=path, violations=violations)
 
 
@@ -88,7 +89,7 @@ def analyze_paths(targets: list[Path], config: Config | None = None) -> list[Che
             results.append(CheckResult(path=path, parse_error=_syntax_error_message(error)))
             continue
         parsed_files.append(parsed)
-        violations = _finalize(_run_file_rules(parsed, config), parsed.comments, config)
+        violations = _finalize(_run_file_rules(parsed, config), parsed, config)
         results.append(CheckResult(path=path, violations=violations))
 
     _run_project_rules(parsed_files, config, results)
@@ -124,7 +125,7 @@ class _ProjectIndex:
     def __init__(self, files: list[ParsedFile], results: list[CheckResult]) -> None:
         self.by_path = {file_result.path: file_result for file_result in results}
         self.suppressions_by_path = {
-            parsed.path: _parse_suppressions(parsed.comments) for parsed in files
+            parsed.path: _parse_suppressions(parsed) for parsed in files
         }
 
 
@@ -165,9 +166,9 @@ def _record_project_violation(violation: Violation, index: _ProjectIndex, config
     file_result.violations.append(violation)
 
 
-def _finalize(violations: list[Violation], comments: list[Comment], config: Config) -> list[Violation]:
+def _finalize(violations: list[Violation], parsed: ParsedFile, config: Config) -> list[Violation]:
     if config.honor_suppressions:
-        suppressions = _parse_suppressions(comments)
+        suppressions = _parse_suppressions(parsed)
         violations = [
             violation
             for violation in violations
@@ -224,14 +225,35 @@ def _extract_comments(source: str) -> list[Comment]:
     return comments
 
 
-def _parse_suppressions(comments: list[Comment]) -> dict[int, set[str] | None]:
-    """Map line -> suppressed rule ids on that line (``None`` = all rules)."""
+def _parse_suppressions(parsed: ParsedFile) -> dict[int, set[str] | None]:
+    """Map line -> suppressed rule ids on that line (``None`` = all rules).
+
+    An inline directive suppresses its own line only. A standalone comment
+    line additionally suppresses the next code line below it, so a directive
+    can sit above the statement it targets (e.g. when the line has no room
+    for a trailing comment).
+    """
+    comment_only_lines = {comment.lineno for comment in parsed.comments if not comment.inline}
     suppressions: dict[int, set[str] | None] = {}
-    for comment in comments:
+    for comment in parsed.comments:
         match = _SUPPRESSION.search(comment.text)
-        if match is not None:
-            _record_suppression(suppressions, comment.lineno, match.group("ids"))
+        if match is None:
+            continue
+        for line in _suppressed_lines(comment, parsed.lines, comment_only_lines):
+            _record_suppression(suppressions, line, match.group("ids"))
     return suppressions
+
+
+def _suppressed_lines(comment: Comment, lines: list[str], comment_only_lines: set[int]) -> Iterator[int]:
+    """The lines one directive covers: its own, plus (standalone only) the next code line."""
+    yield comment.lineno
+    if comment.inline:
+        return
+    for line_number in range(comment.lineno + 1, len(lines) + 1):
+        if line_number in comment_only_lines or not lines[line_number - 1].strip():
+            continue
+        yield line_number
+        return
 
 
 def _record_suppression(

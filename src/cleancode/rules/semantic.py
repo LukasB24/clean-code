@@ -258,7 +258,8 @@ class ReduceInsteadOfSum(Rule):
                     ViolationDetails(
                         message="`reduce(lambda a, b: a + b, ...)` reimplements the "
                         "built-in `sum()`",
-                        suggestion="replace with `sum(iterable)`",
+                        suggestion="replace with `sum(iterable)` for numbers, or "
+                        "`''.join(parts)` when concatenating strings",
                         symbol=ctx.enclosing_symbol(node),
                     ),
                 )
@@ -717,11 +718,12 @@ def _forward_ref_tokens(tree: ast.Module) -> set[str]:
     return tokens
 
 
-def _loaded_names(node: ast.AST) -> set[str]:
+def _referenced_names(node: ast.AST) -> set[str]:
+    """Names read (or explicitly ``del``eted — a deliberate act, not dead code)."""
     return {
         child.id
         for child in ast.walk(node)
-        if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Load)
+        if isinstance(child, ast.Name) and isinstance(child.ctx, (ast.Load, ast.Del))
     }
 
 
@@ -828,7 +830,7 @@ class UnusedBinding(Rule):
     def _check_imports(self, ctx: FileContext) -> Iterator[Violation]:
         if ctx.path.endswith("__init__.py"):
             return
-        used = _loaded_names(ctx.tree) | _forward_ref_tokens(ctx.tree) | _dunder_all_exports(ctx.tree)
+        used = _referenced_names(ctx.tree) | _forward_ref_tokens(ctx.tree) | _dunder_all_exports(ctx.tree)
         for bound_name, alias in _import_aliases(ctx.tree):
             if bound_name in used or _is_exempt_name(bound_name):
                 continue
@@ -849,7 +851,7 @@ class UnusedBinding(Rule):
         if _escapes_to_dynamic_scope(function):
             return
         nonlocal_names = _outer_scope_declared_names(function)
-        used = _loaded_names(function)
+        used = _referenced_names(function)
         for group in _assignment_groups(function):
             candidates = [
                 name for name in group if not _is_exempt_name(name.id) and name.id not in nonlocal_names
