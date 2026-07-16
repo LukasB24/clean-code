@@ -10,6 +10,7 @@ from cleancode.rules.base import (
     FunctionNode,
     Rule,
     functions,
+    is_dunder,
     is_elif_branch,
     own_scope_walk,
     split_identifier,
@@ -239,10 +240,6 @@ class MaxComplexity(Rule):
         return complexity
 
 
-def _is_dunder(name: str) -> bool:
-    return name.startswith("__") and name.endswith("__")
-
-
 class DoOneThing(Rule):
     id = "ST106"
     name = "do-one-thing"
@@ -281,7 +278,7 @@ class DoOneThing(Rule):
     def _conjunction(
         function: FunctionNode, conjunctions: set[str], allowed: set[str]
     ) -> str | None:
-        if function.name in allowed or _is_dunder(function.name):
+        if function.name in allowed or is_dunder(function.name):
             return None
         joined = sorted(conjunctions.intersection(split_identifier(function.name)))
         return joined[0] if joined else None

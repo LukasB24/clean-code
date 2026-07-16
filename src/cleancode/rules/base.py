@@ -15,6 +15,12 @@ if TYPE_CHECKING:
 
 FunctionNode = ast.FunctionDef | ast.AsyncFunctionDef
 
+IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def is_dunder(name: str) -> bool:
+    return name.startswith("__") and name.endswith("__")
+
 
 def functions(tree: ast.Module) -> Iterator[FunctionNode]:
     for node in ast.walk(tree):

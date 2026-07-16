@@ -15,6 +15,7 @@ from typing import Iterable, Iterator
 from cleancode.models import Comment, FileContext, Severity, Violation, ViolationDetails
 from cleancode.rules.base import (
     FRAMING_VERBS,
+    IDENTIFIER,
     FunctionNode,
     Rule,
     content_words,
@@ -56,7 +57,6 @@ _OPERATOR_SYNONYMS: list[tuple[re.Pattern[str], frozenset[str]]] = [
     (re.compile(r"\bprint\b"), frozenset({"show", "display", "output"})),
 ]
 
-_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _NUMBER = re.compile(r"\b\d+\b")
 
 # Spelled-out numbers, so `# iterate three times` matches a code-side `3`.
@@ -183,7 +183,7 @@ def _informative(words: set[str]) -> set[str]:
 def _code_line_words(code_text: str) -> set[str]:
     """All words a lazy comment could copy from this line of code."""
     words: set[str] = set()
-    for identifier in _IDENTIFIER.findall(code_text):
+    for identifier in IDENTIFIER.findall(code_text):
         words.update(split_identifier(identifier))
     for numeral in _NUMBER.findall(code_text):
         words.add(numeral)

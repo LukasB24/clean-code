@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Iterable
 
 from cleancode.models import Location, ParsedFile, Severity, Violation, ViolationDetails
-from cleancode.rules.base import FunctionNode, ProjectRule, functions
+from cleancode.rules.base import FunctionNode, ProjectRule, functions, is_dunder
 
 if TYPE_CHECKING:
     from cleancode.config import Config
@@ -110,10 +110,6 @@ def _is_stub_body(body: list[ast.stmt]) -> bool:
     return isinstance(statement, ast.Pass) or is_ellipsis or _raises_not_implemented(statement)
 
 
-def _is_dunder(name: str) -> bool:
-    return name.startswith("__") and name.endswith("__")
-
-
 @dataclass
 class _IndexState:
     min_statements: int
@@ -144,7 +140,7 @@ class DuplicateFunctionBody(ProjectRule):
         yield from self._flag_duplicates(config, state.groups)
 
     def _index_function(self, function: FunctionNode, parsed: ParsedFile, state: _IndexState) -> None:
-        if _is_dunder(function.name):
+        if is_dunder(function.name):
             return
         body = _significant_body(function)
         if len(body) < state.min_statements or _is_stub_body(body):

@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from typing import Iterable, Iterator
 
 from cleancode.models import FileContext, Severity, Violation, ViolationDetails
-from cleancode.rules.base import FunctionNode, Rule, is_elif_branch
+from cleancode.rules.base import FunctionNode, Rule, is_dunder, is_elif_branch
 
 
 def _is_isinstance_call(test: ast.expr) -> bool:
@@ -136,10 +136,6 @@ class TypeSwitchViolatesOCP(Rule):
             )
 
 
-def _is_dunder(name: str) -> bool:
-    return name.startswith("__") and name.endswith("__")
-
-
 def _is_non_instance_method(method: FunctionNode) -> bool:
     return any(
         isinstance(decorator, ast.Name) and decorator.id in ("staticmethod", "classmethod")
@@ -153,7 +149,7 @@ def _instance_methods(class_def: ast.ClassDef) -> list[FunctionNode]:
         item
         for item in class_def.body
         if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
-        and not _is_dunder(item.name)
+        and not is_dunder(item.name)
         and not _is_non_instance_method(item)
     ]
 
