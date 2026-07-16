@@ -48,6 +48,7 @@ EXPECTED_DIRTY_RULES = {
         "SM601",  # dict-comp nests a list-comp filtered by a ternary
         "SM602",  # bounds[0]/bounds[1]/bounds[2] anonymous tuple access
         "SM603",  # k.startswith('tx_') ternary branch
+        "SM615",  # ternary nested two deep inside the comprehension filter
     },
     "llm_style_metrics.py": {
         "ST101",  # seven levels of nested if/for

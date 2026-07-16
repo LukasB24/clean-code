@@ -387,10 +387,8 @@ class TooManyGuardClauses(Rule):
 
     @staticmethod
     def _max_guard_count(function: FunctionNode) -> int:
-        return max(
-            (
-                sum(1 for statement in block if _is_guard_clause(statement))
-                for block in _blocks(function)
-            ),
-            default=0,
-        )
+        most = 0
+        for block in _blocks(function):
+            guards = sum(1 for statement in block if _is_guard_clause(statement))
+            most = max(most, guards)
+        return most

@@ -62,5 +62,6 @@ def _toml_literal(value: object) -> str:
     if render is not None:
         return render(value)
     if isinstance(value, list):
-        return "[" + ", ".join(_toml_literal(item) for item in value) + "]"
+        items = ", ".join(_toml_literal(item) for item in value)
+        return f"[{items}]"
     return str(value)

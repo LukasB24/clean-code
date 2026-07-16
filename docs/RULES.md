@@ -40,6 +40,10 @@ quick-start, see the [README](../README.md).
 | SM611 | redundant-isinstance-check | — | warning |
 | SM612 | unused-binding | — | warning |
 | SM613 | builtin-shadowing | `watched=[id,type,list,dict,str,…]` | warning |
+| SM614 | bool-arithmetic | — | warning |
+| SM615 | nested-ternary | — | warning |
+| SM616 | callable-indirection | — | warning |
+| SM617 | deep-expression | `max_depth=4` | warning |
 | SD801 | type-switch-violates-ocp | `min_branches=3` | warning |
 | SD802 | low-cohesion-class | `min_methods=4` | warning |
 | DP701 | duplicate-function-body | `min_statements=4` | warning |
@@ -78,6 +82,15 @@ quick-start, see the [README](../README.md).
   when *every* target in it is unused, counts an explicit `del` as a use,
   and bails out of the unused-variable check entirely for a function that
   calls `locals`/`eval`/`exec`.
+- **SM614–SM617 stop complexity from being *compressed* instead of removed.**
+  The structural limits (ST1xx) can be satisfied by squeezing the same logic
+  into denser expressions — that's what these four catch: a boolean added to
+  a counter (`count += x in seen`, SM614), a ternary inside a ternary
+  (SM615), a function that returns a `lambda`/`functools.partial`/bare
+  function reference instead of doing work (SM616), and a statement nesting
+  calls/comprehensions/f-strings more than `max_depth` levels deep (SM617 —
+  a *flat* `and`-chain of conditions stays fine at any length, and
+  module-level constant tables are exempt).
 - **SM613 reuses the same binding-site collection as the `NM2xx` naming
   rules** (parameters, assignment/`for`/`with ... as`/comprehension targets,
   function/class names), so class/instance attributes (`self.id`), dict keys,

@@ -290,6 +290,24 @@ class CommentDensity(Rule):
         return code_lines, comment_lines
 
 
+def _comment_line_sets(comments: list[Comment]) -> tuple[set[int], set[int], set[int]]:
+    """Line sets for density counting: (standalone, counted standalone, counted inline).
+
+    A standalone comment line is never code; only non-exempt comments count
+    toward density.
+    """
+    standalone: set[int] = set()
+    counted_standalone: set[int] = set()
+    counted_inline: set[int] = set()
+    for comment in comments:
+        counted = counted_inline if comment.inline else counted_standalone
+        if not _is_exempt(comment):
+            counted.add(comment.lineno)
+        if not comment.inline:
+            standalone.add(comment.lineno)
+    return standalone, counted_standalone, counted_inline
+
+
 class FileCommentDensity(Rule):
     id = "CM305"
     name = "file-comment-density"
@@ -326,25 +344,19 @@ class FileCommentDensity(Rule):
     @staticmethod
     def _count_file_lines(ctx: FileContext) -> tuple[int, int]:
         """Non-blank (code, comment) line counts across the whole file."""
-        standalone_lines: set[int] = set()  # any standalone comment line — never code
-        counted_standalone: set[int] = set()
-        counted_inline: set[int] = set()
-        for comment in ctx.comments:
-            counted = counted_inline if comment.inline else counted_standalone
-            if not _is_exempt(comment):
-                counted.add(comment.lineno)
-            if not comment.inline:
-                standalone_lines.add(comment.lineno)
-
+        standalone_lines, counted_standalone, counted_inline = _comment_line_sets(ctx.comments)
         docstring_lines = _all_docstring_lines(ctx.tree)
         code_lines = 0
         comment_lines = 0
         for line_number, line in enumerate(ctx.lines, start=1):
             if not line.strip() or line_number in docstring_lines:
                 continue
-            if line_number in standalone_lines:
-                comment_lines += line_number in counted_standalone
+            if line_number in counted_standalone:
+                comment_lines += 1
                 continue
+            if line_number in standalone_lines:
+                continue  # exempt directive on its own line: neither code nor comment
             code_lines += 1
-            comment_lines += line_number in counted_inline
+            if line_number in counted_inline:
+                comment_lines += 1
         return code_lines, comment_lines

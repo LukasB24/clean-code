@@ -162,7 +162,7 @@ retry_delay_seconds = base_delay * 1.5
 
 ## The rules
 
-38 rules across 9 categories, each with a default severity you can override:
+42 rules across 9 categories, each with a default severity you can override:
 
 | Category | IDs | Count | Catches |
 |----------|-----|-------|---------|
@@ -171,7 +171,7 @@ retry_delay_seconds = base_delay * 1.5
 | Comments & docstrings | CM301–CM305 | 5 | docstrings/comments that just restate the code, comment-heavy files |
 | Subscripts | SL401–SL402 | 2 | `x[i][j][k]`-style complexity and chaining |
 | Types | TY501 | 1 | uninformative `Any` |
-| Structural smells | SM601–SM613 | 13 | magic numbers, nested comprehensions, redundant ternaries, PyTorch pitfalls, unused bindings, builtin shadowing, and more |
+| Structural smells | SM601–SM617 | 17 | magic numbers, nested comprehensions, redundant ternaries, PyTorch pitfalls, unused bindings, builtin shadowing, nested ternaries, callable indirection, deep expressions, and more |
 | SOLID | SD801–SD802 | 2 | type-switches violating OCP, low-cohesion classes |
 | Duplication | DP701–DP702 | 2 | copy-pasted and exactly-duplicated function bodies |
 | Correctness | PY901–PY902 | 2 | bare `except:`, silently-discarded exceptions |

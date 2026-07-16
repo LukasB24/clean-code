@@ -10,7 +10,6 @@ from __future__ import annotations
 import ast
 from collections import defaultdict
 from dataclasses import dataclass
-from functools import partial
 from typing import TYPE_CHECKING, Callable, ClassVar, Iterable
 
 from cleancode.models import Location, ParsedFile, Severity, Violation, ViolationDetails
@@ -69,14 +68,15 @@ class _Renderer:
 
     def render(self, node: object) -> str:
         if isinstance(node, list):
-            return "[" + ", ".join(self.render(item) for item in node) + "]"
+            items = [self.render(item) for item in node]
+            return "[" + ", ".join(items) + "]"
         if not isinstance(node, ast.AST):
             return repr(node)
-        fields = ", ".join(
-            f"{name}={self.render(self._field_value(node, name, value))}"
-            for name, value in ast.iter_fields(node)
-        )
-        return f"{type(node).__name__}({fields})"
+        parts = []
+        for name, value in ast.iter_fields(node):
+            rendered = self.render(self._field_value(node, name, value))
+            parts.append(f"{name}={rendered}")
+        return f"{type(node).__name__}({', '.join(parts)})"
 
     def _field_value(self, node: ast.AST, name: str, value: object) -> object:
         """The field's value, blanked to ``"_"`` when it is an anonymized identifier."""
@@ -133,31 +133,21 @@ def _is_stub_body(body: list[ast.stmt]) -> bool:
     return isinstance(statement, ast.Pass) or is_ellipsis or _raises_not_implemented(statement)
 
 
-def _exact_dump(node: ast.AST) -> str:
-    """``ast.dump`` as written: identifiers are kept, so only true copies collide."""
+def _exact_dump(node: ast.AST, imported_names: set[str]) -> str:
+    """``ast.dump`` as written: identifiers are kept, so only true copies collide.
+
+    ``imported_names`` is unused; it exists so both dump functions share one
+    signature and can be passed interchangeably to ``_grouped_by_fingerprint``.
+    """
     return ast.dump(node, annotate_fields=True, include_attributes=False)
 
 
 _Member = tuple[ParsedFile, FunctionNode]
-_Fingerprint = Callable[[ast.AST], str]
-# Builds one file's fingerprint function, so a fingerprint can depend on
-# file-level facts (which names are imports) computed once per file.
-_FingerprintFactory = Callable[[ParsedFile], _Fingerprint]
+_Dump = Callable[[ast.AST, set[str]], str]
 
 
-def _normalized_fingerprint(parsed: ParsedFile) -> _Fingerprint:
-    imported = {name for name, _ in import_aliases(parsed.tree)}
-    return partial(_normalized_dump, imported_names=imported)
-
-
-def _exact_fingerprint(_parsed: ParsedFile) -> _Fingerprint:
-    return _exact_dump
-
-
-def _body_fingerprint(
-    function: FunctionNode, min_statements: int, fingerprint: _Fingerprint
-) -> str | None:
-    """Comparable fingerprint of a function's body, or ``None`` if exempt.
+def _comparable_body(function: FunctionNode, min_statements: int) -> list[ast.stmt] | None:
+    """The statements to fingerprint, or ``None`` if the function is exempt.
 
     Dunder methods, stub bodies, and bodies shorter than ``min_statements``
     are never compared; a leading docstring is stripped first.
@@ -167,47 +157,38 @@ def _body_fingerprint(
     body = _significant_body(function)
     if len(body) < min_statements or _is_stub_body(body):
         return None
-    return "|".join(fingerprint(statement) for statement in body)
+    return body
 
 
-def _comparable_members(
-    files: list[ParsedFile], min_statements: int, make_fingerprint: _FingerprintFactory
+def _file_fingerprints(
+    parsed: ParsedFile, min_statements: int, dump: _Dump
 ) -> Iterable[tuple[str, _Member]]:
-    for parsed in files:
-        yield from _file_members(parsed, min_statements, make_fingerprint(parsed))
-
-
-def _file_members(
-    parsed: ParsedFile, min_statements: int, fingerprint: _Fingerprint
-) -> Iterable[tuple[str, _Member]]:
+    """(fingerprint, member) for every comparable function in one file."""
+    imported = {name for name, _ in import_aliases(parsed.tree)}
     for function in parsed.functions:
-        key = _body_fingerprint(function, min_statements, fingerprint)
-        if key is not None:
-            yield key, (parsed, function)
+        body = _comparable_body(function, min_statements)
+        if body is None:
+            continue
+        key = "|".join(dump(statement, imported) for statement in body)
+        yield key, (parsed, function)
 
 
 def _grouped_by_fingerprint(
-    files: list[ParsedFile], min_statements: int, make_fingerprint: _FingerprintFactory
+    files: list[ParsedFile], min_statements: int, dump: _Dump
 ) -> Iterable[list[_Member]]:
     """Groups of two-or-more functions whose fingerprinted bodies collide."""
     groups: dict[str, list[_Member]] = defaultdict(list)
-    for key, member in _comparable_members(files, min_statements, make_fingerprint):
-        groups[key].append(member)
+    for parsed in files:
+        for key, member in _file_fingerprints(parsed, min_statements, dump):
+            groups[key].append(member)
     return [members for members in groups.values() if len(members) >= 2]
-
-
-@dataclass(frozen=True)
-class _DuplicateWording:
-    """How one duplication rule phrases its violations."""
-
-    verb: str
-    suggestion: str
 
 
 class _DuplicationRule(ProjectRule):
     """Shared reporting for rules that group functions by a body fingerprint."""
 
-    _WORDING: ClassVar[_DuplicateWording]
+    _VERB: ClassVar[str]
+    _SUGGESTION: ClassVar[str]
 
     def _flag_group(self, config: "Config", members: list[_Member]) -> Iterable[Violation]:
         """One violation per member after the first, pointing back at the original."""
@@ -217,9 +198,9 @@ class _DuplicationRule(ProjectRule):
                 config,
                 Location(path=parsed.path, node=function),
                 ViolationDetails(
-                    message=f"function `{function.name}` {self._WORDING.verb} "
+                    message=f"function `{function.name}` {self._VERB} "
                     f"`{first_function.name}` at {first_parsed.path}:{first_function.lineno}",
-                    suggestion=self._WORDING.suggestion,
+                    suggestion=self._SUGGESTION,
                     symbol=function.name,
                 ),
             )
@@ -238,14 +219,12 @@ class DuplicateFunctionBody(_DuplicationRule):
         "are exempt."
     )
 
-    _WORDING = _DuplicateWording(
-        verb="duplicates the body of",
-        suggestion="extract the shared logic into a common helper function",
-    )
+    _VERB = "duplicates the body of"
+    _SUGGESTION = "extract the shared logic into a common helper function"
 
     def check_project(self, files: list[ParsedFile], config: "Config") -> Iterable[Violation]:
         min_statements = config.rules[self.id].options["min_statements"]
-        for members in _grouped_by_fingerprint(files, min_statements, _normalized_fingerprint):
+        for members in _grouped_by_fingerprint(files, min_statements, _normalized_dump):
             yield from self._flag_group(config, members)
 
 
@@ -263,15 +242,13 @@ class IdenticalFunctionImplementation(_DuplicationRule):
         "DP701. Stub bodies and dunder methods are exempt."
     )
 
-    _WORDING = _DuplicateWording(
-        verb="is an exact copy of",
-        suggestion="keep one copy and import/reuse it from the other location",
-    )
+    _VERB = "is an exact copy of"
+    _SUGGESTION = "keep one copy and import/reuse it from the other location"
 
     def check_project(self, files: list[ParsedFile], config: "Config") -> Iterable[Violation]:
         min_statements = config.rules[self.id].options["min_statements"]
         dp701 = config.rules[DuplicateFunctionBody.id]
-        for members in _grouped_by_fingerprint(files, min_statements, _exact_fingerprint):
+        for members in _grouped_by_fingerprint(files, min_statements, _exact_dump):
             if dp701.enabled and self._covered_by_dp701(members, dp701.options["min_statements"]):
                 continue  # DP701 already reports this group; don't double-flag
             yield from self._flag_group(config, members)
