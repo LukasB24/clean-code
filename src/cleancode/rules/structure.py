@@ -352,7 +352,12 @@ def _blocks(function: FunctionNode) -> Iterator[list[ast.stmt]]:
 
 
 def _child_blocks(statement: ast.stmt) -> Iterator[list[ast.stmt]]:
-    """The body/orelse/finalbody/handler/case statement-lists of one statement."""
+    """Every nested block ST107 must scan for guard clauses, whichever clause it hangs off.
+
+    A guard clause piled up inside a ``try``/``except`` or ``match`` arm is
+    just as much a "more than one thing" smell as one sitting in an
+    ``if``/``else`` — the clause it's attached to doesn't change what counts.
+    """
     for attr in ("body", "orelse", "finalbody"):
         block = getattr(statement, attr, None)
         if block:

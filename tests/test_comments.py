@@ -30,6 +30,54 @@ class TestDocstringRestatesName:
         '''
         assert check(source, "CM301") == []
 
+    def test_short_docstring_restating_the_body_is_caught(self, check):
+        # regression: a docstring that paraphrases the function's own body
+        # (not just its name/params) used to slip past CM301 entirely —
+        # this is the PR reviewer's flagged real-world example
+        source = '''
+        def _section_entries(self, docstring, function):
+            """Yield (entry_name, is_uninformative) for Args:/Returns: style entries."""
+            in_section = False
+            section_name = ""
+            for line in docstring.splitlines():
+                header = SECTION_HEADER.match(line)
+                if header:
+                    in_section = True
+                    section_name = header.group(1).lower()
+                    continue
+                if not in_section:
+                    continue
+                if line.strip() and not line.startswith((" ", "\\t")):
+                    in_section = False
+                    continue
+                entry = PARAM_ENTRY.match(line)
+                if entry is None:
+                    continue
+                name = entry.group("name").lstrip("*")
+                description = entry.group("desc").strip()
+                if section_name in ("returns", "raises", "yields"):
+                    reference = set(split_identifier(function.name))
+                else:
+                    reference = set(split_identifier(name))
+                desc_words = content_words(description, extra_stopwords=FRAMING_VERBS)
+                uninformative = desc_words <= (reference | GENERIC_PARAM_WORDS)
+                yield name, uninformative
+        '''
+        violations = check(source, "CM301")
+        assert rule_ids(violations) == ["CM301"]
+        assert "_section_entries" in violations[0].message
+
+    def test_short_docstring_using_body_vocabulary_to_add_real_info_passes(self, check):
+        # a short docstring can legitimately reuse a few of the body's words
+        # while still adding information the code doesn't already say
+        source = '''
+        def _section_entries(self, docstring, function):
+            """Judges Returns/Raises/Yields entries against the function name, not a param."""
+            for line in docstring.splitlines():
+                pass
+        '''
+        assert check(source, "CM301") == []
+
     def test_substantive_multiline_docstring_passes(self, check):
         source = '''
         def get_user_name(user):

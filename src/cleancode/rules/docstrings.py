@@ -17,10 +17,12 @@ from cleancode.models import FileContext, Severity, Violation, ViolationDetails
 from cleancode.rules.base import (
     FRAMING_VERBS,
     GENERIC_PARAM_WORDS,
+    IDENTIFIER,
     FunctionNode,
     Rule,
     content_words,
     docstring_node,
+    end_line,
     split_identifier,
 )
 
@@ -36,6 +38,31 @@ def _signature_words(function: FunctionNode) -> set[str]:
         *function.args.kwonlyargs,
     ]:
         words.update(split_identifier(arg.arg))
+    return words
+
+
+def _body_source_words(function: FunctionNode, lines: list[str]) -> set[str]:
+    """Words appearing anywhere in ``function``'s own source, docstring excluded.
+
+    A short docstring whose every word already appears in the code it
+    documents adds nothing — the same principle ``CM302`` applies to a
+    single line of code, extended to a whole function body. This is a plain
+    text scan (like ``CM302``'s ``_code_line_words``), so it also catches a
+    docstring paraphrase of a string constant the body switches on
+    (``section_name in ("returns", "raises", "yields")``), not just of a
+    real identifier.
+    """
+    doc_node = docstring_node(function)
+    if doc_node is None:
+        doc_span: set[int] = set()
+    else:
+        doc_span = set(range(doc_node.lineno, end_line(doc_node) + 1))
+    words: set[str] = set()
+    for line_number in range(function.lineno, end_line(function) + 1):
+        if line_number in doc_span:
+            continue
+        for identifier in IDENTIFIER.findall(lines[line_number - 1]):
+            words.update(split_identifier(identifier))
     return words
 
 
@@ -75,19 +102,33 @@ def _long_docstring_reason(text: str, reference: set[str]) -> str | None:
 
 @dataclass(frozen=True)
 class _DocstringOwner:
-    """The bits of a function/class ``CM301`` needs, independent of which it is."""
+    """The bits of a function/class ``CM301`` needs, independent of which it is.
+
+    ``short_reference`` is only ever used to judge a two-line-or-fewer
+    docstring; it additionally includes the owner's own source text for a
+    function (see ``_body_source_words``), so a short docstring that
+    paraphrases the code right below it — not just the signature — still
+    counts as a restatement. ``reference`` (signature/class words alone)
+    is what a longer, multi-line docstring is judged against: folding body
+    words into that check too would make genuinely informative prose look
+    like a restatement merely for reusing the function's own vocabulary.
+    """
 
     node: FunctionNode | ast.ClassDef
     name: str
     reference: set[str]
+    short_reference: set[str]
 
 
 def _owners(ctx: FileContext) -> Iterator[_DocstringOwner]:
     for function in ctx.functions:
-        yield _DocstringOwner(function, function.name, _signature_words(function))
+        signature = _signature_words(function)
+        body_words = _body_source_words(function, ctx.lines)
+        yield _DocstringOwner(function, function.name, signature, signature | body_words)
     for node in ast.walk(ctx.tree):
         if isinstance(node, ast.ClassDef):
-            yield _DocstringOwner(node, node.name, _class_reference_words(node))
+            reference = _class_reference_words(node)
+            yield _DocstringOwner(node, node.name, reference, reference)
 
 
 def _restatement(
@@ -102,7 +143,7 @@ def _restatement(
     if not text:
         return None
     reason = (
-        _short_docstring_reason(text, owner.reference, overlap_threshold)
+        _short_docstring_reason(text, owner.short_reference, overlap_threshold)
         if len(text.splitlines()) <= 2
         else _long_docstring_reason(text, owner.reference)
     )
@@ -187,7 +228,14 @@ class BoilerplateParamDocs(Rule):
     def _section_entries(
         self, docstring: str, function: FunctionNode
     ) -> Iterator[tuple[str, bool]]:
-        """Yield (entry_name, is_uninformative) for Args:/Returns: style entries."""
+        """Score each Args/Returns/Yields/Raises line against what it ought to explain.
+
+        A Returns/Raises/Yields entry describes the *output*, so it's judged
+        against the function's own name (there's no parameter to fall back
+        on); every other section judges an entry against its own parameter
+        name. Text outside a recognized section, or that doesn't parse as a
+        `name: description` line, is skipped rather than guessed at.
+        """
         in_section = False
         section_name = ""
         for line in docstring.splitlines():

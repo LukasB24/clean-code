@@ -66,6 +66,18 @@ quick-start, see the [README](../README.md).
   two lines, flags one whose *every* non-empty line never leaves the
   signature/class-name vocabulary plus generic parameter nouns — one
   informative line anywhere is enough to clear it.
+- **A short (two-line-or-fewer) function docstring is also judged against
+  the function's own source text**, not just its name and parameters — a
+  plain scan for identifier- and keyword-shaped words (the same technique
+  `CM302` uses on one code line, extended to the whole body), including
+  words that are only string-constant values the body switches on. A
+  docstring that just paraphrases what the code already shows — return
+  values, local variable names, the branches it takes — restates the code,
+  not just the signature, and is flagged the same way. This widened
+  reference applies only to the short-docstring check; a longer, multi-line
+  docstring is still judged purely against the signature/class vocabulary,
+  so substantive prose that happens to reuse the function's own words for
+  good reason isn't penalized.
 - **CM305 measures comment density file-wide** where CM303 measures it per
   function, so it catches comment sprawl spread across module level and many
   small functions. It counts non-blank comment lines against code lines

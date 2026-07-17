@@ -26,6 +26,11 @@ whether pre- or post-1.0).
   its directly-defined method names), and flags a docstring longer than two
   lines when *every* line stays within the signature/class-name vocabulary
   plus generic filler.
+- `CM301`'s short-docstring check now also judges a function's docstring
+  against its own source text (identifier- and keyword-shaped words, the
+  same scan `CM302` uses on one code line), not just its name and
+  parameters — catching a docstring that paraphrases the return value,
+  a local variable, or a branch the code takes instead of the signature.
 - `ST108` `max-module-length` — flags a module longer than `max_lines`
   (default 500); a file that keeps absorbing helpers becomes a grab-bag.
 - `DP702` `identical-function-implementation` — flags function bodies that
