@@ -16,14 +16,16 @@ quick-start, see the [README](../README.md).
 | ST106 | do-one-thing | `conjunctions=[and, or]` | warning |
 | ST107 | too-many-guard-clauses | `max_guards=2` | info |
 | ST108 | max-module-length | `max_lines=500` | warning |
+| ST109 | redundant-else | — | warning |
 | NM201 | short-name | `min_length=3, allowed=[i,j,k,n,x,y,_,id,ok,fh]` | warning |
 | NM202 | meaningless-name | configurable ban lists | warning |
 | NM203 | cryptic-abbreviation | `known_abbrevs=[cfg,ctx,idx,…]` | info |
-| CM301 | docstring-restates-name | `overlap=0.7` | warning |
-| CM302 | comment-restates-code | `overlap=0.7, min_words=2` | warning |
+| CM301 | docstring-restates-name | `overlap=0.6, private_overlap=0.35` | warning |
+| CM302 | comment-restates-code | `overlap=0.5, min_words=2` | warning |
 | CM303 | comment-density | `max_ratio=0.3, min_code_lines=5` | info |
 | CM304 | boilerplate-param-docs | `min_uninformative=0.5` | warning |
 | CM305 | file-comment-density | `max_ratio=0.2, min_code_lines=30` | warning |
+| CM306 | banner-comment | — | warning |
 | SL401 | complex-subscript | `max_score=5` | warning |
 | SL402 | chained-subscript | `max_chain=2` | warning |
 | TY501 | uninformative-any | — | warning |
@@ -46,12 +48,17 @@ quick-start, see the [README](../README.md).
 | SM617 | deep-expression | `max_depth=4` | warning |
 | SM618 | thin-delegation-wrapper | — | warning |
 | SM619 | buried-value-fallback | — | warning |
+| SM620 | returned-temp | — | warning |
+| SM621 | compatibility-alias | — | warning |
+| SM622 | trivial-property-pair | — | warning |
 | SD801 | type-switch-violates-ocp | `min_branches=3` | warning |
 | SD802 | low-cohesion-class | `min_methods=4` | warning |
+| SD803 | class-as-namespace | `min_methods=2` | warning |
 | DP701 | duplicate-function-body | `min_statements=4` | warning |
 | DP702 | identical-function-implementation | `min_statements=2` | warning |
 | PY901 | bare-except | — | warning |
 | PY902 | empty-exception-handler | — | warning |
+| PY903 | oversized-try | `max_statements=3` | warning |
 
 ## A few details worth knowing
 
@@ -61,6 +68,11 @@ quick-start, see the [README](../README.md).
 - **CM301/CM302 are deterministic, not LLM-judged** — they compare word
   overlap between a docstring/comment and the code it annotates. Comments
   explaining *why* (not *what*) are always exempt.
+- **CM301 judges a `_`-prefixed (private) function/class at a much stricter
+  `private_overlap` (default 0.35) than a public one (`overlap`, default
+  0.6)** — a private name has no external reader to write prose for, only
+  its own body, which the reader can just read instead. Dunders are judged
+  as public, not private.
 - **CM301 also covers class docstrings** (reference words = the class name
   plus its directly-defined method names) and, for docstrings longer than
   two lines, flags one whose *every* non-empty line never leaves the
@@ -130,6 +142,18 @@ quick-start, see the [README](../README.md).
   still verified against the live `builtins` module, not a hardcoded copy.
 - **`elif` chains don't count as nesting** for ST101 (they still count toward
   ST105 complexity).
+- **ST109 flags a plain two-way `if`/`else` whose `if` branch always exits**
+  (return/raise/break/continue) — the else adds an indentation level the exit
+  already made unnecessary. Any `if` that is itself part of an `elif` chain
+  is exempt entirely: a multi-way dispatch ladder ending in `else` is
+  idiomatic, not the redundant-nesting shape this targets, even when every
+  branch in the chain returns.
+- **CM306 flags a decoration-only or decoration-framed comment**
+  (`# ----------`, `# ---- Step 1 ----`) — section-divider ceremony that
+  carries no information the code doesn't already show. It reuses the same
+  directive-comment exemptions as CM303/CM305 (TODO/FIXME/NOTE, `noqa`,
+  `cleancode:`, ...); a plain narrative comment with no decoration characters
+  (`# Step 1: parse the input`) is left to CM302/CM305, not flagged here.
 - **SD801 flags a same-variable type-switch** (`isinstance`/`type()` chain) —
   an Open/Closed Principle smell. Dispatching on Python's own `ast.*` node
   types is exempt, since that's routine AST tooling, not the smell targeted.
@@ -154,6 +178,30 @@ quick-start, see the [README](../README.md).
   copy-paste never produces two violations.
 - **ST108 counts a module's total lines** (blank lines and comments
   included, mirroring how a reader scrolls a file) against `max_lines`.
+- **SM620 flags `name = expr` immediately followed by `return name`**, where
+  `name` has no other use in the function — the assignment adds a name but
+  no information. An annotated assignment (`name: T = expr`) is exempt,
+  since the annotation itself is informative; a name used again before the
+  return (logged, passed to another call) is exempt too.
+- **SM621 flags a module-level `alias = original`** where `original` is a
+  function or class defined in the same file — a second name for something
+  that already has one, the kind of "kept for backwards compatibility" alias
+  that only makes sense in a mature library, not freshly generated code.
+  ALL_CAPS targets, `_`-prefixed targets, and annotated assignments
+  (`TypeAlias`) are exempt.
+- **SM622 flags a `@property`/`@x.setter` pair that only mirrors
+  `self._x`** — both accessors trivial, with no validation or computation in
+  either. A getter-only read-only property (no matching setter) is a
+  legitimate idiom and is exempt entirely; SD802 already treats a property
+  pair as one method for cohesion purposes, the same precedent this rule's
+  pair-detection follows.
+- **SD803 flags a class with no base classes, no decorators, and no
+  class-level state** whose entire body (docstring aside) is
+  `min_methods`-or-more `@staticmethod`s — the class carries no state, so
+  the module is already the namespace it's imitating. Any base class,
+  decorator, or class-level assignment exempts the class entirely; a single
+  static helper alongside instance methods is untouched (only an *all*-static
+  body counts).
 - **PY901 flags a bare `except:`** — it catches `KeyboardInterrupt` and
   `SystemExit` along with genuine bugs. `except Exception:` is merely broad,
   not bare, and is not flagged.
@@ -161,3 +209,10 @@ quick-start, see the [README](../README.md).
   lone string literal) — the exception is discarded with no log, fallback, or
   re-raise. A handler that `continue`s/`return`s/`break`s, logs, or re-raises
   is a real control-flow decision and is not flagged.
+- **PY903 flags a `try` spanning more than `max_statements` top-level
+  statements feeding a bare or `except Exception`/`BaseException` handler** —
+  the handler can't know which of several steps actually failed. The
+  conjunction is deliberate: a long `try` narrowed to a specific exception is
+  a deliberate contract and isn't flagged, and a short `try` (at or under
+  `max_statements`) wrapping a broad handler is a common, harmless top-level
+  guard and isn't flagged either.

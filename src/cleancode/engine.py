@@ -34,7 +34,7 @@ def analyze_source(
     config: Config | None = None,
     path: str = "<string>",
 ) -> CheckResult:
-    """Run all enabled per-file rules over ``source`` and return the sorted violations."""
+    """Only per-file rules run here — project rules need ``analyze_paths``, which sees every file at once."""
     if config is None:
         config = Config.default()
 
@@ -252,7 +252,6 @@ def _suppressed_lines(comment: Comment, lines: list[str], comment_only_lines: se
 def _record_suppression(
     suppressions: dict[int, set[str] | None], line: int, ids: str | None
 ) -> None:
-    """Merge one ``cleancode: disable[=IDS]`` directive into the per-line map."""
     if ids is None:
         suppressions[line] = None  # a blanket disable overrides everything on the line
         return

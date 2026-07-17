@@ -138,7 +138,6 @@ def _docstring_line_span(owner: ast.Module | ast.ClassDef | FunctionNode) -> set
 
 
 def _all_docstring_lines(tree: ast.Module) -> set[int]:
-    """Line numbers covered by any module, class, or function docstring."""
     lines: set[int] = set()
     for node in ast.walk(tree):
         if isinstance(node, _DOCSTRING_OWNERS):
@@ -163,7 +162,6 @@ def _informative(words: set[str]) -> set[str]:
 
 
 def _code_line_words(code_text: str) -> set[str]:
-    """All words a lazy comment could copy from this line of code."""
     words: set[str] = set()
     for identifier in IDENTIFIER.findall(code_text):
         words.update(split_identifier(identifier))
@@ -180,12 +178,16 @@ class CommentRestatesCode(Rule):
     id = "CM302"
     name = "comment-restates-code"
     default_severity = Severity.WARNING
-    default_options = {"overlap": 0.7, "min_words": 2}
+    default_options = {"overlap": 0.5, "min_words": 2}
     description = (
         "Flags comments that paraphrase the code line they annotate "
         "(`x = x + 1  # increment x by 1`, `for k in range(3):  # iterate three "
         "times`). TODO/FIXME/NOTE, tool directives, and comments carrying a "
         "causal/justification marker (because, since, workaround, ...) are exempt."
+    )
+    guidance = (
+        "Only write a comment that explains *why*, never one that paraphrases the "
+        "line below it (`x += 1  # increment x`) — delete restating comments."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
@@ -201,7 +203,6 @@ class CommentRestatesCode(Rule):
                 )
 
     def _candidates(self, ctx: FileContext) -> Iterator[tuple[Comment, set[str]]]:
-        """Yield (comment, words) for comments substantial enough to be worth checking."""
         min_words = ctx.config.options["min_words"]
         for comment in ctx.comments:
             if _is_exempt(comment) or not comment.text:
@@ -248,6 +249,10 @@ class CommentDensity(Rule):
         "Flags functions with more than ~1 comment line per 3 code lines — a strong "
         "smell of generated padding. Docstrings are policed by CM301/CM304, not here."
     )
+    guidance = (
+        "Keep comments sparse inside a function (well under 1 line of comment per 3 "
+        "lines of code) — strip narration and keep only the why."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         max_ratio = ctx.config.options["max_ratio"]
@@ -268,7 +273,6 @@ class CommentDensity(Rule):
 
     @staticmethod
     def _count_lines(ctx: FileContext, function: FunctionNode) -> tuple[int, int]:
-        """Non-blank (code, comment) line counts inside one function body."""
         comment_only_lines: set[int] = set()
         inline_comment_lines: set[int] = set()
         for comment in ctx.comments:
@@ -322,6 +326,10 @@ class FileCommentDensity(Rule):
         "don't count, and files with fewer than `min_code_lines` code lines are "
         "never flagged."
     )
+    guidance = (
+        "Keep a file's overall comment density low — file-wide comment sprawl is as "
+        "much a smell as one dense function."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         max_ratio = ctx.config.options["max_ratio"]
@@ -344,7 +352,6 @@ class FileCommentDensity(Rule):
 
     @staticmethod
     def _count_file_lines(ctx: FileContext) -> tuple[int, int]:
-        """Non-blank (code, comment) line counts across the whole file."""
         standalone_lines, counted_standalone, counted_inline = _comment_line_sets(ctx.comments)
         docstring_lines = _all_docstring_lines(ctx.tree)
         code_lines = 0
@@ -361,3 +368,44 @@ class FileCommentDensity(Rule):
             if line_number in counted_inline:
                 comment_lines += 1
         return code_lines, comment_lines
+
+
+_DECORATION = "-=*_~#"
+_BANNER_ONLY = re.compile(rf"^[{_DECORATION}]{{3,}}$")
+_BANNER_FRAMED = re.compile(rf"^[{_DECORATION}]{{3,}}.*[{_DECORATION}]{{3,}}$")
+
+
+def _is_banner(text: str) -> bool:
+    return bool(text) and bool(_BANNER_ONLY.match(text) or _BANNER_FRAMED.match(text))
+
+
+class BannerComment(Rule):
+    id = "CM306"
+    name = "banner-comment"
+    default_severity = Severity.WARNING
+    default_options: dict = {}
+    description = (
+        "Flags a decoration-only comment (`# ----------`) or a decoration-framed "
+        "one (`# ---- Step 1 ----`) — section-divider ceremony that carries no "
+        "information the code doesn't already show. TODO/FIXME/NOTE and tool "
+        "directives are exempt, like the other comment rules."
+    )
+    guidance = (
+        "Never write a section-divider or banner comment (`# ---- Step 1 ----`) "
+        "— if the file has sections, extract them into named functions or "
+        "modules instead."
+    )
+
+    def check(self, ctx: FileContext) -> Iterable[Violation]:
+        for comment in ctx.comments:
+            if _is_exempt(comment) or not _is_banner(comment.text):
+                continue
+            yield self.violation(
+                ctx,
+                comment,
+                ViolationDetails(
+                    message=f"banner/section-divider comment: `# {comment.text}`",
+                    suggestion="delete the banner; if the file has sections, "
+                    "extract them into named functions or modules instead",
+                ),
+            )

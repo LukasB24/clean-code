@@ -30,6 +30,11 @@ class BoolArithmetic(Rule):
         "makes the reader do the int-cast in their head. Deliberately narrow "
         "(augmented assignments only), so numpy/torch mask arithmetic is untouched."
     )
+    guidance = (
+        "Never add a bare comparison/membership test to a counter "
+        "(`count += x in seen`) — make the boolean explicit with `if <condition>: "
+        "counter += 1`."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         for node in ast.walk(ctx.tree):
@@ -52,7 +57,6 @@ def _contains_nested_ternary(ternary: ast.IfExp) -> bool:
 
 
 def _inside_ternary(node: ast.AST) -> bool:
-    """True when ``node`` sits inside another ternary of the same statement."""
     current = getattr(node, "parent", None)
     while current is not None and not isinstance(current, ast.stmt):
         if isinstance(current, ast.IfExp):
@@ -70,6 +74,10 @@ class NestedTernary(Rule):
         "Flags a conditional expression nested inside another conditional expression "
         "(`a if x else (b if y else c)`). One ternary reads fine; two levels always "
         "need a second pass. Only the outermost ternary of a chain is reported."
+    )
+    guidance = (
+        "Never nest a ternary inside another ternary — unfold into an if/elif "
+        "statement or a dict lookup."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
@@ -98,7 +106,6 @@ class _ModuleCallables:
 
 
 def _bound_names(node: ast.Import | ast.ImportFrom, source_name: str) -> list[str]:
-    """The names one import statement binds for the alias originally called ``source_name``."""
     return [alias.asname or alias.name for alias in node.names if alias.name == source_name]
 
 
@@ -147,6 +154,11 @@ class CallableIndirection(Rule):
         "is `return <name of another function>`. Each is a hop the reviewer must "
         "chase to find the actual logic. Returning a nested `def` is not flagged — "
         "that's the decorator shape."
+    )
+    guidance = (
+        "Never write a function whose only job is manufacturing a callable — no "
+        "bare `return <function name>`, `return lambda: ...`, or `return "
+        "functools.partial(...)`; do the work directly or pass the plain function."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
@@ -266,6 +278,11 @@ class DeepExpression(Rule):
         "statements (constant tables) are exempt. Complements ST101, which limits "
         "statement nesting rather than expression nesting."
     )
+    guidance = (
+        "Keep expression nesting (calls, arithmetic, ternaries, comprehensions, "
+        "f-strings) to {max_depth} levels or fewer per statement — pull inner calls "
+        "out into named intermediates."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         max_depth = ctx.config.options["max_depth"]
@@ -304,7 +321,6 @@ def _is_private_helper(function: FunctionNode) -> bool:
 
 
 def _sole_returned_call(function: FunctionNode) -> ast.Call | None:
-    """The call a single-statement ``return <call>`` body hands back, else ``None``."""
     body = function.body
     if body and _is_docstring(body[0]):
         body = body[1:]
@@ -356,6 +372,11 @@ class ThinDelegationWrapper(Rule):
         "dunders, builtin-wrapping one-liners (`return any(...)`), and calls on the "
         "function's own parameters are exempt."
     )
+    guidance = (
+        "Never write a private function whose whole body is `return <one call to "
+        "another function>` — call the other function directly and delete the "
+        "wrapper."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         for function in ctx.functions:
@@ -402,6 +423,11 @@ class BuriedValueFallback(Rule):
         "(`(node.end_lineno or node.lineno) + 1`) — used as an arithmetic operand "
         "or subscript index, the boolean operator is easy to misread. A bare "
         "`x = a or b` and ordinary boolean conditions stay exempt."
+    )
+    guidance = (
+        "Never bury an `or`/`and` fallback inside a larger expression as an "
+        "arithmetic operand or subscript index — bind it to a named variable on "
+        "its own line first."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:

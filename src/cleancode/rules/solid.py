@@ -56,7 +56,6 @@ def _references_ast_module(node: ast.expr) -> bool:
 
 
 def _type_check_target(test: ast.expr) -> str | None:
-    """The variable name a branch type-switches on, or ``None`` if it isn't one."""
     if _is_isinstance_call(test):
         type_arg = test.args[1]  # type: ignore[union-attr]
         if _references_ast_module(type_arg):
@@ -87,7 +86,6 @@ def _elif_chain(node: ast.If) -> Iterator[ast.If]:
 
 
 def _common_type_switch(branches: list[ast.If], min_branches: int) -> tuple[str, int] | None:
-    """The (name, count) of a leading run of branches type-switching on one name."""
     targets = [_type_check_target(branch.test) for branch in branches]
     if not targets or targets[0] is None:
         return None
@@ -110,6 +108,11 @@ class TypeSwitchViolatesOCP(Rule):
         "each test `isinstance(x, ...)`/`type(x) is ...` against the same variable — "
         "adding a new type means editing this chain instead of extending via "
         "polymorphism, the classic Open/Closed Principle violation."
+    )
+    guidance = (
+        "Never chain {min_branches}-or-more `isinstance`/`type()` branches on the "
+        "same variable — use polymorphism (a method per type) or a "
+        "`dict[type, Callable]` dispatch table."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
@@ -144,7 +147,6 @@ def _is_non_instance_method(method: FunctionNode) -> bool:
 
 
 def _instance_methods(class_def: ast.ClassDef) -> list[FunctionNode]:
-    """Non-dunder, non-static/classmethod methods — the ones cohesion applies to."""
     return [
         item
         for item in class_def.body
@@ -258,6 +260,10 @@ class LowCohesionClass(Rule):
         "`exempt_name_suffixes` (default `Mixin`, since mixins are intentionally "
         "composed from independent, reusable behavior) are exempt entirely."
     )
+    guidance = (
+        "Give a class's methods one shared purpose — if it splits into unrelated "
+        "clusters sharing no state or calls, split it into separate classes."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         options = _CohesionOptions(
@@ -298,3 +304,72 @@ class LowCohesionClass(Rule):
             return None
         clusters = [group for group in _method_groups(methods) if len(group) >= 2]
         return clusters if len(clusters) >= 2 else None
+
+
+def _is_docstring_only(statement: ast.stmt) -> bool:
+    return (
+        isinstance(statement, ast.Expr)
+        and isinstance(statement.value, ast.Constant)
+        and isinstance(statement.value.value, str)
+    )
+
+
+def _non_docstring_body(class_def: ast.ClassDef) -> list[ast.stmt]:
+    body = class_def.body
+    if body and _is_docstring_only(body[0]):
+        return body[1:]
+    return body
+
+
+def _is_staticmethod(method: FunctionNode) -> bool:
+    return any(
+        isinstance(decorator, ast.Name) and decorator.id == "staticmethod"
+        for decorator in method.decorator_list
+    )
+
+
+def _is_namespace_class(class_def: ast.ClassDef, min_methods: int) -> bool:
+    if class_def.bases or class_def.keywords or class_def.decorator_list:
+        return False
+    body = _non_docstring_body(class_def)
+    if len(body) < min_methods:
+        return False
+    return all(
+        isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and _is_staticmethod(item)
+        for item in body
+    )
+
+
+class ClassAsNamespace(Rule):
+    id = "SD803"
+    name = "class-as-namespace"
+    default_severity = Severity.WARNING
+    default_options = {"min_methods": 2}
+    description = (
+        "Flags a class with no base classes, no decorators, and no class-level "
+        "state whose entire body (docstring aside) is `min_methods`-or-more "
+        "`@staticmethod`s — the class carries no state, so the module is "
+        "already the namespace it's imitating."
+    )
+    guidance = (
+        "Never wrap a group of unrelated `@staticmethod`s with no shared "
+        "state in a class — put the functions at module level instead; the "
+        "module is already the namespace."
+    )
+
+    def check(self, ctx: FileContext) -> Iterable[Violation]:
+        min_methods = ctx.config.options["min_methods"]
+        for node in ast.walk(ctx.tree):
+            if isinstance(node, ast.ClassDef) and _is_namespace_class(node, min_methods):
+                method_count = len(_non_docstring_body(node))
+                yield self.violation(
+                    ctx,
+                    node,
+                    ViolationDetails(
+                        message=f"class `{node.name}` is a namespace of "
+                        f"{method_count} static methods with no state",
+                        suggestion="move the functions to module level — the "
+                        "module is already the namespace",
+                        symbol=node.name,
+                    ),
+                )

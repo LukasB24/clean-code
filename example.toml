@@ -52,6 +52,10 @@
 # [tool.cleancode.ST108]
 # max_lines = 500
 
+# ST109  redundant-else  [warning]
+#   Flags a plain two-way `if`/`else` whose `if` branch always exits (ends in return/raise/break/continue) — the else adds an indentation level the exit already made unnecessary. Any `if` that is itself part of an `elif` chain is exempt entirely — a multi-way dispatch ladder ending in `else` is idiomatic, not the redundant-nesting shape this targets.
+# [tool.cleancode.ST109]
+
 # NM201  short-name  [warning]
 #   Flags names shorter than `min_length` characters (default 3) — cryptic pairs like `ab`/`bc`/`df` as much as bare letters. Conventional loop/comprehension/lambda letters (i, j, k, n, x, y) and known short words (id, ok, fh, ...) are allowlisted and configurable; functions, classes, and ordinary variables otherwise always need real names.
 # [tool.cleancode.NM201]
@@ -71,14 +75,15 @@
 # known_abbrevs = ["cfg", "ctx", "idx", "db", "fn", "env", "src", "dst", "str", "css", "tmp", "xml", "html", "sql", "std", "cmd", "msg", "pkg", "txt", "sdk", "api", "url", "uri", "gcd", "rgb", "csv", "json", "yml", "js", "ts", "np", "df", "kwargs", "args", "cls", "llm"]
 
 # CM301  docstring-restates-name  [warning]
-#   Flags docstrings that say nothing beyond the signature: a short one (`def get_user_name`: """Gets the user name.""") whose words all come from the function/class name and parameters, or a longer one where every line stays within that same vocabulary plus generic filler nouns.
+#   Flags docstrings that say nothing beyond the signature: a short one (`def get_user_name`: """Gets the user name.""") whose words all come from the function/class name and parameters, or a longer one where every line stays within that same vocabulary plus generic filler nouns. A `_`-prefixed (private) name is judged at the much stricter `private_overlap` — it has no external reader to write prose for, only its own body, which the reader can just read instead.
 # [tool.cleancode.CM301]
-# overlap = 0.7
+# overlap = 0.6
+# private_overlap = 0.35
 
 # CM302  comment-restates-code  [warning]
 #   Flags comments that paraphrase the code line they annotate (`x = x + 1  # increment x by 1`, `for k in range(3):  # iterate three times`). TODO/FIXME/NOTE, tool directives, and comments carrying a causal/justification marker (because, since, workaround, ...) are exempt.
 # [tool.cleancode.CM302]
-# overlap = 0.7
+# overlap = 0.5
 # min_words = 2
 
 # CM303  comment-density  [info]
@@ -97,6 +102,10 @@
 # [tool.cleancode.CM305]
 # max_ratio = 0.2
 # min_code_lines = 30
+
+# CM306  banner-comment  [warning]
+#   Flags a decoration-only comment (`# ----------`) or a decoration-framed one (`# ---- Step 1 ----`) — section-divider ceremony that carries no information the code doesn't already show. TODO/FIXME/NOTE and tool directives are exempt, like the other comment rules.
+# [tool.cleancode.CM306]
 
 # SL401  complex-subscript  [warning]
 #   Scores each subscript expression (+1 per dimension/step/None/ellipsis/negative index/arithmetic/call, +2 per nested subscript, negative steps count double) and flags scores above the threshold.
@@ -191,6 +200,18 @@
 #   Flags an `or`/`and` value fallback buried inside a larger expression (`(node.end_lineno or node.lineno) + 1`) — used as an arithmetic operand or subscript index, the boolean operator is easy to misread. A bare `x = a or b` and ordinary boolean conditions stay exempt.
 # [tool.cleancode.SM619]
 
+# SM620  returned-temp  [warning]
+#   Flags `name = expr` immediately followed by `return name`, where `name` has no other use in the function — the assignment adds a name but no information. An annotated assignment (`name: T = expr`) is exempt, since the annotation itself is informative.
+# [tool.cleancode.SM620]
+
+# SM621  compatibility-alias  [warning]
+#   Flags a module-level `alias = original` where `original` is a function/class defined in the same file — a second name for something that already has one. ALL_CAPS targets, `_`-prefixed targets, and annotated assignments (`TypeAlias`) are exempt.
+# [tool.cleancode.SM621]
+
+# SM622  trivial-property-pair  [warning]
+#   Flags a `@property` whose body is exactly `return self._x` together with a matching `@x.setter` whose body is exactly `self._x = value` — both trivial, mirroring a private attribute with no logic in between. A getter-only read-only property (no matching setter) is a legitimate idiom and is exempt; any validation or computation in either accessor exempts the pair.
+# [tool.cleancode.SM622]
+
 # SD801  type-switch-violates-ocp  [warning]
 #   Flags an if/elif chain of `min_branches`-or-more (default 3) branches that each test `isinstance(x, ...)`/`type(x) is ...` against the same variable — adding a new type means editing this chain instead of extending via polymorphism, the classic Open/Closed Principle violation.
 # [tool.cleancode.SD801]
@@ -201,6 +222,11 @@
 # [tool.cleancode.SD802]
 # min_methods = 4
 # exempt_name_suffixes = ["Mixin"]
+
+# SD803  class-as-namespace  [warning]
+#   Flags a class with no base classes, no decorators, and no class-level state whose entire body (docstring aside) is `min_methods`-or-more `@staticmethod`s — the class carries no state, so the module is already the namespace it's imitating.
+# [tool.cleancode.SD803]
+# min_methods = 2
 
 # DP701  duplicate-function-body  [warning]
 #   Flags two or more functions/methods, anywhere in the analyzed files, whose bodies are structurally identical once names are ignored — copy-paste DRY violations a single-file rule can't see. Stub bodies (pass/.../raise NotImplementedError), dunder methods, and bodies shorter than `min_statements` are exempt.
@@ -219,4 +245,9 @@
 # PY902  empty-exception-handler  [warning]
 #   Flags an exception handler whose entire body is inert (`pass`, a bare `...`, or a lone string literal, in any combination) — the failure is silently discarded with no log, fallback, or re-raise. Handlers that `continue`/`return`/`break`, log, or re-raise are real control-flow decisions and are not flagged.
 # [tool.cleancode.PY902]
+
+# PY903  oversized-try  [warning]
+#   Flags a `try` block with more than `max_statements` top-level statements feeding a bare or `except Exception`/`BaseException` handler — the handler can't know which of several steps actually failed. A `try` narrowed to a specific exception, or a broad handler wrapping few statements, is not flagged.
+# [tool.cleancode.PY903]
+# max_statements = 3
 

@@ -66,6 +66,10 @@ class EagerDatasetLoading(Rule):
         "every sample's payload at construction time defeats lazy loading and can OOM "
         "on realistic dataset sizes."
     )
+    guidance = (
+        "In a `Dataset.__init__`, store file paths only — load the actual payload "
+        "lazily inside `__getitem__`, never eagerly at construction time."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         for class_def in _dataset_classes(ctx.tree):
@@ -122,6 +126,11 @@ class PrematureDevicePlacement(Rule):
         "Flags `.cuda()`/`.to(device=...)` calls inside `__init__` or `__getitem__` of a "
         "`Dataset` subclass — initializing a CUDA context before DataLoader workers fork "
         "corrupts the context across processes, causing deadlocks or segfaults."
+    )
+    guidance = (
+        "Never call `.cuda()`/`.to(device=...)` inside a `Dataset`'s "
+        "`__init__`/`__getitem__` — keep tensors on CPU there and move to device in "
+        "the training loop."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:

@@ -144,3 +144,67 @@ class TestEmptyExceptionHandler:
             "            continue\n"
         )
         assert check(source, "PY902") == []
+
+
+class TestOversizedTry:
+    def test_flags_long_try_feeding_broad_except(self, check):
+        source = (
+            "def run(row):\n"
+            "    try:\n"
+            "        a = parse(row)\n"
+            "        b = validate(a)\n"
+            "        c = normalize(b)\n"
+            "        d = save(c)\n"
+            "    except Exception:\n"
+            "        logger.error('failed')\n"
+            "    return d\n"
+        )
+        assert rule_ids(check(source, "PY903")) == ["PY903"]
+
+    def test_flags_long_try_feeding_bare_except(self, check):
+        source = (
+            "def run(row):\n"
+            "    try:\n"
+            "        a = parse(row)\n"
+            "        b = validate(a)\n"
+            "        c = normalize(b)\n"
+            "        d = save(c)\n"
+            "    except:\n"
+            "        logger.error('failed')\n"
+        )
+        assert rule_ids(check(source, "PY903")) == ["PY903"]
+
+    def test_long_try_with_narrow_except_passes(self, check):
+        source = (
+            "def run(row):\n"
+            "    try:\n"
+            "        a = parse(row)\n"
+            "        b = validate(a)\n"
+            "        c = normalize(b)\n"
+            "        d = save(c)\n"
+            "    except ValueError:\n"
+            "        logger.error('failed')\n"
+        )
+        assert check(source, "PY903") == []
+
+    def test_short_try_with_broad_except_passes(self, check):
+        source = (
+            "def run():\n"
+            "    try:\n"
+            "        main()\n"
+            "    except Exception:\n"
+            "        logger.error('failed')\n"
+        )
+        assert check(source, "PY903") == []
+
+    def test_max_statements_is_configurable(self, check):
+        source = (
+            "def run(row):\n"
+            "    try:\n"
+            "        a = parse(row)\n"
+            "        b = validate(a)\n"
+            "    except Exception:\n"
+            "        logger.error('failed')\n"
+        )
+        assert check(source, "PY903") == []
+        assert rule_ids(check(source, "PY903", max_statements=1)) == ["PY903"]

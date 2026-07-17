@@ -50,7 +50,6 @@ def _annotated_names(function: FunctionNode) -> dict[str, str]:
 
 
 def _isinstance_call_args(node: ast.AST) -> tuple[ast.Name, ast.expr] | None:
-    """``(target, type_arg)`` for an ``isinstance(target, type_arg)`` call, else ``None``."""
     if not (
         isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
@@ -73,6 +72,10 @@ class RedundantIsinstanceCheck(Rule):
         "Flags `isinstance(x, T)` where `x` already carries a simple static annotation "
         "of exactly `T` — the runtime check is hallucinated safety that a type checker "
         "already guarantees, and it costs cycles in hot loops like `__getitem__`."
+    )
+    guidance = (
+        "Never `isinstance()`-check a value against the exact type its own "
+        "annotation already declares — trust the static annotation."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
@@ -207,7 +210,6 @@ def _class_body_field_positions(tree: ast.Module) -> set[tuple[int, int]]:
 
 
 def _flatten_target(target: ast.expr) -> list[ast.Name] | None:
-    """Name leaves of a simple (optionally tuple/list-unpacking) target, else None."""
     if isinstance(target, ast.Name):
         return [target]
     if not isinstance(target, (ast.Tuple, ast.List)):
@@ -267,6 +269,10 @@ class UnusedBinding(Rule):
         "target is used, and functions that call `locals`/`eval`/`exec` (which "
         "can reference locals dynamically) are all exempt."
     )
+    guidance = (
+        "Remove every import and local variable you don't end up using — don't "
+        "leave dead bindings behind."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         yield from self._check_imports(ctx)
@@ -319,7 +325,6 @@ class UnusedBinding(Rule):
 
 
 def _class_body_assign_names(target: ast.expr) -> Iterator[ast.Name]:
-    """Name leaves of a class-body assignment target, including tuple/list unpacking."""
     if isinstance(target, ast.Name):
         yield target
     elif isinstance(target, (ast.Tuple, ast.List)):
@@ -350,6 +355,10 @@ class BuiltinShadowing(Rule):
         "module rather than a hardcoded copy, so it stays correct across Python "
         "versions. Class-body field declarations (`id: ClassVar[str]`, "
         "`id = \"SM601\"`) are exempt — they're field names, not shadowing locals."
+    )
+    guidance = (
+        "Never name a parameter, variable, or function after a Python builtin "
+        "(`id`, `type`, `list`, ...) — pick a domain-specific name instead."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:

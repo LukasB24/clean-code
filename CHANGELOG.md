@@ -14,6 +14,59 @@ whether pre- or post-1.0).
 
 ### Added
 
+- Seven new rules targeting patterns common in freshly-generated Python,
+  bringing the total to 51:
+  - `ST109` `redundant-else` — a plain two-way `if`/`else` whose `if` branch
+    always exits (return/raise/break/continue). Any `if` that's itself part
+    of an `elif` chain is exempt entirely, so a multi-way dispatch ladder
+    ending in `else` is never flagged, even when every branch returns.
+  - `CM306` `banner-comment` — a decoration-only (`# ----------`) or
+    decoration-framed (`# ---- Step 1 ----`) comment; reuses CM303/CM305's
+    directive-comment exemptions.
+  - `PY903` `oversized-try` — a `try` spanning more than `max_statements`
+    (default 3) top-level statements feeding a bare or broad
+    `except Exception`/`BaseException` handler, which can't tell which step
+    actually failed. A narrowly-typed `except`, or a short `try` wrapping a
+    broad handler, is not flagged.
+  - `SM620` `returned-temp` — `name = expr` immediately followed by
+    `return name` with no other use of `name`. An annotated assignment
+    (`name: T = expr`) is exempt.
+  - `SM621` `compatibility-alias` — a module-level `alias = original`
+    pointing at a function/class defined in the same file. ALL_CAPS
+    targets, `_`-prefixed targets, and annotated assignments are exempt.
+  - `SM622` `trivial-property-pair` — a `@property`/`@x.setter` pair that
+    only mirrors `self._x` with no logic in either accessor. A getter-only
+    read-only property is a legitimate idiom and is exempt.
+  - `SD803` `class-as-namespace` — a class with no bases, decorators, or
+    class-level state whose entire body is `min_methods`-or-more (default
+    2) `@staticmethod`s; the module is already the namespace it's imitating.
+  - `SM620`/`SM621`/`SM622` live in a new `src/cleancode/rules/noise.py`
+    module (naming/indirection ceremony, distinct from the AST-shape
+    smells in `semantic.py`/`clarity.py`).
+- `clean-code guide [PATH]` — a generation-time briefing for an LLM, one
+  imperative bullet per *enabled* rule ("Nest at most 2 levels...", "Never
+  write a bare `except:`..."), rendered with the project's own configured
+  option values so a loosened `max_depth` or a disabled rule shows up
+  correctly. `--agents-md` wraps the same brief with standing instructions
+  for pasting into a project's `CLAUDE.md`/`AGENTS.md`
+  (`clean-code guide --agents-md >> CLAUDE.md`). Every rule carries a new
+  `guidance` string (or is explicitly folded into a sibling's — see
+  `guide.COVERED_BY_SIBLING`), enforced by `tests/test_guide.py`.
+- `clean-code explain <RULE_ID> [<RULE_ID> ...]` — prints a rule's full
+  description, its `guide` sentence, its configured-vs-default options, and
+  a minimal BAD/GOOD before/after example an LLM can pattern-match against.
+  Every rule has an `Example` in the new `src/cleancode/examples/` package;
+  `tests/test_examples.py` runs every `bad` and `good` snippet through the
+  engine and requires the rule to fire on one and not the other, doubling
+  as a permanent regression net.
+- Context-aware suggestions for three high-value rules, falling back to the
+  previous generic text when no hint is available: `NM202`/`NM201` derive a
+  rename candidate from the flagged binding's own annotation (`bounds: list[Trade]`
+  → `trades`) or the call it's assigned from (`data = load_users(path)` →
+  `users`, from `load_users`); `SM607` derives a `MAX_`/`MIN_`-prefixed
+  constant name from the idiomatic `name <op> literal` comparison shape
+  (`if retries > 5` → `MAX_RETRIES = 5`). `Binding` now carries the AST node
+  it was bound at.
 - `SM618` `thin-delegation-wrapper` — flags a private function whose whole
   body is `return <one call to another function>`, a hop that only renames
   work. Public functions, decorated functions, dunders, builtin callees, and
@@ -56,6 +109,17 @@ whether pre- or post-1.0).
 
 ### Changed
 
+- `CM301` tightened further: default `overlap` lowered from 0.7 to 0.6, and
+  a new `private_overlap` (default 0.35) judges any `_`-prefixed function or
+  class at a much stricter bar — a private name has no external reader to
+  write prose for, only its own (usually short) body. Motivated by a real
+  review finding: a private helper's docstring that paraphrased its own
+  body in different words, with no literal signature-word reuse, scored
+  0.625 against the old single 0.7 threshold and slipped through entirely.
+  `CM302`'s default `overlap` also lowered, 0.7 to 0.5, for the same reason
+  applied to inline/standalone comments. Both are pre-1.0 behavior changes;
+  re-run `clean-code check` after upgrading — code that passed before may
+  not now.
 - `CM301`'s default `overlap` lowered from 0.8 to 0.7 — pre-1.0, so this is
   a behavior change, not just a new rule; it now also scores the whole text
   of a two-line docstring instead of only its first line.

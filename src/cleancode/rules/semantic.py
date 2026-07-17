@@ -13,13 +13,18 @@ import ast
 from typing import Iterable, Iterator
 
 from cleancode.models import FileContext, Severity, Violation, ViolationDetails
-from cleancode.rules.base import FunctionNode, Rule, subscript_base_name
+from cleancode.rules.base import (
+    FunctionNode,
+    Rule,
+    simple_name,
+    split_identifier,
+    subscript_base_name,
+)
 
 _COMP_TYPES = (ast.ListComp, ast.DictComp, ast.SetComp, ast.GeneratorExp)
 
 
 def _nested_ternary_comprehension(node: ast.AST) -> ast.AST | None:
-    """A comprehension nested inside ``node`` whose filter is itself a ternary."""
     for child in ast.walk(node):
         if child is node:
             continue
@@ -39,6 +44,10 @@ class ComprehensionDensity(Rule):
         "Flags a comprehension that nests another comprehension whose filter "
         "condition is itself an inline ternary — logical over-compression that's "
         "nearly impossible to read at a glance."
+    )
+    guidance = (
+        "Never nest a comprehension inside another comprehension's ternary-filtered "
+        "generator — pull the nested comprehension into a named helper function."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
@@ -100,6 +109,11 @@ class AnonymousTupleIndexing(Rule):
         "a fixed multi-element tuple — primitive obsession that hides what each "
         "position means. Variadic `tuple[T, ...]` parameters are exempt."
     )
+    guidance = (
+        "Never index a fixed-shape tuple parameter by position (`bounds[0]`) — use "
+        "a NamedTuple/dataclass with named fields, or unpack once at the top of the "
+        "function."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         for function in ctx.functions:
@@ -153,6 +167,10 @@ class MagicStringBranching(Rule):
         "chosen by a hardcoded string prefix/suffix/substring check — the domain "
         "rule hides inside a string literal instead of a named condition."
     )
+    guidance = (
+        "Never branch a ternary on a hardcoded string check — name the condition "
+        "first (`is_transaction_metric = k.startswith('tx_')`)."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         for node in ast.walk(ctx.tree):
@@ -189,6 +207,10 @@ class RedundantBooleanTernary(Rule):
         "that already evaluates to a boolean (`True if x == y else False`) — the "
         "ternary itself is the redundant part."
     )
+    guidance = (
+        "Never write `True if x else False` for an already-boolean condition — use "
+        "the condition (or its negation) directly."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         for node in ast.walk(ctx.tree):
@@ -223,14 +245,6 @@ def _is_add_lambda(node: ast.expr) -> bool:
     )
 
 
-def _reduce_name(func: ast.expr) -> str | None:
-    if isinstance(func, ast.Name):
-        return func.id
-    if isinstance(func, ast.Attribute):
-        return func.attr
-    return None
-
-
 class ReduceInsteadOfSum(Rule):
     id = "SM605"
     name = "reduce-instead-of-sum"
@@ -240,12 +254,16 @@ class ReduceInsteadOfSum(Rule):
         "Flags `functools.reduce(lambda a, b: a + b, xs)` — a built-in `sum(xs)` "
         "does the same thing, faster and without the lambda indirection."
     )
+    guidance = (
+        "Never use `functools.reduce(lambda a, b: a + b, xs)` — use `sum(xs)`, or "
+        "`''.join(parts)` for strings."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         for node in ast.walk(ctx.tree):
             if (
                 isinstance(node, ast.Call)
-                and _reduce_name(node.func) == "reduce"
+                and simple_name(node.func) == "reduce"
                 and node.args
                 and _is_add_lambda(node.args[0])
             ):
@@ -292,6 +310,10 @@ class RepeatedCollectionIteration(Rule):
         "(`item[\"metrics\"]`, `self.rows`, `get_data()`) already iterated by an "
         "earlier comprehension in the same function — two passes where one would do."
     )
+    guidance = (
+        "Never iterate the same collection expression in two separate "
+        "comprehensions within one function — merge into a single pass."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         for function in ctx.functions:
@@ -330,12 +352,39 @@ def _numeric_value(node: ast.expr) -> int | float | None:
 
 
 def _numeric_operand_sites(tree: ast.Module) -> Iterator[tuple[ast.expr, ast.expr]]:
-    """(parent node, operand) for every direct BinOp/Compare operand in the tree."""
     for node in ast.walk(tree):
         if isinstance(node, ast.BinOp):
             yield from ((node, operand) for operand in (node.left, node.right))
         elif isinstance(node, ast.Compare):
             yield from ((node, operand) for operand in (node.left, *node.comparators))
+
+
+_COMPARISON_PREFIXES: dict[type, str] = {
+    ast.Gt: "MAX_",
+    ast.GtE: "MAX_",
+    ast.Lt: "MIN_",
+    ast.LtE: "MIN_",
+}
+
+
+def _constant_name_hint(node: ast.expr, operand: ast.expr) -> str | None:
+    if not _is_named_threshold_compare(node, operand):
+        return None
+    prefix = _COMPARISON_PREFIXES.get(type(node.ops[0]))  # type: ignore[union-attr]
+    base = simple_name(node.left)  # type: ignore[union-attr]
+    if prefix is None or base is None:
+        return None
+    return prefix + "_".join(word.upper() for word in split_identifier(base))
+
+
+def _is_named_threshold_compare(node: ast.expr, operand: ast.expr) -> bool:
+    """True for `<name> <op> <literal>` — the only shape unambiguous enough to name."""
+    return (
+        isinstance(node, ast.Compare)
+        and len(node.ops) == 1
+        and len(node.comparators) == 1
+        and operand is node.comparators[0]
+    )
 
 
 class MagicNumber(Rule):
@@ -348,18 +397,24 @@ class MagicNumber(Rule):
         "(`threshold * 1.2`) instead of a named, typed constant. A configurable "
         "`ignore` list (default 0, 1, -1, 2, 10) exempts domain-agnostic values."
     )
+    guidance = (
+        "Extract numeric literals in comparisons/arithmetic into a named, typed "
+        "constant — don't leave bare numbers like `threshold * 1.2` in the "
+        "expression."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         ignore = set(ctx.config.options["ignore"])
         for node, operand in _numeric_operand_sites(ctx.tree):
             value = _numeric_value(operand)
             if value is not None and value not in ignore:
+                constant_name = _constant_name_hint(node, operand) or "SOME_DESCRIPTIVE_NAME"
                 yield self.violation(
                     ctx,
                     operand,
                     ViolationDetails(
                         message=f"magic number `{value}` — extract it to a named, typed constant",
-                        suggestion=f"e.g. `SOME_DESCRIPTIVE_NAME = {value}`",
+                        suggestion=f"e.g. `{constant_name} = {value}`",
                         symbol=ctx.enclosing_symbol(node),
                     ),
                 )
@@ -381,6 +436,10 @@ class NonIdiomaticEmptinessCheck(Rule):
     description = (
         "Flags `len(x) > 0` / `len(x) == 0` style checks — Python sequences are "
         "already truthy/falsy, so PEP 8 prefers `if x:` / `if not x:`."
+    )
+    guidance = (
+        "Never write `len(x) > 0` / `len(x) == 0` — use `if x:` / `if not x:`, "
+        "since sequences are already truthy/falsy."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:

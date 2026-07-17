@@ -57,7 +57,6 @@ _SCALAR_LITERALS: dict[type, Callable[[object], str]] = {
 
 
 def _toml_literal(value: object) -> str:
-    """Render a Python default as the TOML literal a user would type."""
     render = _SCALAR_LITERALS.get(type(value))
     if render is not None:
         return render(value)

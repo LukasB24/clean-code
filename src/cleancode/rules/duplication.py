@@ -96,7 +96,6 @@ def _is_docstring_expr(statement: ast.stmt) -> bool:
 
 
 def _significant_body(function: FunctionNode) -> list[ast.stmt]:
-    """The function body with a leading docstring (if any) stripped."""
     body = function.body
     if body and _is_docstring_expr(body[0]):
         return body[1:]
@@ -159,7 +158,6 @@ def _comparable_body(function: FunctionNode, min_statements: int) -> list[ast.st
 def _file_fingerprints(
     parsed: ParsedFile, min_statements: int, exact: bool
 ) -> Iterable[tuple[str, _Member]]:
-    """(fingerprint, member) for every comparable function in one file."""
     imported = {name for name, _ in import_aliases(parsed.tree)}
     for function in parsed.functions:
         body = _comparable_body(function, min_statements)
@@ -187,7 +185,6 @@ class _DuplicationRule(ProjectRule):
     _SUGGESTION: ClassVar[str]
 
     def _flag_group(self, config: "Config", members: list[_Member]) -> Iterable[Violation]:
-        """One violation per member after the first, pointing back at the original."""
         first_parsed, first_function = members[0]
         for parsed, function in members[1:]:
             yield self.violation(
@@ -214,6 +211,10 @@ class DuplicateFunctionBody(_DuplicationRule):
         "NotImplementedError), dunder methods, and bodies shorter than `min_statements` "
         "are exempt."
     )
+    guidance = (
+        "Never copy-paste a function/method body into a second location, even with "
+        "renamed variables — extract the shared logic into a common helper function."
+    )
 
     _VERB = "duplicates the body of"
     _SUGGESTION = "extract the shared logic into a common helper function"
@@ -237,6 +238,7 @@ class IdenticalFunctionImplementation(_DuplicationRule):
         "DP701 without noise; bodies long enough for DP701 to report are left to "
         "DP701. Stub bodies and dunder methods are exempt."
     )
+    guidance = None  # covered by DP701's guidance; see guide.COVERED_BY_SIBLING
 
     _VERB = "is an exact copy of"
     _SUGGESTION = "keep one copy and import/reuse it from the other location"

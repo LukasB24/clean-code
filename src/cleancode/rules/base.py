@@ -22,10 +22,52 @@ def is_dunder(name: str) -> bool:
     return name.startswith("__") and name.endswith("__")
 
 
+def is_private(name: str) -> bool:
+    # A private name has no external readers to write prose documentation
+    # for — only its own (short) body does, so a docstring on one earns its
+    # keep at a much stricter bar than a public API's.
+    return name.startswith("_") and not is_dunder(name)
+
+
 def functions(tree: ast.Module) -> Iterator[FunctionNode]:
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             yield node
+
+
+def simple_name(node: ast.expr) -> str | None:
+    """``reduce`` -> ``"reduce"``, ``obj.load`` -> ``"load"`` — anything else
+    (a call, a subscript, ...) has no single name to point at."""
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return None
+
+
+def statement_blocks(function: FunctionNode) -> Iterator[list[ast.stmt]]:
+    # Nested function/class definitions are skipped — they're examined on
+    # their own, not folded into the enclosing function's blocks.
+    def walk(statements: list[ast.stmt]) -> Iterator[list[ast.stmt]]:
+        yield statements
+        for statement in statements:
+            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                continue
+            for child_block in _child_blocks(statement):
+                yield from walk(child_block)
+
+    yield from walk(function.body)
+
+
+def _child_blocks(statement: ast.stmt) -> Iterator[list[ast.stmt]]:
+    for attr in ("body", "orelse", "finalbody"):
+        block = getattr(statement, attr, None)
+        if block:
+            yield block
+    for handler in getattr(statement, "handlers", []):
+        yield handler.body
+    for case in getattr(statement, "cases", []):
+        yield case.body
 
 
 def subscript_base_name(node: ast.Subscript) -> str | None:
@@ -44,7 +86,6 @@ def end_line(node: ast.AST) -> int:
 
 
 def docstring_node(owner: ast.Module | ast.ClassDef | FunctionNode) -> ast.Constant | None:
-    """The string constant of ``owner``'s docstring, or ``None``."""
     if not owner.body:
         return None
     first = owner.body[0]
@@ -116,6 +157,11 @@ class Rule(ABC):
     default_severity: ClassVar[Severity]
     default_options: ClassVar[dict[str, Any]]
     description: ClassVar[str]
+    # A one-line generation-time imperative ("Nest at most {max_depth} levels...")
+    # rendered by ``guide.py`` with this rule's *configured* option values. ``None``
+    # only when a sibling rule's guidance already covers this one — see
+    # ``guide.COVERED_BY_SIBLING``.
+    guidance: ClassVar[str | None] = None
 
     @abstractmethod
     def check(self, ctx: "FileContext") -> Iterable[Violation]: ...
@@ -146,6 +192,7 @@ class ProjectRule(ABC):
     default_severity: ClassVar[Severity]
     default_options: ClassVar[dict[str, Any]]
     description: ClassVar[str]
+    guidance: ClassVar[str | None] = None
 
     @abstractmethod
     def check_project(

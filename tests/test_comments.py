@@ -146,10 +146,10 @@ class TestDocstringRestatesName:
         """
         assert check(source, "CM301") == []
 
-    def test_overlap_threshold_default_is_0_7(self, check):
-        # regression: default tightened from 0.8 to 0.7 pre-1.0.
+    def test_overlap_threshold_default_is_0_6(self, check):
+        # regression: default tightened from 0.7 to 0.6 pre-1.0.
         # doc words {path, parse, quickly, config} vs signature words
-        # {path, parse, mode, config}: overlap 3/4 = 0.75 -> fires at 0.7, not 0.8
+        # {path, parse, mode, config}: overlap 3/4 = 0.75 -> fires at 0.6, not 0.8
         source = '''
         def parse_config(path, mode):
             """Parse config path quickly."""
@@ -157,6 +157,46 @@ class TestDocstringRestatesName:
         '''
         assert rule_ids(check(source, "CM301")) == ["CM301"]
         assert check(source, "CM301", overlap=0.8) == []
+
+    def test_private_helper_uses_the_stricter_private_overlap_threshold(self, check):
+        # regression: this exact docstring/body pair (from a real PR review)
+        # scored 0.625 overlap against the public default -- well under the
+        # old 0.7 threshold, so it slipped past CM301 entirely
+        source = '''
+        def _used_elsewhere(function, name, skip):
+            """True if `name` appears as a Name node anywhere in the function besides `skip`."""
+            for node in ast.walk(function):
+                if isinstance(node, ast.Name) and node.id == name and node not in skip:
+                    return True
+            return False
+        '''
+        assert rule_ids(check(source, "CM301")) == ["CM301"]
+
+    def test_private_helper_with_real_information_still_passes(self, check):
+        source = '''
+        def _merge_config(base, overrides):
+            """Overrides win on key conflicts; nested dicts are merged recursively."""
+            return base
+        '''
+        assert check(source, "CM301") == []
+
+    def test_private_overlap_threshold_is_configurable(self, check):
+        source = '''
+        def _load(path):
+            """Reads the file at path."""
+            return path
+        '''
+        assert check(source, "CM301") == []
+        assert rule_ids(check(source, "CM301", private_overlap=0.1)) == ["CM301"]
+
+    def test_dunder_method_is_not_judged_as_private(self, check):
+        source = '''
+        class Point:
+            def __repr__(self):
+                """Falls back to the default repr format when coordinates are unset."""
+                return "Point"
+        '''
+        assert check(source, "CM301") == []
 
 
 class TestCommentRestatesCode:
@@ -344,3 +384,31 @@ class TestFileCommentDensity:
         violations = check(source, "CM305", min_code_lines=10)
         assert rule_ids(violations) == ["CM305"]
         assert "4 comment lines for 10 code lines" in violations[0].message
+
+
+class TestBannerComment:
+    def test_flags_decoration_only_comment(self, check):
+        source = "# ----------\nx = 1\n"
+        violations = check(source, "CM306")
+        assert rule_ids(violations) == ["CM306"]
+
+    def test_flags_decoration_framed_comment(self, check):
+        source = "# ---- Step 1 ----\nx = 1\n"
+        violations = check(source, "CM306")
+        assert rule_ids(violations) == ["CM306"]
+
+    def test_flags_equals_sign_banner(self, check):
+        source = "# ============================\nx = 1\n"
+        assert rule_ids(check(source, "CM306")) == ["CM306"]
+
+    def test_plain_narrative_comment_passes(self, check):
+        source = "# Step 1: parse the input\nx = 1\n"
+        assert check(source, "CM306") == []
+
+    def test_todo_directive_is_exempt(self, check):
+        source = "# TODO: -----\nx = 1\n"
+        assert check(source, "CM306") == []
+
+    def test_short_dashes_below_threshold_pass(self, check):
+        source = "# --\nx = 1\n"
+        assert check(source, "CM306") == []

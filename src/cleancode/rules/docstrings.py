@@ -23,6 +23,7 @@ from cleancode.rules.base import (
     content_words,
     docstring_node,
     end_line,
+    is_private,
     split_identifier,
 )
 
@@ -134,7 +135,6 @@ def _owners(ctx: FileContext) -> Iterator[_DocstringOwner]:
 def _restatement(
     owner: "_DocstringOwner", overlap_threshold: float
 ) -> tuple[ast.Constant, str] | None:
-    """``(docstring node, reason)`` if ``owner``'s docstring restates its name, else ``None``."""
     docstring = ast.get_docstring(owner.node, clean=True)
     node = docstring_node(owner.node)
     if docstring is None or node is None:
@@ -154,18 +154,29 @@ class DocstringRestatesName(Rule):
     id = "CM301"
     name = "docstring-restates-name"
     default_severity = Severity.WARNING
-    default_options = {"overlap": 0.7}
+    default_options = {"overlap": 0.6, "private_overlap": 0.35}
     description = (
         "Flags docstrings that say nothing beyond the signature: a short one "
         '(`def get_user_name`: """Gets the user name.""") whose words all come from '
         "the function/class name and parameters, or a longer one where every line "
-        "stays within that same vocabulary plus generic filler nouns."
+        "stays within that same vocabulary plus generic filler nouns. A `_`-prefixed "
+        "(private) name is judged at the much stricter `private_overlap` — it has no "
+        "external reader to write prose for, only its own body, which the reader can "
+        "just read instead."
+    )
+    guidance = (
+        "Only write a docstring if it says something the signature can't — skip it, "
+        "or document why/edge cases/units/invariants, not a restatement of the name. "
+        "Hold a private helper to a much stricter bar than a public function: its only "
+        "reader can already see the body, so the docstring must earn its place."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         overlap_threshold = ctx.config.options["overlap"]
+        private_overlap_threshold = ctx.config.options["private_overlap"]
         for owner in _owners(ctx):
-            yield from self._check_owner(ctx, owner, overlap_threshold)
+            threshold = private_overlap_threshold if is_private(owner.name) else overlap_threshold
+            yield from self._check_owner(ctx, owner, threshold)
 
     def _check_owner(
         self, ctx: FileContext, owner: _DocstringOwner, overlap_threshold: float
@@ -196,6 +207,11 @@ class BoilerplateParamDocs(Rule):
     description = (
         "Flags Google-style Args:/Returns: sections where entries like "
         "`data: The data.` describe nothing beyond the parameter name."
+    )
+    guidance = (
+        "In an Args:/Returns: docstring section, document only parameters whose "
+        "meaning, units, or constraints aren't obvious from the name — skip entries "
+        "like `data: The data.`"
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:

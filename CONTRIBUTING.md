@@ -101,15 +101,31 @@ of a recent real one (`PY901` bare-except):
    refactoring," an actual instruction). That's the whole point of the tool;
    see the README's "Every violation ships a fix" pitch.
 
-3. **Register it** in `src/cleancode/rules/__init__.py`: import the class
+3. **Write a `guidance` line** — a one-sentence, generation-time imperative
+   ("Nest at most {max_depth} levels...") that `clean-code guide` renders
+   before an LLM writes any code, formatted with the rule's *configured*
+   option values. If the smell is already covered by a sibling rule's
+   guidance (the way `DP702` is covered by `DP701`), set `guidance = None`
+   and add an entry to `COVERED_BY_SIBLING` in `src/cleancode/guide.py`
+   instead of repeating the same instruction. `tests/test_guide.py` enforces
+   that every rule does one or the other.
+
+4. **Register it** in `src/cleancode/rules/__init__.py`: import the class
    and add it to `ALL_RULES`.
 
-4. **Add fixtures.** Drop a small `tests/fixtures/dirty/*.py` snippet that
+5. **Add a BAD/GOOD example** to `src/cleancode/examples/<band>.py`: a
+   minimal `Example(bad=..., good=...)` — `bad` must actually trigger the
+   rule and `good` must not, both under the rule's *default* options.
+   `tests/test_examples.py` enforces full coverage and runs every example
+   through the engine, so a snippet that doesn't trigger as expected fails
+   CI. This is what `clean-code explain <RULE_ID>` renders.
+
+6. **Add fixtures.** Drop a small `tests/fixtures/dirty/*.py` snippet that
    trips the rule and, if useful, a `tests/fixtures/clean/*.py` snippet that
    doesn't. `tests/test_fixtures.py` runs the whole fixture set through the
    engine as a sanity check.
 
-5. **Write unit tests** in the matching `tests/test_<band>.py`, using the
+7. **Write unit tests** in the matching `tests/test_<band>.py`, using the
    `check` fixture from `conftest.py`:
 
    ```python
@@ -128,13 +144,13 @@ of a recent real one (`PY901` bare-except):
    Cover the positive case, the obvious near-miss that should *not* fire,
    and any documented exemption.
 
-6. **Document it** in the rule table in `docs/RULES.md` (ID, name, default,
+8. **Document it** in the rule table in `docs/RULES.md` (ID, name, default,
    severity), and add a bullet under "A few details worth knowing" if the
    rule has non-obvious exemptions or edge cases — this is where most of
    that file's existing detail comes from. Also update the category count
    in `README.md`'s "The rules" table if your rule starts a new category.
 
-7. **Run the full loop** before opening a PR: `pytest -q`, `ruff check src
+9. **Run the full loop** before opening a PR: `pytest -q`, `ruff check src
    tests`, and `clean-code check src` (the tool should stay clean on its own
    source — if your new rule flags something in `src/cleancode`, fix that
    code too, don't suppress it).
