@@ -61,7 +61,6 @@ def statement_blocks(function: FunctionNode) -> Iterator[list[ast.stmt]]:
 
 
 def _child_blocks(statement: ast.stmt) -> Iterator[list[ast.stmt]]:
-    """Every nested block hanging off ``statement``, whichever clause it's attached to."""
     for attr in ("body", "orelse", "finalbody"):
         block = getattr(statement, attr, None)
         if block:

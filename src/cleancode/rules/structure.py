@@ -418,7 +418,6 @@ def _body_always_exits(body: list[ast.stmt]) -> bool:
 
 
 def _is_genuine_else(node: ast.If) -> bool:
-    """True for a plain `else:` block — not an `elif` continuation."""
     if not node.orelse:
         return False
     return not (len(node.orelse) == 1 and is_elif_branch(node.orelse[0]))

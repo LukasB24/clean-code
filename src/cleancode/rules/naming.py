@@ -98,7 +98,6 @@ _IO_VERBS = frozenset({"load", "fetch", "read", "parse", "build", "retrieve", "q
 
 
 def _name_hint(binding: Binding) -> _NameHint | None:
-    """A rename candidate derived from the binding's own annotation or assigned call, if any."""
     node = binding.node
     if isinstance(node, ast.arg):
         return _hint_from_annotation(node.annotation) if node.annotation is not None else None
@@ -170,7 +169,6 @@ def _strip_leading_verb(words: list[str]) -> list[str]:
 
 
 def _rename_suggestion(binding: Binding, generic: str) -> str:
-    """A concrete rename when the binding's own annotation/call gives one, else ``generic``."""
     hint = _name_hint(binding)
     if hint is None:
         return generic

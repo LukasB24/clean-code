@@ -39,7 +39,7 @@ def _is_simple_name_assign(statement: ast.stmt) -> str | None:
 
 
 def _used_elsewhere(function: FunctionNode, name: str, skip: tuple[ast.Name, ast.Name]) -> bool:
-    """True if `name` appears as a Name node anywhere in the function besides ``skip``."""
+    # skip = the pattern's own target/return nodes, not a real second use.
     for node in ast.walk(function):
         if isinstance(node, ast.Name) and node.id == name and node not in skip:
             return True
@@ -102,7 +102,6 @@ def _module_level_defined_names(tree: ast.Module) -> set[str]:
 
 
 def _name_to_name_assign(statement: ast.stmt) -> tuple[str, str] | None:
-    """``(target, value)`` for an `alias = original` statement where both sides are bare names."""
     if not (isinstance(statement, ast.Assign) and len(statement.targets) == 1):
         return None
     target = statement.targets[0]
@@ -112,7 +111,8 @@ def _name_to_name_assign(statement: ast.stmt) -> tuple[str, str] | None:
 
 
 def _is_alias_worth_flagging(statement: ast.stmt, defined: set[str]) -> tuple[str, str] | None:
-    """``(alias, original)`` for a module-level `alias = original` pointing at a def/class, else None."""
+    # ALL_CAPS/`_`-prefixed targets and RHS names not defined in this file
+    # are deliberate, not the accidental "kept the old name too" pattern.
     pair = _name_to_name_assign(statement)
     if pair is None:
         return None
@@ -158,7 +158,6 @@ class CompatibilityAlias(Rule):
 
 
 def _self_attr_target(node: ast.expr) -> str | None:
-    """The `_x` attribute name of a bare `self._x` expression, else ``None``."""
     if (
         isinstance(node, ast.Attribute)
         and isinstance(node.value, ast.Name)
@@ -169,7 +168,6 @@ def _self_attr_target(node: ast.expr) -> str | None:
 
 
 def _is_trivial_getter(method: FunctionNode) -> str | None:
-    """The backing attribute of a property whose whole body is `return self._x`, else None."""
     body = method.body
     if len(body) == 1 and isinstance(body[0], ast.Return):
         return _self_attr_target(body[0].value) if body[0].value is not None else None
@@ -177,7 +175,8 @@ def _is_trivial_getter(method: FunctionNode) -> str | None:
 
 
 def _is_trivial_setter(method: FunctionNode) -> str | None:
-    """The backing attribute of a setter whose whole body is `self._x = value`, else None."""
+    # The value side must be a bare parameter (`self._x = value`), not an
+    # expression — anything computed there is real setter logic, not a mirror.
     body = method.body
     if len(body) != 1 or not isinstance(body[0], ast.Assign) or len(body[0].targets) != 1:
         return None

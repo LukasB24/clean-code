@@ -370,7 +370,6 @@ _COMPARISON_PREFIXES: dict[type, str] = {
 
 
 def _constant_name_hint(node: ast.expr, operand: ast.expr) -> str | None:
-    """A MAX_/MIN_-prefixed constant name for the idiomatic `name <op> literal` shape, else None."""
     if not _is_named_threshold_compare(node, operand):
         return None
     prefix = _COMPARISON_PREFIXES.get(type(node.ops[0]))  # type: ignore[union-attr]
