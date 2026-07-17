@@ -31,7 +31,7 @@ Run the `clean-code` static analyzer on the targeted Python file or directory to
 
 4. **Fix, iterating until clean:**
    * By default, `info`-severity violations (the fuzziest, lowest-signal rules) are hidden to avoid context noise. If the summary indicates violations hidden below `--min-severity warning` and a deeper pass is warranted, rerun with `clean-code check --min-severity info "{{target_path}}"`.
-   * Apply the suggested `fix:` pattern for each violation directly in the source.
+   * Apply the suggested `fix:` pattern for each violation directly in the source. If a violation isn't obvious from the message alone, run `clean-code explain <RULE_ID>` for the rule's full description and a BAD/GOOD before/after example to pattern-match against.
    * `DP701`/`DP702`/`SD801`/`SD802` findings are SOLID/DRY smells, not local style nits — the `fix:` suggestion (extract a shared helper, replace a type-switch with polymorphism/a dispatch table, split a class) usually means introducing a new function/class or changing call sites, not a one-line edit. Apply the refactor, but summarize what you restructured and why when presenting the result, since these findings reshape the code's structure more than the other rules do.
    * Re-run `clean-code check` after each round of fixes.
    * **Stop conditions:** stop as soon as `check` exits clean, or after 3 fix iterations — whichever comes first. If violations remain after 3 iterations (including a fix for one rule that keeps re-triggering another), stop, present the remaining violations verbatim to the user along with a short note on the tension, and do not suppress them to force a clean exit.

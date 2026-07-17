@@ -58,7 +58,7 @@ to write it clean than to fix it in a review pass.
 _FOOTER = """\
 When you're done, run `clean-code check <paths>` and apply every `fix:` it
 prints. If a violation isn't obvious, run `clean-code explain <RULE_ID>` for
-a before/after example.
+the rule's description and a BAD/GOOD before/after example.
 """
 
 

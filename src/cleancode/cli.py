@@ -9,9 +9,10 @@ from pathlib import Path
 
 import click
 
-from cleancode.config import Config, ConfigError
+from cleancode.config import Config, ConfigError, RuleConfig
 from cleancode.engine import analyze_paths
 from cleancode.models import CheckResult, Severity, Violation
+from cleancode.rules.base import ProjectRule, Rule
 
 _SEVERITY_COLORS = {
     Severity.INFO: "cyan",
@@ -153,6 +154,89 @@ def guide(path: Path, config_path: Path | None, as_agents_md: bool) -> None:
         raise click.UsageError(str(error)) from error
     text = build_agents_md(config) if as_agents_md else build_guide(config)
     click.echo(text, nl=False)
+
+
+@main.command()
+@click.argument("rule_ids", nargs=-1, required=True)
+@click.option(
+    "--config",
+    "config_path",
+    type=click.Path(exists=True, path_type=Path),
+    help="Explicit TOML config file (default: nearest pyproject.toml).",
+)
+def explain(rule_ids: tuple[str, ...], config_path: Path | None) -> None:
+    """Show a rule's description, guidance, and a BAD/GOOD example."""
+    from cleancode.rules import RULES_BY_ID
+
+    unknown = [rule_id for rule_id in rule_ids if rule_id not in RULES_BY_ID]
+    if unknown:
+        valid = ", ".join(sorted(RULES_BY_ID))
+        raise click.UsageError(
+            f"unknown rule id(s) {', '.join(unknown)}; valid ids: {valid}"
+        )
+
+    try:
+        config = Config.load(Path.cwd(), override=config_path)
+    except (ConfigError, ValueError) as error:
+        raise click.UsageError(str(error)) from error
+
+    for index, rule_id in enumerate(rule_ids):
+        if index:
+            click.echo()
+        _print_explanation(rule_id, config)
+
+
+def _print_explanation(rule_id: str, config: Config) -> None:
+    from cleancode.examples import EXAMPLES
+    from cleancode.rules import RULES_BY_ID
+
+    rule = RULES_BY_ID[rule_id]
+    rule_config = config.rules[rule_id]
+    status = "enabled" if rule_config.enabled else "disabled"
+    header = f"{rule.id}  {rule.name}  [{rule_config.severity.name.lower()}]  ({status})"
+    click.echo(click.style(header, bold=True))
+    click.echo(f"  {rule.description}\n")
+    if rule.guidance is not None:
+        click.echo(f"  guidance: {rule.guidance.format(**rule_config.options)}\n")
+    _print_options(rule, rule_config)
+    example = EXAMPLES[rule_id]
+    click.echo("  # BAD")
+    _print_snippet(example.bad)
+    click.echo("  # GOOD")
+    _print_snippet(example.good)
+    if example.note:
+        click.echo(f"\n  {example.note}")
+
+
+def _print_options(rule: type[Rule] | type[ProjectRule], rule_config: RuleConfig) -> None:
+    if not rule.default_options:
+        return
+    click.echo("  options:")
+    for option, default in rule.default_options.items():
+        current = rule_config.options.get(option, default)
+        marker = "default" if current == default else f"configured (default {default!r})"
+        click.echo(f"    {option} = {current!r}  [{marker}]")
+    click.echo()
+
+
+_SNIPPET_HEAD = 6
+_SNIPPET_TAIL = 4
+_SNIPPET_TRUNCATE_ABOVE = 14
+
+
+def _print_snippet(code: str) -> None:
+    """Print an indented code snippet, truncating a very long one for readability."""
+    lines = code.splitlines()
+    if len(lines) <= _SNIPPET_TRUNCATE_ABOVE:
+        for line in lines:
+            click.echo(f"  {line}")
+        return
+    omitted = len(lines) - _SNIPPET_HEAD - _SNIPPET_TAIL
+    for line in lines[:_SNIPPET_HEAD]:
+        click.echo(f"  {line}")
+    click.echo(f"  ... ({omitted} lines omitted) ...")
+    for line in lines[-_SNIPPET_TAIL:]:
+        click.echo(f"  {line}")
 
 
 @main.command()

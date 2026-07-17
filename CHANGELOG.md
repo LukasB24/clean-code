@@ -23,6 +23,13 @@ whether pre- or post-1.0).
   (`clean-code guide --agents-md >> CLAUDE.md`). Every rule carries a new
   `guidance` string (or is explicitly folded into a sibling's — see
   `guide.COVERED_BY_SIBLING`), enforced by `tests/test_guide.py`.
+- `clean-code explain <RULE_ID> [<RULE_ID> ...]` — prints a rule's full
+  description, its `guide` sentence, its configured-vs-default options, and
+  a minimal BAD/GOOD before/after example an LLM can pattern-match against.
+  Every rule has an `Example` in the new `src/cleancode/examples/` package;
+  `tests/test_examples.py` runs every `bad` and `good` snippet through the
+  engine and requires the rule to fire on one and not the other, doubling
+  as a permanent regression net.
 - `SM618` `thin-delegation-wrapper` — flags a private function whose whole
   body is `return <one call to another function>`, a hop that only renames
   work. Public functions, decorated functions, dunders, builtin callees, and

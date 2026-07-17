@@ -146,6 +146,14 @@ code, or append it once to your project's `CLAUDE.md`/`AGENTS.md`:
 clean-code guide --agents-md >> CLAUDE.md
 ```
 
+If a violation from `check` isn't self-explanatory, `clean-code explain
+<RULE_ID>` prints the rule's full description, its guidance line, and a
+minimal BAD/GOOD before/after example to pattern-match against:
+
+```bash
+clean-code explain SM607
+```
+
 ## Configure it for your project
 
 Out of the box the defaults are strict (max nesting depth 2, max 3
