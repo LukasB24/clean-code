@@ -47,6 +47,15 @@
 # [tool.cleancode.ST107]
 # max_guards = 2
 
+# ST108  max-module-length  [warning]
+#   Limits how long one module may grow (default 500 lines). A file that keeps absorbing new classes and helpers turns into a grab-bag nobody can navigate — split it into focused submodules, one concern per file, before it gets there.
+# [tool.cleancode.ST108]
+# max_lines = 500
+
+# ST109  redundant-else  [warning]
+#   Flags a plain two-way `if`/`else` whose `if` branch always exits (ends in return/raise/break/continue) — the else adds an indentation level the exit already made unnecessary. Any `if` that is itself part of an `elif` chain is exempt entirely — a multi-way dispatch ladder ending in `else` is idiomatic, not the redundant-nesting shape this targets.
+# [tool.cleancode.ST109]
+
 # NM201  short-name  [warning]
 #   Flags names shorter than `min_length` characters (default 3) — cryptic pairs like `ab`/`bc`/`df` as much as bare letters. Conventional loop/comprehension/lambda letters (i, j, k, n, x, y) and known short words (id, ok, fh, ...) are allowlisted and configurable; functions, classes, and ordinary variables otherwise always need real names.
 # [tool.cleancode.NM201]
@@ -66,14 +75,15 @@
 # known_abbrevs = ["cfg", "ctx", "idx", "db", "fn", "env", "src", "dst", "str", "css", "tmp", "xml", "html", "sql", "std", "cmd", "msg", "pkg", "txt", "sdk", "api", "url", "uri", "gcd", "rgb", "csv", "json", "yml", "js", "ts", "np", "df", "kwargs", "args", "cls", "llm"]
 
 # CM301  docstring-restates-name  [warning]
-#   Flags short docstrings whose words all come from the function signature (`def get_user_name`: """Gets the user name.""") — they cost reading time and add nothing.
+#   Flags docstrings that say nothing beyond the signature: a short one (`def get_user_name`: """Gets the user name.""") whose words all come from the function/class name and parameters, or a longer one where every line stays within that same vocabulary plus generic filler nouns. A `_`-prefixed (private) name is judged at the much stricter `private_overlap` — it has no external reader to write prose for, only its own body, which the reader can just read instead.
 # [tool.cleancode.CM301]
-# overlap = 0.8
+# overlap = 0.6
+# private_overlap = 0.35
 
 # CM302  comment-restates-code  [warning]
 #   Flags comments that paraphrase the code line they annotate (`x = x + 1  # increment x by 1`, `for k in range(3):  # iterate three times`). TODO/FIXME/NOTE, tool directives, and comments carrying a causal/justification marker (because, since, workaround, ...) are exempt.
 # [tool.cleancode.CM302]
-# overlap = 0.7
+# overlap = 0.5
 # min_words = 2
 
 # CM303  comment-density  [info]
@@ -86,6 +96,16 @@
 #   Flags Google-style Args:/Returns: sections where entries like `data: The data.` describe nothing beyond the parameter name.
 # [tool.cleancode.CM304]
 # min_uninformative = 0.5
+
+# CM305  file-comment-density  [warning]
+#   Flags a file whose overall comment density exceeds `max_ratio` (default 1 comment line per 5 code lines) — file-wide comment sprawl that CM303 misses when no single function is dense enough on its own. Directive comments (TODO, noqa, `cleancode:`, ...) and docstrings (policed by CM301/CM304) don't count, and files with fewer than `min_code_lines` code lines are never flagged.
+# [tool.cleancode.CM305]
+# max_ratio = 0.2
+# min_code_lines = 30
+
+# CM306  banner-comment  [warning]
+#   Flags a decoration-only comment (`# ----------`) or a decoration-framed one (`# ---- Step 1 ----`) — section-divider ceremony that carries no information the code doesn't already show. TODO/FIXME/NOTE and tool directives are exempt, like the other comment rules.
+# [tool.cleancode.CM306]
 
 # SL401  complex-subscript  [warning]
 #   Scores each subscript expression (+1 per dimension/step/None/ellipsis/negative index/arithmetic/call, +2 per nested subscript, negative steps count double) and flags scores above the threshold.
@@ -146,6 +166,52 @@
 #   Flags `isinstance(x, T)` where `x` already carries a simple static annotation of exactly `T` — the runtime check is hallucinated safety that a type checker already guarantees, and it costs cycles in hot loops like `__getitem__`.
 # [tool.cleancode.SM611]
 
+# SM612  unused-binding  [warning]
+#   Flags an import that's never referenced anywhere in the module, and a local variable that's assigned inside a function but never read. Names already prefixed with `_`, `__all__` exports, `__init__.py` re-exports, `global`/`nonlocal` names, multi-target unpacking where at least one target is used, and functions that call `locals`/`eval`/`exec` (which can reference locals dynamically) are all exempt.
+# [tool.cleancode.SM612]
+
+# SM613  builtin-shadowing  [warning]
+#   Flags a binding site (parameter, assignment target, `for`/`with ... as`/comprehension target, function/class name) whose identifier shadows a Python builtin (`id`, `type`, `list`, ...), which can cause confusing bugs if the original builtin is needed later in the same scope. A configurable `watched` list (default: the builtins most often reused as domain terms) limits noise; every entry is still checked against the live `builtins` module rather than a hardcoded copy, so it stays correct across Python versions. Class-body field declarations (`id: ClassVar[str]`, `id = "SM601"`) are exempt — they're field names, not shadowing locals.
+# [tool.cleancode.SM613]
+# watched = ["id", "type", "list", "dict", "str", "input", "format", "filter", "min", "max", "sum", "hash", "object", "property", "map", "next", "iter"]
+
+# SM614  bool-arithmetic  [warning]
+#   Flags an augmented assignment whose right-hand side is a bare comparison or membership test (`count += value in seen`) — a boolean used as a number makes the reader do the int-cast in their head. Deliberately narrow (augmented assignments only), so numpy/torch mask arithmetic is untouched.
+# [tool.cleancode.SM614]
+
+# SM615  nested-ternary  [warning]
+#   Flags a conditional expression nested inside another conditional expression (`a if x else (b if y else c)`). One ternary reads fine; two levels always need a second pass. Only the outermost ternary of a chain is reported.
+# [tool.cleancode.SM615]
+
+# SM616  callable-indirection  [warning]
+#   Flags a function that manufactures a callable instead of doing work: it returns a `lambda`, returns a `functools.partial(...)`, or its whole body is `return <name of another function>`. Each is a hop the reviewer must chase to find the actual logic. Returning a nested `def` is not flagged — that's the decorator shape.
+# [tool.cleancode.SM616]
+
+# SM617  deep-expression  [warning]
+#   Flags a statement whose expression tree nests operations (calls, arithmetic, ternaries, comprehensions, f-strings) deeper than `max_depth` (default 4). A flat chain of conditions reads fine at any length; five layers of calls-inside-f-strings-inside-comprehensions on one line do not. Module-level statements (constant tables) are exempt. Complements ST101, which limits statement nesting rather than expression nesting.
+# [tool.cleancode.SM617]
+# max_depth = 4
+
+# SM618  thin-delegation-wrapper  [warning]
+#   Flags a private function whose whole body is `return <one call to another function>` — a wrapper that only renames work and adds a hop the reviewer must chase. Public functions (API conveniences), decorated functions, dunders, builtin-wrapping one-liners (`return any(...)`), and calls on the function's own parameters are exempt.
+# [tool.cleancode.SM618]
+
+# SM619  buried-value-fallback  [warning]
+#   Flags an `or`/`and` value fallback buried inside a larger expression (`(node.end_lineno or node.lineno) + 1`) — used as an arithmetic operand or subscript index, the boolean operator is easy to misread. A bare `x = a or b` and ordinary boolean conditions stay exempt.
+# [tool.cleancode.SM619]
+
+# SM620  returned-temp  [warning]
+#   Flags `name = expr` immediately followed by `return name`, where `name` has no other use in the function — the assignment adds a name but no information. An annotated assignment (`name: T = expr`) is exempt, since the annotation itself is informative.
+# [tool.cleancode.SM620]
+
+# SM621  compatibility-alias  [warning]
+#   Flags a module-level `alias = original` where `original` is a function/class defined in the same file — a second name for something that already has one. ALL_CAPS targets, `_`-prefixed targets, and annotated assignments (`TypeAlias`) are exempt.
+# [tool.cleancode.SM621]
+
+# SM622  trivial-property-pair  [warning]
+#   Flags a `@property` whose body is exactly `return self._x` together with a matching `@x.setter` whose body is exactly `self._x = value` — both trivial, mirroring a private attribute with no logic in between. A getter-only read-only property (no matching setter) is a legitimate idiom and is exempt; any validation or computation in either accessor exempts the pair.
+# [tool.cleancode.SM622]
+
 # SD801  type-switch-violates-ocp  [warning]
 #   Flags an if/elif chain of `min_branches`-or-more (default 3) branches that each test `isinstance(x, ...)`/`type(x) is ...` against the same variable — adding a new type means editing this chain instead of extending via polymorphism, the classic Open/Closed Principle violation.
 # [tool.cleancode.SD801]
@@ -157,8 +223,31 @@
 # min_methods = 4
 # exempt_name_suffixes = ["Mixin"]
 
+# SD803  class-as-namespace  [warning]
+#   Flags a class with no base classes, no decorators, and no class-level state whose entire body (docstring aside) is `min_methods`-or-more `@staticmethod`s — the class carries no state, so the module is already the namespace it's imitating.
+# [tool.cleancode.SD803]
+# min_methods = 2
+
 # DP701  duplicate-function-body  [warning]
 #   Flags two or more functions/methods, anywhere in the analyzed files, whose bodies are structurally identical once names are ignored — copy-paste DRY violations a single-file rule can't see. Stub bodies (pass/.../raise NotImplementedError), dunder methods, and bodies shorter than `min_statements` are exempt.
 # [tool.cleancode.DP701]
 # min_statements = 4
+
+# DP702  identical-function-implementation  [warning]
+#   Flags two or more functions/methods whose bodies are exactly identical, identifiers included — the same implementation pasted twice, like a private helper that drifted into a second module. Requiring identifiers to match is what lets this rule inspect much shorter bodies (default 2 statements) than DP701 without noise; bodies long enough for DP701 to report are left to DP701. Stub bodies and dunder methods are exempt.
+# [tool.cleancode.DP702]
+# min_statements = 2
+
+# PY901  bare-except  [warning]
+#   Flags `except:` with no exception type at all — it catches `KeyboardInterrupt` and `SystemExit` along with genuine bugs, silently absorbing signals that should propagate. `except Exception:` is merely broad, not bare, and is not flagged.
+# [tool.cleancode.PY901]
+
+# PY902  empty-exception-handler  [warning]
+#   Flags an exception handler whose entire body is inert (`pass`, a bare `...`, or a lone string literal, in any combination) — the failure is silently discarded with no log, fallback, or re-raise. Handlers that `continue`/`return`/`break`, log, or re-raise are real control-flow decisions and are not flagged.
+# [tool.cleancode.PY902]
+
+# PY903  oversized-try  [warning]
+#   Flags a `try` block with more than `max_statements` top-level statements feeding a bare or `except Exception`/`BaseException` handler — the handler can't know which of several steps actually failed. A `try` narrowed to a specific exception, or a broad handler wrapping few statements, is not flagged.
+# [tool.cleancode.PY903]
+# max_statements = 3
 

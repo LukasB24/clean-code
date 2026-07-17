@@ -8,29 +8,83 @@ copy-pasted into another module (or another class in the same file).
 from __future__ import annotations
 
 import ast
-import re
 from collections import defaultdict
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Iterable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, ClassVar, Iterable
 
 from cleancode.models import Location, ParsedFile, Severity, Violation, ViolationDetails
-from cleancode.rules.base import FunctionNode, ProjectRule, functions
+from cleancode.rules.base import FunctionNode, ProjectRule, import_aliases, is_dunder
 
 if TYPE_CHECKING:
     from cleancode.config import Config
 
-_IDENTIFIER_FIELD = re.compile(r"(id|arg|attr)='[^']*'")
 
+def _preserved_nodes(statement: ast.AST, imported_names: set[str]) -> set[ast.AST]:
+    """The nodes whose identifiers survive anonymization: call targets.
 
-def _normalized_dump(node: ast.AST) -> str:
-    """``ast.dump`` with variable/parameter/attribute names blanked out.
-
-    Two statements with identical control flow and literals but different
-    names (``rows`` vs ``items``) dump to the same string; different literal
-    constants still tell them apart, so this stays conservative.
+    Two bodies that call different functions (``json.dumps(x)`` vs
+    ``pickle.loads(x)``) are doing different things, not copy-pasting each
+    other. A call's receiver chain survives too when it is rooted at an
+    imported name — ``json.dumps`` and ``yaml.dumps`` name different APIs —
+    while a variable receiver stays anonymized, because ``fh.write`` vs
+    ``out.write`` is just a rename.
     """
-    dumped = ast.dump(node, annotate_fields=True, include_attributes=False)
-    return _IDENTIFIER_FIELD.sub(r"\1='_'", dumped)
+    preserved: set[ast.AST] = set()
+    for node in ast.walk(statement):
+        if isinstance(node, ast.Call) and isinstance(node.func, (ast.Name, ast.Attribute)):
+            preserved.add(node.func)
+            _extend_with_imported_receiver(preserved, node.func, imported_names)
+    return preserved
+
+
+def _extend_with_imported_receiver(
+    preserved: set[ast.AST], func: ast.expr, imported_names: set[str]
+) -> None:
+    chain: list[ast.AST] = []
+    current = func.value if isinstance(func, ast.Attribute) else None
+    while isinstance(current, ast.Attribute):
+        chain.append(current)
+        current = current.value
+    if isinstance(current, ast.Name) and current.id in imported_names:
+        preserved.add(current)
+        preserved.update(chain)
+
+
+# Identifier-carrying fields that anonymization blanks (unless preserved).
+_IDENTIFIER_FIELDS = {(ast.Name, "id"), (ast.Attribute, "attr"), (ast.arg, "arg"), (ast.keyword, "arg")}
+
+
+@dataclass(frozen=True)
+class _Renderer:
+    """Builds DP701's comparison key for a statement: same shape, names blanked.
+
+    Its whole purpose is to make *renamed* copies of a statement collide —
+    two bodies that differ only in local names render to the identical
+    string — while ``preserved`` nodes (call targets and imported receivers)
+    keep their names, so bodies calling different APIs stay distinct.
+    Rendering walks read-only via ``ast.iter_fields``, which only visits a
+    node's declared ``_fields``; the ``parent`` back-reference the engine
+    attaches is never one of those, so it can't drag the module in.
+    """
+
+    preserved: set[ast.AST]
+
+    def render(self, node: object) -> str:
+        if isinstance(node, list):
+            items = [self.render(item) for item in node]
+            return "[" + ", ".join(items) + "]"
+        if not isinstance(node, ast.AST):
+            return repr(node)
+        parts = []
+        for name, value in ast.iter_fields(node):
+            rendered = self.render(self._field_value(node, name, value))
+            parts.append(f"{name}={rendered}")
+        return f"{type(node).__name__}({', '.join(parts)})"
+
+    def _field_value(self, node: ast.AST, name: str, value: object) -> object:
+        """The field's value, blanked to ``"_"`` when it is an anonymized identifier."""
+        is_identifier = (type(node), name) in _IDENTIFIER_FIELDS and value is not None
+        return "_" if is_identifier and node not in self.preserved else value
 
 
 def _is_docstring_expr(statement: ast.stmt) -> bool:
@@ -42,7 +96,6 @@ def _is_docstring_expr(statement: ast.stmt) -> bool:
 
 
 def _significant_body(function: FunctionNode) -> list[ast.stmt]:
-    """The function body with a leading docstring (if any) stripped."""
     body = function.body
     if body and _is_docstring_expr(body[0]):
         return body[1:]
@@ -71,19 +124,82 @@ def _is_stub_body(body: list[ast.stmt]) -> bool:
     return isinstance(statement, ast.Pass) or is_ellipsis or _raises_not_implemented(statement)
 
 
-def _is_dunder(name: str) -> bool:
-    return name.startswith("__") and name.endswith("__")
+def _dump(statement: ast.AST, exact: bool, imported_names: set[str]) -> str:
+    """One statement's fingerprint text, in one of two strengths.
+
+    ``exact`` keeps every identifier (plain ``ast.dump``) so only true copies
+    collide — DP702's contract. Otherwise variable/parameter/attribute names
+    are blanked so renamed copies collide too — DP701's contract; called
+    function/method names (with any imported-module receiver) and literal
+    constants still tell bodies apart.
+    """
+    if exact:
+        return ast.dump(statement, annotate_fields=True, include_attributes=False)
+    return _Renderer(_preserved_nodes(statement, imported_names)).render(statement)
 
 
-@dataclass
-class _IndexState:
-    min_statements: int
-    groups: dict[str, list[tuple[ParsedFile, FunctionNode]]] = field(
-        default_factory=lambda: defaultdict(list)
-    )
+_Member = tuple[ParsedFile, FunctionNode]
 
 
-class DuplicateFunctionBody(ProjectRule):
+def _comparable_body(function: FunctionNode, min_statements: int) -> list[ast.stmt] | None:
+    """The statements to fingerprint, or ``None`` if the function is exempt.
+
+    Dunder methods, stub bodies, and bodies shorter than ``min_statements``
+    are never compared; a leading docstring is stripped first.
+    """
+    if is_dunder(function.name):
+        return None
+    body = _significant_body(function)
+    if len(body) < min_statements or _is_stub_body(body):
+        return None
+    return body
+
+
+def _file_fingerprints(
+    parsed: ParsedFile, min_statements: int, exact: bool
+) -> Iterable[tuple[str, _Member]]:
+    imported = {name for name, _ in import_aliases(parsed.tree)}
+    for function in parsed.functions:
+        body = _comparable_body(function, min_statements)
+        if body is None:
+            continue
+        key = "|".join(_dump(statement, exact, imported) for statement in body)
+        yield key, (parsed, function)
+
+
+def _grouped_by_fingerprint(
+    files: list[ParsedFile], min_statements: int, exact: bool
+) -> Iterable[list[_Member]]:
+    """Groups of two-or-more functions whose fingerprinted bodies collide."""
+    groups: dict[str, list[_Member]] = defaultdict(list)
+    for parsed in files:
+        for key, member in _file_fingerprints(parsed, min_statements, exact):
+            groups[key].append(member)
+    return [members for members in groups.values() if len(members) >= 2]
+
+
+class _DuplicationRule(ProjectRule):
+    """Shared reporting for rules that group functions by a body fingerprint."""
+
+    _VERB: ClassVar[str]
+    _SUGGESTION: ClassVar[str]
+
+    def _flag_group(self, config: "Config", members: list[_Member]) -> Iterable[Violation]:
+        first_parsed, first_function = members[0]
+        for parsed, function in members[1:]:
+            yield self.violation(
+                config,
+                Location(path=parsed.path, node=function),
+                ViolationDetails(
+                    message=f"function `{function.name}` {self._VERB} "
+                    f"`{first_function.name}` at {first_parsed.path}:{first_function.lineno}",
+                    suggestion=self._SUGGESTION,
+                    symbol=function.name,
+                ),
+            )
+
+
+class DuplicateFunctionBody(_DuplicationRule):
     id = "DP701"
     name = "duplicate-function-body"
     default_severity = Severity.WARNING
@@ -95,39 +211,47 @@ class DuplicateFunctionBody(ProjectRule):
         "NotImplementedError), dunder methods, and bodies shorter than `min_statements` "
         "are exempt."
     )
+    guidance = (
+        "Never copy-paste a function/method body into a second location, even with "
+        "renamed variables — extract the shared logic into a common helper function."
+    )
+
+    _VERB = "duplicates the body of"
+    _SUGGESTION = "extract the shared logic into a common helper function"
 
     def check_project(self, files: list[ParsedFile], config: "Config") -> Iterable[Violation]:
         min_statements = config.rules[self.id].options["min_statements"]
-        state = _IndexState(min_statements=min_statements)
-        for parsed in files:
-            for function in functions(parsed.tree):
-                self._index_function(function, parsed, state)
-        yield from self._flag_duplicates(config, state.groups)
+        for members in _grouped_by_fingerprint(files, min_statements, exact=False):
+            yield from self._flag_group(config, members)
 
-    def _index_function(self, function: FunctionNode, parsed: ParsedFile, state: _IndexState) -> None:
-        if _is_dunder(function.name):
-            return
-        body = _significant_body(function)
-        if len(body) < state.min_statements or _is_stub_body(body):
-            return
-        fingerprint = "|".join(_normalized_dump(statement) for statement in body)
-        state.groups[fingerprint].append((parsed, function))
 
-    def _flag_duplicates(
-        self, config: "Config", groups: dict[str, list[tuple[ParsedFile, FunctionNode]]]
-    ) -> Iterable[Violation]:
-        for members in groups.values():
-            if len(members) < 2:
-                continue
-            first_parsed, first_function = members[0]
-            for parsed, function in members[1:]:
-                yield self.violation(
-                    config,
-                    Location(path=parsed.path, node=function),
-                    ViolationDetails(
-                        message=f"function `{function.name}` duplicates the body of "
-                        f"`{first_function.name}` at {first_parsed.path}:{first_function.lineno}",
-                        suggestion="extract the shared logic into a common helper function",
-                        symbol=function.name,
-                    ),
-                )
+class IdenticalFunctionImplementation(_DuplicationRule):
+    id = "DP702"
+    name = "identical-function-implementation"
+    default_severity = Severity.WARNING
+    default_options = {"min_statements": 2}
+    description = (
+        "Flags two or more functions/methods whose bodies are exactly identical, "
+        "identifiers included — the same implementation pasted twice, like a private "
+        "helper that drifted into a second module. Requiring identifiers to match is "
+        "what lets this rule inspect much shorter bodies (default 2 statements) than "
+        "DP701 without noise; bodies long enough for DP701 to report are left to "
+        "DP701. Stub bodies and dunder methods are exempt."
+    )
+    guidance = None  # covered by DP701's guidance; see guide.COVERED_BY_SIBLING
+
+    _VERB = "is an exact copy of"
+    _SUGGESTION = "keep one copy and import/reuse it from the other location"
+
+    def check_project(self, files: list[ParsedFile], config: "Config") -> Iterable[Violation]:
+        min_statements = config.rules[self.id].options["min_statements"]
+        dp701 = config.rules[DuplicateFunctionBody.id]
+        for members in _grouped_by_fingerprint(files, min_statements, exact=True):
+            if dp701.enabled and self._covered_by_dp701(members, dp701.options["min_statements"]):
+                continue  # DP701 already reports this group; don't double-flag
+            yield from self._flag_group(config, members)
+
+    @staticmethod
+    def _covered_by_dp701(members: list[_Member], dp701_min_statements: int) -> bool:
+        _, first_function = members[0]
+        return len(_significant_body(first_function)) >= dp701_min_statements

@@ -118,3 +118,32 @@ class TestRules:
         assert result.exit_code == 0
         for rule_id in ("ST101", "NM201", "CM301", "SL401"):
             assert rule_id in result.output
+
+
+class TestExplain:
+    def test_prints_description_guidance_and_example(self, runner):
+        result = runner.invoke(main, ["explain", "SM607"])
+        assert result.exit_code == 0
+        assert "SM607" in result.output
+        assert "guidance:" in result.output
+        assert "# BAD" in result.output
+        assert "# GOOD" in result.output
+
+    def test_batches_multiple_rule_ids(self, runner):
+        result = runner.invoke(main, ["explain", "NM202", "ST101"])
+        assert result.exit_code == 0
+        assert "NM202" in result.output
+        assert "ST101" in result.output
+
+    def test_unknown_rule_id_is_a_usage_error(self, runner):
+        result = runner.invoke(main, ["explain", "ZZ999"])
+        assert result.exit_code == 2
+        assert "ZZ999" in result.output
+
+    def test_reflects_configured_options(self, runner, tmp_path):
+        write(tmp_path, "pyproject.toml", "[tool.cleancode.ST101]\nmax_depth = 5\n")
+        result = runner.invoke(
+            main, ["explain", "--config", str(tmp_path / "pyproject.toml"), "ST101"]
+        )
+        assert "max_depth = 5" in result.output
+        assert "Nest at most 5 levels" in result.output

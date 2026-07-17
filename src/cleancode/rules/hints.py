@@ -6,11 +6,10 @@ import ast
 from typing import Iterable, Iterator
 
 from cleancode.models import FileContext, Severity, Violation, ViolationDetails
-from cleancode.rules.base import FunctionNode, Rule, functions, subscript_base_name
+from cleancode.rules.base import FunctionNode, Rule, subscript_base_name
 
 
 def _annotations(function: FunctionNode) -> Iterator[tuple[ast.expr, str]]:
-    """Yield (annotation, label) for each annotated parameter and the return type."""
     args = function.args
     params = [*args.posonlyargs, *args.args, *args.kwonlyargs, args.vararg, args.kwarg]
     for arg in params:
@@ -61,9 +60,14 @@ class UninformativeAny(Rule):
         "and `Any | None`) on parameters and return types. `Any` nested in a "
         "container such as `dict[str, Any]` is permitted as a justified exception."
     )
+    guidance = (
+        "Never annotate a parameter or return type with bare `Any` — use a "
+        "structured type (TypedDict, dataclass) or reserve `Any` for container "
+        "payloads like `dict[str, Any]`."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
-        for function in functions(ctx.tree):
+        for function in ctx.functions:
             yield from self._check_function(ctx, function)
 
     def _check_function(

@@ -1,6 +1,7 @@
 """Tests for the reference config template."""
 
 import tomllib
+from pathlib import Path
 
 from click.testing import CliRunner
 
@@ -32,6 +33,12 @@ class TestBuildConfigTemplate:
         )
         config = Config.load(tmp_path)
         assert config.rules["ST101"].options["max_depth"] == 1
+
+    def test_committed_example_toml_has_not_drifted(self):
+        # example.toml is generated; regenerate with
+        # `clean-code config-template --out example.toml` after rule changes
+        committed = Path(__file__).parent.parent / "example.toml"
+        assert committed.read_text(encoding="utf-8") == build_config_template()
 
     def test_defaults_shown_match_the_registry(self):
         text = build_config_template()

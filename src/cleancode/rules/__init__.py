@@ -1,40 +1,53 @@
 """Rule registry. Rules are registered explicitly — no plugin machinery."""
 
 from cleancode.rules.base import ProjectRule, Rule
+from cleancode.rules.bindings import (
+    BuiltinShadowing,
+    RedundantIsinstanceCheck,
+    UnusedBinding,
+)
+from cleancode.rules.clarity import (
+    BoolArithmetic,
+    BuriedValueFallback,
+    CallableIndirection,
+    DeepExpression,
+    NestedTernary,
+    ThinDelegationWrapper,
+)
 from cleancode.rules.comments import (
-    BoilerplateParamDocs,
+    BannerComment,
     CommentDensity,
     CommentRestatesCode,
-    DocstringRestatesName,
+    FileCommentDensity,
 )
-from cleancode.rules.correctness import BareExcept, EmptyExceptionHandler
-from cleancode.rules.duplication import DuplicateFunctionBody
+from cleancode.rules.correctness import BareExcept, EmptyExceptionHandler, OversizedTry
+from cleancode.rules.docstrings import BoilerplateParamDocs, DocstringRestatesName
+from cleancode.rules.duplication import DuplicateFunctionBody, IdenticalFunctionImplementation
 from cleancode.rules.hints import UninformativeAny
 from cleancode.rules.naming import CrypticAbbreviation, MeaninglessName, ShortName
+from cleancode.rules.noise import CompatibilityAlias, ReturnedTemp, TrivialPropertyPair
+from cleancode.rules.pytorch import EagerDatasetLoading, PrematureDevicePlacement
 from cleancode.rules.semantic import (
     AnonymousTupleIndexing,
-    BuiltinShadowing,
     ComprehensionDensity,
-    EagerDatasetLoading,
     MagicNumber,
     MagicStringBranching,
     NonIdiomaticEmptinessCheck,
-    PrematureDevicePlacement,
     ReduceInsteadOfSum,
     RedundantBooleanTernary,
-    RedundantIsinstanceCheck,
     RepeatedCollectionIteration,
-    UnusedBinding,
 )
 from cleancode.rules.slicing import ChainedSubscript, ComplexSubscript
-from cleancode.rules.solid import LowCohesionClass, TypeSwitchViolatesOCP
+from cleancode.rules.solid import ClassAsNamespace, LowCohesionClass, TypeSwitchViolatesOCP
 from cleancode.rules.structure import (
     DoOneThing,
     MaxClassLength,
     MaxComplexity,
     MaxFunctionLength,
+    MaxModuleLength,
     MaxNestingDepth,
     MaxParameters,
+    RedundantElse,
     TooManyGuardClauses,
 )
 
@@ -46,6 +59,8 @@ ALL_RULES: list[type[Rule] | type[ProjectRule]] = [
     MaxComplexity,
     DoOneThing,
     TooManyGuardClauses,
+    MaxModuleLength,
+    RedundantElse,
     ShortName,
     MeaninglessName,
     CrypticAbbreviation,
@@ -53,6 +68,8 @@ ALL_RULES: list[type[Rule] | type[ProjectRule]] = [
     CommentRestatesCode,
     CommentDensity,
     BoilerplateParamDocs,
+    FileCommentDensity,
+    BannerComment,
     ComplexSubscript,
     ChainedSubscript,
     UninformativeAny,
@@ -69,11 +86,23 @@ ALL_RULES: list[type[Rule] | type[ProjectRule]] = [
     RedundantIsinstanceCheck,
     UnusedBinding,
     BuiltinShadowing,
+    BoolArithmetic,
+    NestedTernary,
+    CallableIndirection,
+    DeepExpression,
+    ThinDelegationWrapper,
+    BuriedValueFallback,
+    ReturnedTemp,
+    CompatibilityAlias,
+    TrivialPropertyPair,
     TypeSwitchViolatesOCP,
     LowCohesionClass,
+    ClassAsNamespace,
     DuplicateFunctionBody,
+    IdenticalFunctionImplementation,
     BareExcept,
     EmptyExceptionHandler,
+    OversizedTry,
 ]
 
 RULES_BY_ID: dict[str, type[Rule] | type[ProjectRule]] = {rule.id: rule for rule in ALL_RULES}

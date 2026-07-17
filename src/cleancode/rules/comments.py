@@ -1,9 +1,8 @@
-"""Comment and docstring noise rules (CM3xx).
+"""Comment noise rules (CM302, CM303, CM305).
 
-These rules deterministically detect the classic LLM padding: docstrings that
-restate the signature, comments that restate the code line, and Args sections
-that document nothing. The core trick is word-overlap between the natural-
-language text and the identifiers it sits next to.
+These rules deterministically detect the classic LLM padding: comments that
+restate the code line they annotate, and comment-heavy functions or files.
+Docstring noise is policed by the CM301/CM304 rules in ``docstrings.py``.
 """
 
 from __future__ import annotations
@@ -12,13 +11,22 @@ import ast
 import re
 from typing import Iterable, Iterator
 
-from cleancode.models import Comment, FileContext, Severity, Violation, ViolationDetails
+from cleancode.models import (
+    Comment,
+    FileContext,
+    ModuleTop,
+    Severity,
+    Violation,
+    ViolationDetails,
+)
 from cleancode.rules.base import (
-    FRAMING_VERBS,
+    GENERIC_PARAM_WORDS,
+    IDENTIFIER,
     FunctionNode,
     Rule,
     content_words,
-    functions,
+    docstring_node,
+    end_line,
     split_identifier,
 )
 
@@ -56,7 +64,6 @@ _OPERATOR_SYNONYMS: list[tuple[re.Pattern[str], frozenset[str]]] = [
     (re.compile(r"\bprint\b"), frozenset({"show", "display", "output"})),
 ]
 
-_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _NUMBER = re.compile(r"\b\d+\b")
 
 # Spelled-out numbers, so `# iterate three times` matches a code-side `3`.
@@ -71,15 +78,6 @@ _NUMBER_TO_WORDS: dict[str, frozenset[str]] = {
     for target in set(_NUMBER_WORDS.values())
 }
 
-# Generic filler that adds no information in a parameter description.
-_GENERIC_PARAM_WORDS = frozenset(
-    """
-    parameter argument input output value object instance number string integer
-    int float bool boolean list dict dictionary tuple set array data item items
-    optional default variable name type
-    """.split()
-)
-
 # Causal/justification markers: a comment carrying one of these explains
 # *why*, so it's exempt from the restatement check regardless of overlap.
 # One base form per concept; see `_stem_candidates` for the inflected-form
@@ -92,10 +90,6 @@ _WHY_SIGNALS = frozenset(
     though despite instead rather
     """.split()
 )
-
-_SECTION_HEADER = re.compile(r"^\s*(args|arguments|parameters|returns|raises|yields)\s*:\s*$", re.IGNORECASE)
-_PARAM_ENTRY = re.compile(r"^\s*(?P<name>\*{0,2}\w+)\s*(?:\((?P<type>[^)]*)\))?\s*:\s*(?P<desc>.*)$")
-
 
 # (suffix, replacement endings to try once the suffix is stripped). "ing"/"ed"
 # also try restoring a silent "e" (iterating -> iterat -> iterate).
@@ -133,35 +127,22 @@ def _stemmed(words: set[str]) -> set[str]:
     return {stem for word in words for stem in _stem_candidates(word)}
 
 
-def _docstring_node(function: FunctionNode) -> ast.Constant | None:
-    if not function.body:
-        return None
-    first = function.body[0]
-    if (
-        isinstance(first, ast.Expr)
-        and isinstance(first.value, ast.Constant)
-        and isinstance(first.value.value, str)
-    ):
-        return first.value
-    return None
+_DOCSTRING_OWNERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
 
 
-def _docstring_line_span(function: FunctionNode) -> set[int]:
-    node = _docstring_node(function)
+def _docstring_line_span(owner: ast.Module | ast.ClassDef | FunctionNode) -> set[int]:
+    node = docstring_node(owner)
     if node is None:
         return set()
-    return set(range(node.lineno, (node.end_lineno or node.lineno) + 1))
+    return set(range(node.lineno, end_line(node) + 1))
 
 
-def _signature_words(function: FunctionNode) -> set[str]:
-    words = set(split_identifier(function.name))
-    for arg in [
-        *function.args.posonlyargs,
-        *function.args.args,
-        *function.args.kwonlyargs,
-    ]:
-        words.update(split_identifier(arg.arg))
-    return words
+def _all_docstring_lines(tree: ast.Module) -> set[int]:
+    lines: set[int] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, _DOCSTRING_OWNERS):
+            lines.update(_docstring_line_span(node))
+    return lines
 
 
 def _is_exempt(comment: Comment) -> bool:
@@ -176,14 +157,13 @@ def _informative(words: set[str]) -> set[str]:
     get diluted by "number" — a word no operator synonym table will ever
     match, yet carries no information either way.
     """
-    filtered = words - _GENERIC_PARAM_WORDS
+    filtered = words - GENERIC_PARAM_WORDS
     return filtered or words
 
 
 def _code_line_words(code_text: str) -> set[str]:
-    """All words a lazy comment could copy from this line of code."""
     words: set[str] = set()
-    for identifier in _IDENTIFIER.findall(code_text):
+    for identifier in IDENTIFIER.findall(code_text):
         words.update(split_identifier(identifier))
     for numeral in _NUMBER.findall(code_text):
         words.add(numeral)
@@ -194,60 +174,20 @@ def _code_line_words(code_text: str) -> set[str]:
     return words
 
 
-class DocstringRestatesName(Rule):
-    id = "CM301"
-    name = "docstring-restates-name"
-    default_severity = Severity.WARNING
-    default_options = {"overlap": 0.8}
-    description = (
-        "Flags short docstrings whose words all come from the function signature "
-        '(`def get_user_name`: """Gets the user name.""") — they cost reading time '
-        "and add nothing."
-    )
-
-    def check(self, ctx: FileContext) -> Iterable[Violation]:
-        overlap_threshold = ctx.config.options["overlap"]
-        for function in functions(ctx.tree):
-            docstring = ast.get_docstring(function, clean=True)
-            node = _docstring_node(function)
-            if docstring is None or node is None:
-                continue
-            if len(docstring.strip().splitlines()) > 2:
-                continue  # substantive multi-line docstrings are never flagged
-            doc_words = content_words(docstring.splitlines()[0], extra_stopwords=FRAMING_VERBS)
-            signature_words = _signature_words(function)
-            if not doc_words:
-                message = f"docstring of `{function.name}` carries no information"
-            elif len(doc_words & signature_words) / len(doc_words) >= overlap_threshold:
-                message = (
-                    f"docstring of `{function.name}` only restates the function signature"
-                )
-            else:
-                continue
-            yield self.violation(
-                ctx,
-                node,
-                ViolationDetails(
-                    message=message,
-                    suggestion=(
-                        "delete it, or document what the name cannot say: why, edge cases, "
-                        "units, invariants"
-                    ),
-                    symbol=function.name,
-                ),
-            )
-
-
 class CommentRestatesCode(Rule):
     id = "CM302"
     name = "comment-restates-code"
     default_severity = Severity.WARNING
-    default_options = {"overlap": 0.7, "min_words": 2}
+    default_options = {"overlap": 0.5, "min_words": 2}
     description = (
         "Flags comments that paraphrase the code line they annotate "
         "(`x = x + 1  # increment x by 1`, `for k in range(3):  # iterate three "
         "times`). TODO/FIXME/NOTE, tool directives, and comments carrying a "
         "causal/justification marker (because, since, workaround, ...) are exempt."
+    )
+    guidance = (
+        "Only write a comment that explains *why*, never one that paraphrases the "
+        "line below it (`x += 1  # increment x`) — delete restating comments."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
@@ -263,7 +203,6 @@ class CommentRestatesCode(Rule):
                 )
 
     def _candidates(self, ctx: FileContext) -> Iterator[tuple[Comment, set[str]]]:
-        """Yield (comment, words) for comments substantial enough to be worth checking."""
         min_words = ctx.config.options["min_words"]
         for comment in ctx.comments:
             if _is_exempt(comment) or not comment.text:
@@ -310,11 +249,15 @@ class CommentDensity(Rule):
         "Flags functions with more than ~1 comment line per 3 code lines — a strong "
         "smell of generated padding. Docstrings are policed by CM301/CM304, not here."
     )
+    guidance = (
+        "Keep comments sparse inside a function (well under 1 line of comment per 3 "
+        "lines of code) — strip narration and keep only the why."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         max_ratio = ctx.config.options["max_ratio"]
         min_code_lines = ctx.config.options["min_code_lines"]
-        for function in functions(ctx.tree):
+        for function in ctx.functions:
             code_lines, comment_lines = self._count_lines(ctx, function)
             if code_lines >= min_code_lines and comment_lines / code_lines > max_ratio:
                 yield self.violation(
@@ -330,7 +273,6 @@ class CommentDensity(Rule):
 
     @staticmethod
     def _count_lines(ctx: FileContext, function: FunctionNode) -> tuple[int, int]:
-        """Non-blank (code, comment) line counts inside one function body."""
         comment_only_lines: set[int] = set()
         inline_comment_lines: set[int] = set()
         for comment in ctx.comments:
@@ -340,7 +282,7 @@ class CommentDensity(Rule):
 
         code_lines = 0
         comment_lines = 0
-        for line_number in range(function.lineno, (function.end_lineno or function.lineno) + 1):
+        for line_number in range(function.lineno, end_line(function) + 1):
             stripped = ctx.lines[line_number - 1].strip()
             if not stripped or line_number in docstring_lines:
                 continue
@@ -353,69 +295,117 @@ class CommentDensity(Rule):
         return code_lines, comment_lines
 
 
-class BoilerplateParamDocs(Rule):
-    id = "CM304"
-    name = "boilerplate-param-docs"
+def _comment_line_sets(comments: list[Comment]) -> tuple[set[int], set[int], set[int]]:
+    """Line sets for density counting: (standalone, counted standalone, counted inline).
+
+    A standalone comment line is never code; only non-exempt comments count
+    toward density.
+    """
+    standalone: set[int] = set()
+    counted_standalone: set[int] = set()
+    counted_inline: set[int] = set()
+    for comment in comments:
+        counted = counted_inline if comment.inline else counted_standalone
+        if not _is_exempt(comment):
+            counted.add(comment.lineno)
+        if not comment.inline:
+            standalone.add(comment.lineno)
+    return standalone, counted_standalone, counted_inline
+
+
+class FileCommentDensity(Rule):
+    id = "CM305"
+    name = "file-comment-density"
     default_severity = Severity.WARNING
-    default_options = {"min_uninformative": 0.5}
+    default_options = {"max_ratio": 0.2, "min_code_lines": 30}
     description = (
-        "Flags Google-style Args:/Returns: sections where entries like "
-        "`data: The data.` describe nothing beyond the parameter name."
+        "Flags a file whose overall comment density exceeds `max_ratio` (default 1 "
+        "comment line per 5 code lines) — file-wide comment sprawl that CM303 misses "
+        "when no single function is dense enough on its own. Directive comments "
+        "(TODO, noqa, `cleancode:`, ...) and docstrings (policed by CM301/CM304) "
+        "don't count, and files with fewer than `min_code_lines` code lines are "
+        "never flagged."
+    )
+    guidance = (
+        "Keep a file's overall comment density low — file-wide comment sprawl is as "
+        "much a smell as one dense function."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
-        min_uninformative = ctx.config.options["min_uninformative"]
-        for function in functions(ctx.tree):
-            docstring = ast.get_docstring(function, clean=True)
-            node = _docstring_node(function)
-            if docstring is None or node is None:
-                continue
-            entries = list(self._section_entries(docstring, function))
-            if not entries:
-                continue
-            uninformative = [name for name, is_noise in entries if is_noise]
-            if len(uninformative) / len(entries) >= min_uninformative:
-                pretty = ", ".join(f"`{name}`" for name in uninformative)
-                yield self.violation(
-                    ctx,
-                    node,
-                    ViolationDetails(
-                        message=f"docstring of `{function.name}` has boilerplate parameter "
-                        f"docs: {pretty}",
-                        suggestion=(
-                            "delete entries that restate the name; document only parameters "
-                            "whose meaning, units, or constraints are not obvious"
-                        ),
-                        symbol=function.name,
+        max_ratio = ctx.config.options["max_ratio"]
+        min_code_lines = ctx.config.options["min_code_lines"]
+        code_lines, comment_lines = self._count_file_lines(ctx)
+        if code_lines >= min_code_lines and comment_lines / code_lines > max_ratio:
+            yield self.violation(
+                ctx,
+                ModuleTop(),
+                ViolationDetails(
+                    message=f"file has {comment_lines} comment lines for {code_lines} "
+                    f"code lines (max ratio {max_ratio})",
+                    suggestion=(
+                        "analyze every comment in this file and keep only those that say "
+                        "something the code cannot — delete narration, restatements, and "
+                        "section banners"
                     ),
-                )
+                ),
+            )
 
-    def _section_entries(
-        self, docstring: str, function: FunctionNode
-    ) -> Iterator[tuple[str, bool]]:
-        """Yield (entry_name, is_uninformative) for Args:/Returns: style entries."""
-        in_section = False
-        section_name = ""
-        for line in docstring.splitlines():
-            header = _SECTION_HEADER.match(line)
-            if header:
-                in_section = True
-                section_name = header.group(1).lower()
+    @staticmethod
+    def _count_file_lines(ctx: FileContext) -> tuple[int, int]:
+        standalone_lines, counted_standalone, counted_inline = _comment_line_sets(ctx.comments)
+        docstring_lines = _all_docstring_lines(ctx.tree)
+        code_lines = 0
+        comment_lines = 0
+        for line_number, line in enumerate(ctx.lines, start=1):
+            if not line.strip() or line_number in docstring_lines:
                 continue
-            if not in_section:
+            if line_number in counted_standalone:
+                comment_lines += 1
                 continue
-            if line.strip() and not line.startswith((" ", "\t")):
-                in_section = False  # dedented text ends the section
+            if line_number in standalone_lines:
+                continue  # exempt directive on its own line: neither code nor comment
+            code_lines += 1
+            if line_number in counted_inline:
+                comment_lines += 1
+        return code_lines, comment_lines
+
+
+_DECORATION = "-=*_~#"
+_BANNER_ONLY = re.compile(rf"^[{_DECORATION}]{{3,}}$")
+_BANNER_FRAMED = re.compile(rf"^[{_DECORATION}]{{3,}}.*[{_DECORATION}]{{3,}}$")
+
+
+def _is_banner(text: str) -> bool:
+    return bool(text) and bool(_BANNER_ONLY.match(text) or _BANNER_FRAMED.match(text))
+
+
+class BannerComment(Rule):
+    id = "CM306"
+    name = "banner-comment"
+    default_severity = Severity.WARNING
+    default_options: dict = {}
+    description = (
+        "Flags a decoration-only comment (`# ----------`) or a decoration-framed "
+        "one (`# ---- Step 1 ----`) — section-divider ceremony that carries no "
+        "information the code doesn't already show. TODO/FIXME/NOTE and tool "
+        "directives are exempt, like the other comment rules."
+    )
+    guidance = (
+        "Never write a section-divider or banner comment (`# ---- Step 1 ----`) "
+        "— if the file has sections, extract them into named functions or "
+        "modules instead."
+    )
+
+    def check(self, ctx: FileContext) -> Iterable[Violation]:
+        for comment in ctx.comments:
+            if _is_exempt(comment) or not _is_banner(comment.text):
                 continue
-            entry = _PARAM_ENTRY.match(line)
-            if entry is None:
-                continue
-            name = entry.group("name").lstrip("*")
-            description = entry.group("desc").strip()
-            if section_name in ("returns", "raises", "yields"):
-                reference = set(split_identifier(function.name))
-            else:
-                reference = set(split_identifier(name))
-            desc_words = content_words(description, extra_stopwords=FRAMING_VERBS)
-            uninformative = desc_words <= (reference | _GENERIC_PARAM_WORDS)
-            yield name, uninformative
+            yield self.violation(
+                ctx,
+                comment,
+                ViolationDetails(
+                    message=f"banner/section-divider comment: `# {comment.text}`",
+                    suggestion="delete the banner; if the file has sections, "
+                    "extract them into named functions or modules instead",
+                ),
+            )

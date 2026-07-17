@@ -15,11 +15,59 @@ if TYPE_CHECKING:
 
 FunctionNode = ast.FunctionDef | ast.AsyncFunctionDef
 
+IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def is_dunder(name: str) -> bool:
+    return name.startswith("__") and name.endswith("__")
+
+
+def is_private(name: str) -> bool:
+    # A private name has no external readers to write prose documentation
+    # for — only its own (short) body does, so a docstring on one earns its
+    # keep at a much stricter bar than a public API's.
+    return name.startswith("_") and not is_dunder(name)
+
 
 def functions(tree: ast.Module) -> Iterator[FunctionNode]:
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             yield node
+
+
+def simple_name(node: ast.expr) -> str | None:
+    """``reduce`` -> ``"reduce"``, ``obj.load`` -> ``"load"`` — anything else
+    (a call, a subscript, ...) has no single name to point at."""
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return None
+
+
+def statement_blocks(function: FunctionNode) -> Iterator[list[ast.stmt]]:
+    # Nested function/class definitions are skipped — they're examined on
+    # their own, not folded into the enclosing function's blocks.
+    def walk(statements: list[ast.stmt]) -> Iterator[list[ast.stmt]]:
+        yield statements
+        for statement in statements:
+            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                continue
+            for child_block in _child_blocks(statement):
+                yield from walk(child_block)
+
+    yield from walk(function.body)
+
+
+def _child_blocks(statement: ast.stmt) -> Iterator[list[ast.stmt]]:
+    for attr in ("body", "orelse", "finalbody"):
+        block = getattr(statement, attr, None)
+        if block:
+            yield block
+    for handler in getattr(statement, "handlers", []):
+        yield handler.body
+    for case in getattr(statement, "cases", []):
+        yield case.body
 
 
 def subscript_base_name(node: ast.Subscript) -> str | None:
@@ -30,6 +78,62 @@ def subscript_base_name(node: ast.Subscript) -> str | None:
     if isinstance(value, ast.Attribute):
         return value.attr
     return None
+
+
+def end_line(node: ast.AST) -> int:
+    """The last line of ``node``, falling back to its first when the parser gave no end."""
+    return node.end_lineno or node.lineno  # type: ignore[attr-defined]
+
+
+def docstring_node(owner: ast.Module | ast.ClassDef | FunctionNode) -> ast.Constant | None:
+    if not owner.body:
+        return None
+    first = owner.body[0]
+    if (
+        isinstance(first, ast.Expr)
+        and isinstance(first.value, ast.Constant)
+        and isinstance(first.value.value, str)
+    ):
+        return first.value
+    return None
+
+
+def import_aliases(tree: ast.Module) -> Iterator[tuple[str, ast.alias]]:
+    """(bound name, alias node) for every import in the module, ``__future__`` excluded."""
+    for node in ast.walk(tree):
+        yield from _aliases_of(node)
+
+
+def _aliases_of(node: ast.AST) -> Iterator[tuple[str, ast.alias]]:
+    if isinstance(node, ast.Import):
+        aliases = node.names
+        return ((alias.asname or alias.name.split(".")[0], alias) for alias in aliases)
+    if isinstance(node, ast.ImportFrom) and node.module != "__future__":
+        aliases = node.names
+        return ((alias.asname or alias.name, alias) for alias in aliases if alias.name != "*")
+    return iter(())
+
+
+SCOPE_BOUNDARIES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
+
+
+def own_scope_walk(
+    node: ast.AST, boundaries: tuple[type[ast.AST], ...] = SCOPE_BOUNDARIES
+) -> Iterator[ast.AST]:
+    """Descendants of ``node`` in its own scope — nested scopes are skipped.
+
+    Each nested function/class is checked independently when a rule reaches
+    it; walking into it here would attribute its nodes to the wrong scope.
+    Pass a narrower ``boundaries`` tuple to keep some nested scopes in the
+    walk (e.g. lambdas, which never get their own per-function score).
+    """
+    stack = list(ast.iter_child_nodes(node))
+    while stack:
+        child = stack.pop()
+        if isinstance(child, boundaries):
+            continue
+        yield child
+        stack.extend(ast.iter_child_nodes(child))
 
 
 def is_elif_branch(statement: ast.stmt) -> bool:
@@ -53,6 +157,11 @@ class Rule(ABC):
     default_severity: ClassVar[Severity]
     default_options: ClassVar[dict[str, Any]]
     description: ClassVar[str]
+    # A one-line generation-time imperative ("Nest at most {max_depth} levels...")
+    # rendered by ``guide.py`` with this rule's *configured* option values. ``None``
+    # only when a sibling rule's guidance already covers this one — see
+    # ``guide.COVERED_BY_SIBLING``.
+    guidance: ClassVar[str | None] = None
 
     @abstractmethod
     def check(self, ctx: "FileContext") -> Iterable[Violation]: ...
@@ -83,6 +192,7 @@ class ProjectRule(ABC):
     default_severity: ClassVar[Severity]
     default_options: ClassVar[dict[str, Any]]
     description: ClassVar[str]
+    guidance: ClassVar[str | None] = None
 
     @abstractmethod
     def check_project(
@@ -115,6 +225,15 @@ STOPWORDS = frozenset(
     all each any some no not if then when while
     over through using per via up down out off into onto also just simply now
     here there new current
+    """.split()
+)
+
+# Generic filler that adds no information in a parameter description.
+GENERIC_PARAM_WORDS = frozenset(
+    """
+    parameter argument input output value object instance number string integer
+    int float bool boolean list dict dictionary tuple set array data item items
+    optional default variable name type
     """.split()
 )
 

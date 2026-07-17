@@ -1,8 +1,9 @@
-"""Engine-level tests: suppressions, syntax errors, registry sanity."""
+"""Engine-level tests: suppressions, syntax errors, file walking, registry sanity."""
 
 import re
 
 from cleancode.config import Config
+from cleancode.engine import analyze_paths
 from cleancode.rules import ALL_RULES, RULES_BY_ID
 
 
@@ -27,6 +28,22 @@ class TestSuppressions:
         result = analyze(source, config=config)
         assert [violation.rule_id for violation in result.violations] == ["NM202"]
 
+    def test_standalone_directive_suppresses_the_next_code_line(self, analyze):
+        source = "# cleancode: disable=NM202\ntmp = 1\n"
+        assert analyze(source).violations == []
+
+    def test_standalone_directive_skips_blank_and_comment_lines(self, analyze):
+        source = "# cleancode: disable=NM202\n\n# unrelated remark\ntmp = 1\n"
+        assert analyze(source).violations == []
+
+    def test_standalone_directive_reaches_only_the_next_code_line(self, analyze):
+        source = "# cleancode: disable=NM202\ntmp = 1\ndata = 2\n"
+        assert [violation.line for violation in analyze(source).violations] == [3]
+
+    def test_inline_directive_does_not_leak_to_the_next_line(self, analyze):
+        source = "tmp = 1  # cleancode: disable=NM202\ndata = 2\n"
+        assert [violation.line for violation in analyze(source).violations] == [2]
+
 
 class TestParseErrors:
     def test_syntax_error_is_reported_not_raised(self, analyze):
@@ -34,6 +51,40 @@ class TestParseErrors:
         assert result.parse_error is not None
         assert not result.ok
         assert result.violations == []
+
+    def test_non_utf8_file_is_reported_not_raised(self, tmp_path):
+        # regression: one undecodable file used to abort the whole run
+        bad = tmp_path / "latin1.py"
+        bad.write_bytes("x = 'caf\xe9'\n".encode("latin-1"))
+        (tmp_path / "fine.py").write_text("VALUE = 1\n", encoding="utf-8")
+        results = analyze_paths([tmp_path])
+        by_name = {result.path.rsplit("/", 1)[-1]: result for result in results}
+        assert "not valid UTF-8" in by_name["latin1.py"].parse_error
+        assert by_name["fine.py"].ok
+
+
+class TestExcludes:
+    def test_relative_pattern_matches_below_the_project_root(self, tmp_path):
+        # regression: the documented `exclude = ["migrations/**"]` example
+        # never matched because patterns were only tried against absolute paths
+        (tmp_path / "pyproject.toml").write_text(
+            '[tool.cleancode]\nexclude = ["migrations/**"]\n', encoding="utf-8"
+        )
+        migrations = tmp_path / "migrations"
+        migrations.mkdir()
+        (migrations / "auto.py").write_text("tmp = 1\n", encoding="utf-8")
+        (tmp_path / "app.py").write_text("VALUE = 1\n", encoding="utf-8")
+        config = Config.load(tmp_path)
+        results = analyze_paths([tmp_path], config)
+        assert [result.path.rsplit("/", 1)[-1] for result in results] == ["app.py"]
+
+    def test_absolute_style_default_excludes_still_match(self, tmp_path):
+        venv = tmp_path / "venv"
+        venv.mkdir()
+        (venv / "vendored.py").write_text("tmp = 1\n", encoding="utf-8")
+        (tmp_path / "app.py").write_text("VALUE = 1\n", encoding="utf-8")
+        results = analyze_paths([tmp_path])
+        assert [result.path.rsplit("/", 1)[-1] for result in results] == ["app.py"]
 
 
 class TestRegistry:

@@ -155,6 +155,22 @@ class TestMagicNumber:
         source = "TOP_TIER_MULTIPLIER = 1.2\n"
         assert check(source, "SM607") == []
 
+    def test_suggestion_derives_max_prefix_from_greater_than_comparison(self, check):
+        violations = check("if retries > 5:\n    pass\n", "SM607")
+        assert violations[0].suggestion == "e.g. `MAX_RETRIES = 5`"
+
+    def test_suggestion_derives_min_prefix_from_less_than_comparison(self, check):
+        violations = check("if timeout < 30:\n    pass\n", "SM607")
+        assert violations[0].suggestion == "e.g. `MIN_TIMEOUT = 30`"
+
+    def test_suggestion_falls_back_for_binop(self, check):
+        violations = check("result = threshold * 1.2\n", "SM607")
+        assert violations[0].suggestion == "e.g. `SOME_DESCRIPTIVE_NAME = 1.2`"
+
+    def test_suggestion_falls_back_for_literal_on_the_left(self, check):
+        violations = check("if 5 < retries:\n    pass\n", "SM607")
+        assert violations[0].suggestion == "e.g. `SOME_DESCRIPTIVE_NAME = 5`"
+
 
 class TestNonIdiomaticEmptinessCheck:
     def test_flags_len_greater_than_zero(self, check):
@@ -332,6 +348,16 @@ class TestUnusedBinding:
             raw = read(path)
             parsed_data = parse(raw)
             return parsed_data
+        """
+        assert check(source, "SM612") == []
+
+    def test_deleted_variable_counts_as_used(self, check):
+        # regression: `del cache` is a deliberate act, not a dead binding
+        source = """
+        def run():
+            cache = build()
+            del cache
+            return None
         """
         assert check(source, "SM612") == []
 

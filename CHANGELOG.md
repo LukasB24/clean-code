@@ -12,7 +12,182 @@ whether pre- or post-1.0).
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- Seven new rules targeting patterns common in freshly-generated Python,
+  bringing the total to 51:
+  - `ST109` `redundant-else` — a plain two-way `if`/`else` whose `if` branch
+    always exits (return/raise/break/continue). Any `if` that's itself part
+    of an `elif` chain is exempt entirely, so a multi-way dispatch ladder
+    ending in `else` is never flagged, even when every branch returns.
+  - `CM306` `banner-comment` — a decoration-only (`# ----------`) or
+    decoration-framed (`# ---- Step 1 ----`) comment; reuses CM303/CM305's
+    directive-comment exemptions.
+  - `PY903` `oversized-try` — a `try` spanning more than `max_statements`
+    (default 3) top-level statements feeding a bare or broad
+    `except Exception`/`BaseException` handler, which can't tell which step
+    actually failed. A narrowly-typed `except`, or a short `try` wrapping a
+    broad handler, is not flagged.
+  - `SM620` `returned-temp` — `name = expr` immediately followed by
+    `return name` with no other use of `name`. An annotated assignment
+    (`name: T = expr`) is exempt.
+  - `SM621` `compatibility-alias` — a module-level `alias = original`
+    pointing at a function/class defined in the same file. ALL_CAPS
+    targets, `_`-prefixed targets, and annotated assignments are exempt.
+  - `SM622` `trivial-property-pair` — a `@property`/`@x.setter` pair that
+    only mirrors `self._x` with no logic in either accessor. A getter-only
+    read-only property is a legitimate idiom and is exempt.
+  - `SD803` `class-as-namespace` — a class with no bases, decorators, or
+    class-level state whose entire body is `min_methods`-or-more (default
+    2) `@staticmethod`s; the module is already the namespace it's imitating.
+  - `SM620`/`SM621`/`SM622` live in a new `src/cleancode/rules/noise.py`
+    module (naming/indirection ceremony, distinct from the AST-shape
+    smells in `semantic.py`/`clarity.py`).
+- `clean-code guide [PATH]` — a generation-time briefing for an LLM, one
+  imperative bullet per *enabled* rule ("Nest at most 2 levels...", "Never
+  write a bare `except:`..."), rendered with the project's own configured
+  option values so a loosened `max_depth` or a disabled rule shows up
+  correctly. `--agents-md` wraps the same brief with standing instructions
+  for pasting into a project's `CLAUDE.md`/`AGENTS.md`
+  (`clean-code guide --agents-md >> CLAUDE.md`). Every rule carries a new
+  `guidance` string (or is explicitly folded into a sibling's — see
+  `guide.COVERED_BY_SIBLING`), enforced by `tests/test_guide.py`.
+- `clean-code explain <RULE_ID> [<RULE_ID> ...]` — prints a rule's full
+  description, its `guide` sentence, its configured-vs-default options, and
+  a minimal BAD/GOOD before/after example an LLM can pattern-match against.
+  Every rule has an `Example` in the new `src/cleancode/examples/` package;
+  `tests/test_examples.py` runs every `bad` and `good` snippet through the
+  engine and requires the rule to fire on one and not the other, doubling
+  as a permanent regression net.
+- Context-aware suggestions for three high-value rules, falling back to the
+  previous generic text when no hint is available: `NM202`/`NM201` derive a
+  rename candidate from the flagged binding's own annotation (`bounds: list[Trade]`
+  → `trades`) or the call it's assigned from (`data = load_users(path)` →
+  `users`, from `load_users`); `SM607` derives a `MAX_`/`MIN_`-prefixed
+  constant name from the idiomatic `name <op> literal` comparison shape
+  (`if retries > 5` → `MAX_RETRIES = 5`). `Binding` now carries the AST node
+  it was bound at.
+- `SM618` `thin-delegation-wrapper` — flags a private function whose whole
+  body is `return <one call to another function>`, a hop that only renames
+  work. Public functions, decorated functions, dunders, builtin callees, and
+  calls on the function's own parameters are exempt.
+- `SM619` `buried-value-fallback` — flags an `or`/`and` value fallback used
+  as an arithmetic operand or subscript index (`(node.end_lineno or
+  node.lineno) + 1`), where the boolean operator is easy to misread. A bare
+  `x = a or b` and ordinary boolean conditions are exempt.
+- `CM301` now also checks class docstrings (reference words: class name +
+  its directly-defined method names), and flags a docstring longer than two
+  lines when *every* line stays within the signature/class-name vocabulary
+  plus generic filler.
+- `CM301`'s short-docstring check now also judges a function's docstring
+  against its own source text (identifier- and keyword-shaped words, the
+  same scan `CM302` uses on one code line), not just its name and
+  parameters — catching a docstring that paraphrases the return value,
+  a local variable, or a branch the code takes instead of the signature.
+- `ST108` `max-module-length` — flags a module longer than `max_lines`
+  (default 500); a file that keeps absorbing helpers becomes a grab-bag.
+- `DP702` `identical-function-implementation` — flags function bodies that
+  are exactly identical, identifiers included (default 2+ statements).
+  Complements `DP701`; groups long enough for `DP701` are left to it so a
+  copy-paste is never reported twice.
+- `CM305` `file-comment-density` — flags a file whose overall comment/code
+  line ratio exceeds `max_ratio` (default 0.2), catching comment sprawl
+  that per-function `CM303` misses. Directive comments and docstrings don't
+  count; the suggestion instructs the fixer to analyze every comment in the
+  file and keep only those that say something the code cannot.
+- `SM614`–`SM617`, the expression clarity family — catches complexity that
+  was *compressed* to satisfy the structural limits instead of removed:
+  `SM614` `bool-arithmetic` (a comparison added to a counter), `SM615`
+  `nested-ternary`, `SM616` `callable-indirection` (returning a `lambda`/
+  `functools.partial`/bare function reference instead of doing work), and
+  `SM617` `deep-expression` (expressions nested more than `max_depth`
+  levels in one statement; flat condition chains and module-level constant
+  tables stay exempt).
+- Suppression directives now also work from the line above: a standalone
+  `# cleancode: disable[=IDS]` comment suppresses the next code line below
+  it (inline directives stay same-line-only).
+
+### Changed
+
+- `CM301` tightened further: default `overlap` lowered from 0.7 to 0.6, and
+  a new `private_overlap` (default 0.35) judges any `_`-prefixed function or
+  class at a much stricter bar — a private name has no external reader to
+  write prose for, only its own (usually short) body. Motivated by a real
+  review finding: a private helper's docstring that paraphrased its own
+  body in different words, with no literal signature-word reuse, scored
+  0.625 against the old single 0.7 threshold and slipped through entirely.
+  `CM302`'s default `overlap` also lowered, 0.7 to 0.5, for the same reason
+  applied to inline/standalone comments. Both are pre-1.0 behavior changes;
+  re-run `clean-code check` after upgrading — code that passed before may
+  not now.
+- `CM301`'s default `overlap` lowered from 0.8 to 0.7 — pre-1.0, so this is
+  a behavior change, not just a new rule; it now also scores the whole text
+  of a two-line docstring instead of only its first line.
+- `DP701`/`DP702`'s two dump functions merged into one (`SM618` motivated
+  this: two near-duplicate one-liners were themselves the smell), threading
+  an `exact` flag instead of passing a callable through the fingerprinting
+  pipeline.
+- The new clarity rules forced their own cleanup of this codebase (the
+  dogfood gate at work): `DP701`/`DP702`'s fingerprint-factory layer is
+  replaced by two dump functions with a shared signature passed directly
+  (`SM616`), boolean-counting in `CM305` became explicit `if`s (`SM614`),
+  and three depth-5 one-liners in `duplication.py`/`structure.py`/
+  `template.py` were unpacked into named intermediates (`SM617`).
+  Duplicate-detection output is byte-identical before and after.
+- `rules/semantic.py` split by concern: `SM609`/`SM610` moved to
+  `rules/pytorch.py`, `SM611`–`SM613` to `rules/bindings.py`. Rule ids,
+  class names, and behavior are unchanged.
+- `DP701` now preserves called function/method names when normalizing
+  bodies, so two same-shaped functions invoking different APIs no longer
+  fingerprint as duplicates. A call's receiver chain is preserved too when
+  it is rooted at an imported name (`json.dumps(...)` vs `yaml.dumps(...)`
+  are different APIs), while variable receivers (`fh.write` vs `out.write`)
+  still normalize as renames.
+- `ST101` violations now attribute their symbol to the innermost
+  function/class containing the offending block, instead of always the
+  outermost function.
+- `SM605`'s suggestion mentions `''.join()` for string concatenation,
+  where `sum()` would raise.
+
+### Fixed
+
+- Checking a medium project no longer takes double-digit seconds
+  (`clean-code check src` on this repo: 13.5s → 0.9s). `DP701`'s
+  fingerprinting deep-copied each statement's AST, and the `parent`
+  back-reference every node carries dragged the entire module graph into
+  every copy; fingerprints are now rendered from the tree in place, with
+  no copy. Per-file rules also share one cached function/binding walk per
+  file instead of re-walking the tree per rule.
+- `ST105` no longer counts a nested function's branches toward the
+  enclosing function's cyclomatic complexity (each function scores its own
+  body; lambdas still count toward their enclosing function).
+- `ST101` no longer reports the same deep block twice (once for the outer
+  function and once for a nested function); nested functions keep
+  inheriting the enclosing visual depth.
+- `ST101` no longer crashes when the first offender is a `match` case
+  (anchored at the case's pattern now).
+- A non-UTF-8 or unreadable file no longer aborts the whole run with a
+  traceback; it is reported as a per-file error (exit code 2) and the
+  remaining files are still checked.
+- Relative `exclude` patterns (`migrations/**`, as documented) now work:
+  patterns are matched against the path relative to the project root (the
+  directory of the `pyproject.toml`/`--config` file) in addition to the
+  absolute path.
+- `SM612` no longer flags a local variable that is explicitly `del`ed.
+- `SM616` no longer misreports guarded dispatch (`if cond: return handler`)
+  as "does nothing but hand back" — the bare-forward check now requires the
+  `return` to be the function's sole top-level statement.
+- `SM616` only calls a call `functools.partial` when it resolves to one
+  through the module's imports; an unrelated `something.partial(...)`
+  method is no longer flagged.
+- `ST101` treats a `ClassDef` as a scope boundary (matching `ST105`), so
+  methods of a locally-defined class are measured from their own baseline
+  instead of inheriting the enclosing function's depth.
+- `example.toml` regenerated — it had drifted and was missing the four
+  0.2.0 rules (`SM612`, `SM613`, `PY901`, `PY902`); a new test now pins it
+  to the generator's output.
+- README banner uses an absolute `raw.githubusercontent.com` URL again so
+  it renders on PyPI (the 0.2.1 fix had been lost in a later edit).
 
 ## [0.2.1] - 2026-07-15
 

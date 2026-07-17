@@ -5,10 +5,12 @@ from __future__ import annotations
 import ast
 import enum
 from dataclasses import dataclass, field
+from functools import cached_property
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from cleancode.config import RuleConfig
+    from cleancode.rules.naming import Binding
 
 
 @runtime_checkable
@@ -17,6 +19,14 @@ class Positioned(Protocol):
 
     lineno: int
     col_offset: int
+
+
+@dataclass(frozen=True)
+class ModuleTop:
+    """Position anchor for module-level violations (an ``ast.Module`` has none)."""
+
+    lineno: int = 1
+    col_offset: int = 0
 
 
 @dataclass(frozen=True)
@@ -125,7 +135,8 @@ class ParsedFile:
 
     Built once per file by the engine and reused both for per-file ``Rule``s (each
     wrapped in its own ``FileContext``) and for ``ProjectRule``s, which see every
-    file in the run at once.
+    file in the run at once. The cached properties exist so ~15 rules share one
+    tree walk per file instead of redoing it each.
     """
 
     path: str
@@ -134,17 +145,58 @@ class ParsedFile:
     tree: ast.Module
     comments: list[Comment]
 
+    @cached_property
+    def functions(self) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
+        """Every function/method in the file, in one cached walk."""
+        return [
+            node
+            for node in ast.walk(self.tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        ]
+
+    @cached_property
+    def bindings(self) -> list["Binding"]:
+        """Every binding occurrence in the file, in one cached walk."""
+        # Deferred import: the rules package imports this module at its top level.
+        from cleancode.rules.naming import collect_bindings
+
+        return list(collect_bindings(self.tree))
+
 
 @dataclass
 class FileContext:
     """Everything a rule needs to inspect one parsed file."""
 
-    path: str
-    source: str
-    lines: list[str]
-    tree: ast.Module
-    comments: list[Comment]
+    parsed: ParsedFile
     config: "RuleConfig"
+
+    @property
+    def path(self) -> str:
+        return self.parsed.path
+
+    @property
+    def source(self) -> str:
+        return self.parsed.source
+
+    @property
+    def lines(self) -> list[str]:
+        return self.parsed.lines
+
+    @property
+    def tree(self) -> ast.Module:
+        return self.parsed.tree
+
+    @property
+    def comments(self) -> list[Comment]:
+        return self.parsed.comments
+
+    @property
+    def functions(self) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
+        return self.parsed.functions
+
+    @property
+    def bindings(self) -> list["Binding"]:
+        return self.parsed.bindings
 
     def enclosing_symbol(self, node: ast.AST) -> str | None:
         """Dotted name of the innermost function/class containing ``node``."""

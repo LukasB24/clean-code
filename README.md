@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/clean-code_banner.gif" alt="clean-code: a messy LLM-generated function on the left becomes a short, well-named function on the right" width="700">
+  <img src="https://raw.githubusercontent.com/LukasB24/clean-code/main/assets/clean-code_banner.gif" alt="clean-code: a messy LLM-generated function on the left becomes a short, well-named function on the right" width="700">
 </p>
 
 <h1 align="center">clean-code</h1>
@@ -126,6 +126,34 @@ hides a violation that `--fail-on`/`fail_on` would fail the run on: setting
 always see what can fail your build. Set `min_severity` explicitly to
 override that.
 
+## Prime your agent: `clean-code guide`
+
+`clean-code check` is a *reactive* loop — it finds what's already wrong.
+`clean-code guide` is the other half: a short, generation-time brief that
+turns every enabled rule into a "write it this way" instruction, so an LLM
+can follow the rules while it writes instead of fixing them after:
+
+```bash
+clean-code guide src
+```
+
+It's rendered from your project's own config, so a loosened `max_depth` or
+a disabled rule shows up correctly — no drift between what the brief says
+and what `check` actually enforces. Feed it to an agent before it generates
+code, or append it once to your project's `CLAUDE.md`/`AGENTS.md`:
+
+```bash
+clean-code guide --agents-md >> CLAUDE.md
+```
+
+If a violation from `check` isn't self-explanatory, `clean-code explain
+<RULE_ID>` prints the rule's full description, its guidance line, and a
+minimal BAD/GOOD before/after example to pattern-match against:
+
+```bash
+clean-code explain SM607
+```
+
 ## Configure it for your project
 
 Out of the box the defaults are strict (max nesting depth 2, max 3
@@ -137,7 +165,7 @@ in your `pyproject.toml`:
 [tool.cleancode]
 disable = ["NM203"]           # rules you don't want at all
 fail_on = "warning"           # info | warning | error — what fails the build
-exclude = ["migrations/**"]   # globs to skip entirely
+exclude = ["migrations/**"]   # globs to skip, relative to this file's directory
 
 [tool.cleancode.ST101]
 max_depth = 3                 # loosen the default nesting limit
@@ -150,27 +178,31 @@ clean-code finds this automatically by walking up from whatever path you
 check (or point it elsewhere with `--config`).
 
 One line too noisy to fix right now? Suppress it inline instead of touching
-the config:
+the config — or, when the line has no room for a trailing comment, put the
+directive on its own line directly above:
 
 ```python
 legacy_tmp = migrate(rows)  # cleancode: disable=NM202
+
+# cleancode: disable=SM607
+retry_delay_seconds = base_delay * 1.5
 ```
 
 ## The rules
 
-35 rules across 9 categories, each with a default severity you can override:
+51 rules across 9 categories, each with a default severity you can override:
 
 | Category | IDs | Count | Catches |
 |----------|-----|-------|---------|
-| Structure | ST101–ST107 | 7 | nesting, length, params, complexity, mixed responsibilities |
+| Structure | ST101–ST109 | 9 | nesting, length, params, complexity, mixed responsibilities, oversized modules, redundant `else` |
 | Naming | NM201–NM203 | 3 | single-letter names, `data`/`tmp`/`process_data`, cryptic abbreviations |
-| Comments & docstrings | CM301–CM304 | 4 | docstrings/comments that just restate the code |
+| Comments & docstrings | CM301–CM306 | 6 | docstrings/comments that just restate the code, comment-heavy files, banner comments |
 | Subscripts | SL401–SL402 | 2 | `x[i][j][k]`-style complexity and chaining |
 | Types | TY501 | 1 | uninformative `Any` |
-| Structural smells | SM601–SM613 | 13 | magic numbers, nested comprehensions, redundant ternaries, PyTorch pitfalls, unused bindings, builtin shadowing, and more |
-| SOLID | SD801–SD802 | 2 | type-switches violating OCP, low-cohesion classes |
-| Duplication | DP701 | 1 | copy-pasted function bodies |
-| Correctness | PY901–PY902 | 2 | bare `except:`, silently-discarded exceptions |
+| Structural smells | SM601–SM622 | 22 | magic numbers, nested comprehensions, redundant ternaries, PyTorch pitfalls, unused bindings, builtin shadowing, nested ternaries, callable indirection, deep expressions, thin wrappers, buried fallbacks, returned temporaries, compatibility aliases, trivial property pairs, and more |
+| SOLID | SD801–SD803 | 3 | type-switches violating OCP, low-cohesion classes, all-static namespace classes |
+| Duplication | DP701–DP702 | 2 | copy-pasted and exactly-duplicated function bodies |
+| Correctness | PY901–PY903 | 3 | bare `except:`, silently-discarded exceptions, oversized broad-except `try` blocks |
 
 `cleancode rules` prints the full list from the CLI. For every rule's exact
 default options, severity, and the edge cases each one accounts for (what's

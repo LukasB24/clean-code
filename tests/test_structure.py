@@ -46,6 +46,67 @@ class TestMaxNestingDepth:
         assert lines_of(violations) == [("ST101", 6)]
         assert "depth 4" in violations[0].message
 
+    def test_deep_nesting_inside_nested_function_is_reported_once(self, check):
+        source = """
+        def outer():
+            def inner(values):
+                for value in values:
+                    if value:
+                        if value > 1:
+                            print(value)
+            return inner
+        """
+        # regression: this used to yield two identical violations, one attributed
+        # to `outer` and one to `inner`, for the same block
+        violations = check(source, "ST101", max_depth=2)
+        assert lines_of(violations) == [("ST101", 6)]
+        # the symbol names the innermost function the offending block sits in
+        assert violations[0].symbol == "outer.inner"
+
+    def test_local_class_method_does_not_inherit_enclosing_depth(self, check):
+        # regression: a ClassDef is a scope boundary (as in ST105), so a
+        # factory's local class must not push its methods over the limit
+        source = """
+        def factory(flag):
+            if flag:
+                class Handler:
+                    def process(self, items):
+                        for item in items:
+                            if item.valid:
+                                print(item)
+            return Handler
+        """
+        assert check(source, "ST101", max_depth=2) == []
+
+    def test_local_class_method_is_still_measured_on_its_own(self, check):
+        source = """
+        def factory(flag):
+            if flag:
+                class Handler:
+                    def process(self, items):
+                        for item in items:
+                            if item.valid:
+                                if item.priority:
+                                    print(item)
+            return Handler
+        """
+        violations = check(source, "ST101", max_depth=2)
+        assert lines_of(violations) == [("ST101", 8)]
+        assert "depth 3" in violations[0].message
+
+    def test_match_case_offender_reports_at_pattern_line(self, check):
+        # regression: a match_case as first offender crashed (no lineno of its own)
+        source = """
+        def dispatch(commands):
+            for command in commands:
+                if command:
+                    match command:
+                        case "start":
+                            print(command)
+        """
+        violations = check(source, "ST101", max_depth=2)
+        assert lines_of(violations) == [("ST101", 6)]
+
     def test_try_and_with_count_as_levels(self, check):
         source = """
         def risky(path):
@@ -143,6 +204,35 @@ class TestMaxComplexity:
         """
         assert check(source, "ST105") == []
 
+    def test_nested_function_branches_score_only_the_nested_function(self, check):
+        # regression: inner's branches used to count toward outer's complexity too
+        source = """
+        def outer(values):
+            def inner(value):
+                if value == 1:
+                    return "one"
+                if value == 2:
+                    return "two"
+                if value == 3:
+                    return "three"
+                return None
+            return inner
+        """
+        violations = check(source, "ST105", max_complexity=3)
+        assert lines_of(violations) == [("ST105", 3)]
+        assert "`inner`" in violations[0].message
+
+    def test_lambda_branches_count_toward_enclosing_function(self, check):
+        source = """
+        def pick(values):
+            chooser = lambda value: "big" if value > 1 else "small"
+            return [chooser(value) for value in values if value]
+        """
+        # 1 base + 1 lambda ternary + 1 comprehension filter = 3
+        violations = check(source, "ST105", max_complexity=2)
+        assert lines_of(violations) == [("ST105", 2)]
+        assert "complexity 3" in violations[0].message
+
     def test_comprehension_filters_count(self, check):
         source = """
         def sieve(numbers):
@@ -150,6 +240,18 @@ class TestMaxComplexity:
         """
         violations = check(source, "ST105", max_complexity=2)
         assert lines_of(violations) == [("ST105", 2)]
+
+
+class TestMaxModuleLength:
+    def test_flags_module_over_the_limit(self, check):
+        source = "\n".join(f"CONSTANT_{index} = {index}" for index in range(12))
+        violations = check(source, "ST108", max_lines=10)
+        assert lines_of(violations) == [("ST108", 1)]
+        assert "12 lines" in violations[0].message
+
+    def test_module_at_the_limit_passes(self, check):
+        source = "\n".join(f"CONSTANT_{index} = {index}" for index in range(10))
+        assert check(source, "ST108", max_lines=10) == []
 
 
 class TestDoOneThing:
@@ -303,3 +405,69 @@ class TestTooManyGuardClauses:
                 print(item)
         """
         assert check(source, "ST107", max_guards=1) != []
+
+
+class TestRedundantElse:
+    def test_flags_else_after_return(self, check):
+        source = """
+        def classify(n):
+            if n < 0:
+                return "negative"
+            else:
+                return "non-negative"
+        """
+        violations = check(source, "ST109")
+        assert lines_of(violations) == [("ST109", 3)]
+
+    def test_flags_else_after_raise(self, check):
+        source = """
+        def parse(raw):
+            if raw is None:
+                raise ValueError("missing")
+            else:
+                value = int(raw)
+            return value
+        """
+        assert [v.rule_id for v in check(source, "ST109")] == ["ST109"]
+
+    def test_flags_else_after_continue_in_loop(self, check):
+        source = """
+        def totals(rows):
+            for row in rows:
+                if row is None:
+                    continue
+                else:
+                    print(row)
+        """
+        assert [v.rule_id for v in check(source, "ST109")] == ["ST109"]
+
+    def test_elif_chain_is_not_flagged(self, check):
+        source = """
+        def classify(n):
+            if n < 0:
+                return "negative"
+            elif n == 0:
+                return "zero"
+            else:
+                return "positive"
+        """
+        assert check(source, "ST109") == []
+
+    def test_else_after_non_exiting_branch_is_not_flagged(self, check):
+        source = """
+        def announce(active):
+            if active:
+                log("active")
+            else:
+                log("inactive")
+        """
+        assert check(source, "ST109") == []
+
+    def test_if_with_no_else_is_not_flagged(self, check):
+        source = """
+        def guard(value):
+            if value is None:
+                return None
+            return value
+        """
+        assert check(source, "ST109") == []
