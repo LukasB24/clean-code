@@ -344,3 +344,31 @@ class TestFileCommentDensity:
         violations = check(source, "CM305", min_code_lines=10)
         assert rule_ids(violations) == ["CM305"]
         assert "4 comment lines for 10 code lines" in violations[0].message
+
+
+class TestBannerComment:
+    def test_flags_decoration_only_comment(self, check):
+        source = "# ----------\nx = 1\n"
+        violations = check(source, "CM306")
+        assert rule_ids(violations) == ["CM306"]
+
+    def test_flags_decoration_framed_comment(self, check):
+        source = "# ---- Step 1 ----\nx = 1\n"
+        violations = check(source, "CM306")
+        assert rule_ids(violations) == ["CM306"]
+
+    def test_flags_equals_sign_banner(self, check):
+        source = "# ============================\nx = 1\n"
+        assert rule_ids(check(source, "CM306")) == ["CM306"]
+
+    def test_plain_narrative_comment_passes(self, check):
+        source = "# Step 1: parse the input\nx = 1\n"
+        assert check(source, "CM306") == []
+
+    def test_todo_directive_is_exempt(self, check):
+        source = "# TODO: -----\nx = 1\n"
+        assert check(source, "CM306") == []
+
+    def test_short_dashes_below_threshold_pass(self, check):
+        source = "# --\nx = 1\n"
+        assert check(source, "CM306") == []

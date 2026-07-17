@@ -23,6 +23,7 @@ EXPECTED_DIRTY_RULES = {
         "CM302",  # '# loop over the data' etc.
         "CM303",  # comment-heavy body
         "CM304",  # 'data: The data.'
+        "SM620",  # usr_mgr = data2; return usr_mgr
     },
     "llm_style_tensor.py": {
         "SL401",  # x[:, None, idx[i+1]:idx[i+2]:2, ::-1]
@@ -76,6 +77,16 @@ EXPECTED_DIRTY_RULES = {
         "SD802",  # UsageReport splits into shape-tracking vs. db-query groups
         "SM607",  # 3.14159, 0.5
         "NM203",  # dsn
+    },
+    "llm_style_noise.py": {
+        "CM306",  # two `# ====...====` banner comments
+        "ST109",  # classify_order: if/else both branches return
+        "NM202",  # result = sum(...)
+        "SM620",  # result = sum(...); return result
+        "PY903",  # load_config: 4-statement try feeding except Exception
+        "SM622",  # Order.total property/setter only mirror self._total
+        "SD803",  # OrderMath: two staticmethods, no state
+        "SM621",  # legacy_process_order = process_order
     },
 }
 

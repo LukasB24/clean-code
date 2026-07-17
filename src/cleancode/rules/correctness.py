@@ -13,7 +13,7 @@ import ast
 from typing import Iterable
 
 from cleancode.models import FileContext, Severity, Violation, ViolationDetails
-from cleancode.rules.base import Rule
+from cleancode.rules.base import Rule, simple_name
 
 
 def _except_handlers(tree: ast.Module) -> Iterable[ast.ExceptHandler]:
@@ -96,3 +96,52 @@ class EmptyExceptionHandler(Rule):
                         symbol=ctx.enclosing_symbol(handler),
                     ),
                 )
+
+
+_BROAD_EXCEPTION_NAMES = frozenset({"Exception", "BaseException"})
+
+
+def _is_broad_handler(handler: ast.ExceptHandler) -> bool:
+    if handler.type is None:
+        return True
+    return simple_name(handler.type) in _BROAD_EXCEPTION_NAMES
+
+
+class OversizedTry(Rule):
+    id = "PY903"
+    name = "oversized-try"
+    default_severity = Severity.WARNING
+    default_options = {"max_statements": 3}
+    description = (
+        "Flags a `try` block with more than `max_statements` top-level "
+        "statements feeding a bare or `except Exception`/`BaseException` "
+        "handler — the handler can't know which of several steps actually "
+        "failed. A `try` narrowed to a specific exception, or a broad handler "
+        "wrapping few statements, is not flagged."
+    )
+    guidance = (
+        "Narrow a `try` to the statement(s) that can actually raise, or name "
+        "the specific exception each step raises, before writing a "
+        "bare/broad `except`."
+    )
+
+    def check(self, ctx: FileContext) -> Iterable[Violation]:
+        max_statements = ctx.config.options["max_statements"]
+        for node in ast.walk(ctx.tree):
+            if not isinstance(node, (ast.Try, ast.TryStar)):
+                continue
+            if len(node.body) <= max_statements or not any(
+                _is_broad_handler(handler) for handler in node.handlers
+            ):
+                continue
+            yield self.violation(
+                ctx,
+                node,
+                ViolationDetails(
+                    message=f"`try` spans {len(node.body)} statements feeding a "
+                    "broad `except` — the handler cannot know which step failed",
+                    suggestion="narrow the try to the statement(s) that can "
+                    "raise, or name the specific exception each step raises",
+                    symbol=ctx.enclosing_symbol(node),
+                ),
+            )

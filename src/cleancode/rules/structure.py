@@ -14,6 +14,7 @@ from cleancode.rules.base import (
     is_elif_branch,
     own_scope_walk,
     split_identifier,
+    statement_blocks,
 )
 
 _NESTING_NODES = (
@@ -362,42 +363,6 @@ def _is_guard_clause(statement: ast.stmt) -> bool:
     )
 
 
-def _blocks(function: FunctionNode) -> Iterator[list[ast.stmt]]:
-    """Every statement list nested directly inside ``function``, one per scope.
-
-    A block is the function body itself, or the body/orelse/finalbody/except/
-    match-case of any statement within it. Nested function and class
-    definitions are skipped — they are examined on their own.
-    """
-
-    def walk(statements: list[ast.stmt]) -> Iterator[list[ast.stmt]]:
-        yield statements
-        for statement in statements:
-            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                continue
-            for child_block in _child_blocks(statement):
-                yield from walk(child_block)
-
-    yield from walk(function.body)
-
-
-def _child_blocks(statement: ast.stmt) -> Iterator[list[ast.stmt]]:
-    """Every nested block ST107 must scan for guard clauses, whichever clause it hangs off.
-
-    A guard clause piled up inside a ``try``/``except`` or ``match`` arm is
-    just as much a "more than one thing" smell as one sitting in an
-    ``if``/``else`` — the clause it's attached to doesn't change what counts.
-    """
-    for attr in ("body", "orelse", "finalbody"):
-        block = getattr(statement, attr, None)
-        if block:
-            yield block
-    for handler in getattr(statement, "handlers", []):
-        yield handler.body
-    for case in getattr(statement, "cases", []):
-        yield case.body
-
-
 class TooManyGuardClauses(Rule):
     id = "ST107"
     name = "too-many-guard-clauses"
@@ -439,7 +404,60 @@ class TooManyGuardClauses(Rule):
     @staticmethod
     def _max_guard_count(function: FunctionNode) -> int:
         most = 0
-        for block in _blocks(function):
+        for block in statement_blocks(function):
             guards = sum(1 for statement in block if _is_guard_clause(statement))
             most = max(most, guards)
         return most
+
+
+_EXIT_TYPES = (ast.Return, ast.Raise, ast.Break, ast.Continue)
+
+
+def _body_always_exits(body: list[ast.stmt]) -> bool:
+    return bool(body) and isinstance(body[-1], _EXIT_TYPES)
+
+
+def _is_genuine_else(node: ast.If) -> bool:
+    """True for a plain `else:` block — not an `elif` continuation."""
+    if not node.orelse:
+        return False
+    return not (len(node.orelse) == 1 and is_elif_branch(node.orelse[0]))
+
+
+class RedundantElse(Rule):
+    id = "ST109"
+    name = "redundant-else"
+    default_severity = Severity.WARNING
+    default_options: dict = {}
+    description = (
+        "Flags a plain two-way `if`/`else` whose `if` branch always exits (ends "
+        "in return/raise/break/continue) — the else adds an indentation level "
+        "the exit already made unnecessary. Any `if` that is itself part of an "
+        "`elif` chain is exempt entirely — a multi-way dispatch ladder ending in "
+        "`else` is idiomatic, not the redundant-nesting shape this targets."
+    )
+    guidance = (
+        "Never write a plain `if`/`else` where the `if` branch always "
+        "returns/raises/breaks/continues — dedent the else body instead."
+    )
+
+    def check(self, ctx: FileContext) -> Iterable[Violation]:
+        for node in ast.walk(ctx.tree):
+            if not isinstance(node, ast.If) or is_elif_branch(node):
+                continue
+            if self._is_redundant(node):
+                yield self.violation(
+                    ctx,
+                    node,
+                    ViolationDetails(
+                        message="`else` after a branch that always exits — the "
+                        "else indentation is unnecessary",
+                        suggestion="dedent the else block; the guard above it "
+                        "already returned/raised/broke/continued",
+                        symbol=ctx.enclosing_symbol(node),
+                    ),
+                )
+
+    @staticmethod
+    def _is_redundant(node: ast.If) -> bool:
+        return _is_genuine_else(node) and _body_always_exits(node.body)

@@ -51,4 +51,25 @@ EXAMPLES: dict[str, Example] = {
         ),
         note="A class named with an `exempt_name_suffixes` suffix (default `Mixin`) is exempt entirely.",
     ),
+    "SD803": Example(
+        bad=(
+            "class MathUtils:\n"
+            "    @staticmethod\n"
+            "    def add(a, b):\n"
+            "        return a + b\n"
+            "\n"
+            "    @staticmethod\n"
+            "    def sub(a, b):\n"
+            "        return a - b\n"
+        ),
+        good=(
+            "def add(a, b):\n"
+            "    return a + b\n"
+            "\n"
+            "\n"
+            "def sub(a, b):\n"
+            "    return a - b\n"
+        ),
+        note="A class with any instance state, a base class, or a decorator is exempt entirely.",
+    ),
 }

@@ -39,4 +39,9 @@ EXAMPLES: dict[str, Example] = {
         good='def greet(name):\n    return f"hello {name}"\n',
         note="Files under `min_code_lines` (default 30) are never flagged, however dense.",
     ),
+    "CM306": Example(
+        bad="# ---- Step 1: parse input ----\nrows = parse(raw)\n",
+        good="rows = parse(raw)\n",
+        note="TODO/FIXME/NOTE and tool directives (`noqa`, `cleancode:`, ...) are exempt.",
+    ),
 }

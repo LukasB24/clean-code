@@ -15,15 +15,17 @@ from cleancode.rules.clarity import (
     ThinDelegationWrapper,
 )
 from cleancode.rules.comments import (
+    BannerComment,
     CommentDensity,
     CommentRestatesCode,
     FileCommentDensity,
 )
-from cleancode.rules.correctness import BareExcept, EmptyExceptionHandler
+from cleancode.rules.correctness import BareExcept, EmptyExceptionHandler, OversizedTry
 from cleancode.rules.docstrings import BoilerplateParamDocs, DocstringRestatesName
 from cleancode.rules.duplication import DuplicateFunctionBody, IdenticalFunctionImplementation
 from cleancode.rules.hints import UninformativeAny
 from cleancode.rules.naming import CrypticAbbreviation, MeaninglessName, ShortName
+from cleancode.rules.noise import CompatibilityAlias, ReturnedTemp, TrivialPropertyPair
 from cleancode.rules.pytorch import EagerDatasetLoading, PrematureDevicePlacement
 from cleancode.rules.semantic import (
     AnonymousTupleIndexing,
@@ -36,7 +38,7 @@ from cleancode.rules.semantic import (
     RepeatedCollectionIteration,
 )
 from cleancode.rules.slicing import ChainedSubscript, ComplexSubscript
-from cleancode.rules.solid import LowCohesionClass, TypeSwitchViolatesOCP
+from cleancode.rules.solid import ClassAsNamespace, LowCohesionClass, TypeSwitchViolatesOCP
 from cleancode.rules.structure import (
     DoOneThing,
     MaxClassLength,
@@ -45,6 +47,7 @@ from cleancode.rules.structure import (
     MaxModuleLength,
     MaxNestingDepth,
     MaxParameters,
+    RedundantElse,
     TooManyGuardClauses,
 )
 
@@ -57,6 +60,7 @@ ALL_RULES: list[type[Rule] | type[ProjectRule]] = [
     DoOneThing,
     TooManyGuardClauses,
     MaxModuleLength,
+    RedundantElse,
     ShortName,
     MeaninglessName,
     CrypticAbbreviation,
@@ -65,6 +69,7 @@ ALL_RULES: list[type[Rule] | type[ProjectRule]] = [
     CommentDensity,
     BoilerplateParamDocs,
     FileCommentDensity,
+    BannerComment,
     ComplexSubscript,
     ChainedSubscript,
     UninformativeAny,
@@ -87,12 +92,17 @@ ALL_RULES: list[type[Rule] | type[ProjectRule]] = [
     DeepExpression,
     ThinDelegationWrapper,
     BuriedValueFallback,
+    ReturnedTemp,
+    CompatibilityAlias,
+    TrivialPropertyPair,
     TypeSwitchViolatesOCP,
     LowCohesionClass,
+    ClassAsNamespace,
     DuplicateFunctionBody,
     IdenticalFunctionImplementation,
     BareExcept,
     EmptyExceptionHandler,
+    OversizedTry,
 ]
 
 RULES_BY_ID: dict[str, type[Rule] | type[ProjectRule]] = {rule.id: rule for rule in ALL_RULES}

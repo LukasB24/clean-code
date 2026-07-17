@@ -331,3 +331,82 @@ class TestLowCohesionClass:
             """
         assert [v.rule_id for v in check(source, "SD802")] == ["SD802"]
         assert check(source, "SD802", min_methods=5) == []
+
+
+class TestClassAsNamespace:
+    def test_flags_all_staticmethod_class(self, check):
+        source = """
+            class MathUtils:
+                @staticmethod
+                def add(a, b):
+                    return a + b
+
+                @staticmethod
+                def sub(a, b):
+                    return a - b
+            """
+        violations = check(source, "SD803")
+        assert [v.rule_id for v in violations] == ["SD803"]
+        assert "`MathUtils`" in violations[0].message
+
+    def test_docstring_is_not_counted_as_a_member(self, check):
+        source = '''
+            class MathUtils:
+                """Math helpers."""
+
+                @staticmethod
+                def add(a, b):
+                    return a + b
+
+                @staticmethod
+                def sub(a, b):
+                    return a - b
+            '''
+        assert [v.rule_id for v in check(source, "SD803")] == ["SD803"]
+
+    def test_class_with_base_is_exempt(self, check):
+        source = """
+            class MathUtils(Base):
+                @staticmethod
+                def add(a, b):
+                    return a + b
+
+                @staticmethod
+                def sub(a, b):
+                    return a - b
+            """
+        assert check(source, "SD803") == []
+
+    def test_class_with_instance_state_is_exempt(self, check):
+        source = """
+            class Calculator:
+                def __init__(self):
+                    self.total = 0
+
+                @staticmethod
+                def add(a, b):
+                    return a + b
+
+                @staticmethod
+                def sub(a, b):
+                    return a - b
+            """
+        assert check(source, "SD803") == []
+
+    def test_single_staticmethod_below_threshold_is_exempt(self, check):
+        source = """
+            class MathUtils:
+                @staticmethod
+                def add(a, b):
+                    return a + b
+            """
+        assert check(source, "SD803") == []
+
+    def test_min_methods_is_configurable(self, check):
+        source = """
+            class MathUtils:
+                @staticmethod
+                def add(a, b):
+                    return a + b
+            """
+        assert [v.rule_id for v in check(source, "SD803", min_methods=1)] == ["SD803"]

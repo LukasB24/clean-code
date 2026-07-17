@@ -405,3 +405,69 @@ class TestTooManyGuardClauses:
                 print(item)
         """
         assert check(source, "ST107", max_guards=1) != []
+
+
+class TestRedundantElse:
+    def test_flags_else_after_return(self, check):
+        source = """
+        def classify(n):
+            if n < 0:
+                return "negative"
+            else:
+                return "non-negative"
+        """
+        violations = check(source, "ST109")
+        assert lines_of(violations) == [("ST109", 3)]
+
+    def test_flags_else_after_raise(self, check):
+        source = """
+        def parse(raw):
+            if raw is None:
+                raise ValueError("missing")
+            else:
+                value = int(raw)
+            return value
+        """
+        assert [v.rule_id for v in check(source, "ST109")] == ["ST109"]
+
+    def test_flags_else_after_continue_in_loop(self, check):
+        source = """
+        def totals(rows):
+            for row in rows:
+                if row is None:
+                    continue
+                else:
+                    print(row)
+        """
+        assert [v.rule_id for v in check(source, "ST109")] == ["ST109"]
+
+    def test_elif_chain_is_not_flagged(self, check):
+        source = """
+        def classify(n):
+            if n < 0:
+                return "negative"
+            elif n == 0:
+                return "zero"
+            else:
+                return "positive"
+        """
+        assert check(source, "ST109") == []
+
+    def test_else_after_non_exiting_branch_is_not_flagged(self, check):
+        source = """
+        def announce(active):
+            if active:
+                log("active")
+            else:
+                log("inactive")
+        """
+        assert check(source, "ST109") == []
+
+    def test_if_with_no_else_is_not_flagged(self, check):
+        source = """
+        def guard(value):
+            if value is None:
+                return None
+            return value
+        """
+        assert check(source, "ST109") == []

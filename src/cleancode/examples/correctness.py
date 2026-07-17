@@ -15,4 +15,27 @@ EXAMPLES: dict[str, Example] = {
         good='try:\n    connect()\nexcept ConnectionError:\n    log.warning("connection failed")\n',
         note="A handler that continues/returns/breaks, logs, or re-raises is not flagged.",
     ),
+    "PY903": Example(
+        bad=(
+            "def run(row):\n"
+            "    try:\n"
+            "        a = parse(row)\n"
+            "        b = validate(a)\n"
+            "        c = normalize(b)\n"
+            "        d = save(c)\n"
+            "    except Exception:\n"
+            "        logger.error(\"failed\")\n"
+        ),
+        good=(
+            "def run(row):\n"
+            "    try:\n"
+            "        a = parse(row)\n"
+            "        b = validate(a)\n"
+            "        c = normalize(b)\n"
+            "        d = save(c)\n"
+            "    except ValueError:\n"
+            "        logger.error(\"failed\")\n"
+        ),
+        note="A short try (at or under `max_statements`) wrapping a broad except is not flagged.",
+    ),
 }

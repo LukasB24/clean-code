@@ -130,4 +130,20 @@ EXAMPLES: dict[str, Example] = {
         good='def greet(name):\n    return f"hello {name}"\n',
         note="Counts blank lines and comments too, mirroring how a reader scrolls the file.",
     ),
+    "ST109": Example(
+        bad=(
+            "def classify(n):\n"
+            '    if n < 0:\n'
+            '        return "negative"\n'
+            "    else:\n"
+            '        return "non-negative"\n'
+        ),
+        good=(
+            "def classify(n):\n"
+            '    if n < 0:\n'
+            '        return "negative"\n'
+            '    return "non-negative"\n'
+        ),
+        note="Any `if` that's itself part of an `elif` chain is exempt — a multi-way dispatch ladder is idiomatic.",
+    ),
 }

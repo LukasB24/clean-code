@@ -28,13 +28,48 @@ def functions(tree: ast.Module) -> Iterator[FunctionNode]:
             yield node
 
 
-def call_target_name(func: ast.expr) -> str | None:
-    """A call's own name: ``reduce(...)`` -> ``"reduce"``, ``obj.load(...)`` -> ``"load"``."""
-    if isinstance(func, ast.Name):
-        return func.id
-    if isinstance(func, ast.Attribute):
-        return func.attr
+def simple_name(node: ast.expr) -> str | None:
+    """A bare or dotted expression's own terminal identifier.
+
+    ``reduce`` -> ``"reduce"``, ``obj.load`` -> ``"load"`` — for anything else
+    (a call, a subscript, ...) there is no single name to point at.
+    """
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
     return None
+
+
+def statement_blocks(function: FunctionNode) -> Iterator[list[ast.stmt]]:
+    """Every statement list nested directly inside ``function``, one per scope.
+
+    A block is the function body itself, or the body/orelse/finalbody/except/
+    match-case of any statement within it. Nested function and class
+    definitions are skipped — they are examined on their own.
+    """
+
+    def walk(statements: list[ast.stmt]) -> Iterator[list[ast.stmt]]:
+        yield statements
+        for statement in statements:
+            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                continue
+            for child_block in _child_blocks(statement):
+                yield from walk(child_block)
+
+    yield from walk(function.body)
+
+
+def _child_blocks(statement: ast.stmt) -> Iterator[list[ast.stmt]]:
+    """Every nested block hanging off ``statement``, whichever clause it's attached to."""
+    for attr in ("body", "orelse", "finalbody"):
+        block = getattr(statement, attr, None)
+        if block:
+            yield block
+    for handler in getattr(statement, "handlers", []):
+        yield handler.body
+    for case in getattr(statement, "cases", []):
+        yield case.body
 
 
 def subscript_base_name(node: ast.Subscript) -> str | None:

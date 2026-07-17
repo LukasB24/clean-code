@@ -14,6 +14,35 @@ whether pre- or post-1.0).
 
 ### Added
 
+- Seven new rules targeting patterns common in freshly-generated Python,
+  bringing the total to 51:
+  - `ST109` `redundant-else` — a plain two-way `if`/`else` whose `if` branch
+    always exits (return/raise/break/continue). Any `if` that's itself part
+    of an `elif` chain is exempt entirely, so a multi-way dispatch ladder
+    ending in `else` is never flagged, even when every branch returns.
+  - `CM306` `banner-comment` — a decoration-only (`# ----------`) or
+    decoration-framed (`# ---- Step 1 ----`) comment; reuses CM303/CM305's
+    directive-comment exemptions.
+  - `PY903` `oversized-try` — a `try` spanning more than `max_statements`
+    (default 3) top-level statements feeding a bare or broad
+    `except Exception`/`BaseException` handler, which can't tell which step
+    actually failed. A narrowly-typed `except`, or a short `try` wrapping a
+    broad handler, is not flagged.
+  - `SM620` `returned-temp` — `name = expr` immediately followed by
+    `return name` with no other use of `name`. An annotated assignment
+    (`name: T = expr`) is exempt.
+  - `SM621` `compatibility-alias` — a module-level `alias = original`
+    pointing at a function/class defined in the same file. ALL_CAPS
+    targets, `_`-prefixed targets, and annotated assignments are exempt.
+  - `SM622` `trivial-property-pair` — a `@property`/`@x.setter` pair that
+    only mirrors `self._x` with no logic in either accessor. A getter-only
+    read-only property is a legitimate idiom and is exempt.
+  - `SD803` `class-as-namespace` — a class with no bases, decorators, or
+    class-level state whose entire body is `min_methods`-or-more (default
+    2) `@staticmethod`s; the module is already the namespace it's imitating.
+  - `SM620`/`SM621`/`SM622` live in a new `src/cleancode/rules/noise.py`
+    module (naming/indirection ceremony, distinct from the AST-shape
+    smells in `semantic.py`/`clarity.py`).
 - `clean-code guide [PATH]` — a generation-time briefing for an LLM, one
   imperative bullet per *enabled* rule ("Nest at most 2 levels...", "Never
   write a bare `except:`..."), rendered with the project's own configured

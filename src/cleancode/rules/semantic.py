@@ -16,7 +16,7 @@ from cleancode.models import FileContext, Severity, Violation, ViolationDetails
 from cleancode.rules.base import (
     FunctionNode,
     Rule,
-    call_target_name,
+    simple_name,
     split_identifier,
     subscript_base_name,
 )
@@ -264,7 +264,7 @@ class ReduceInsteadOfSum(Rule):
         for node in ast.walk(ctx.tree):
             if (
                 isinstance(node, ast.Call)
-                and call_target_name(node.func) == "reduce"
+                and simple_name(node.func) == "reduce"
                 and node.args
                 and _is_add_lambda(node.args[0])
             ):
@@ -369,20 +369,12 @@ _COMPARISON_PREFIXES: dict[type, str] = {
 }
 
 
-def _operand_name(node: ast.expr) -> str | None:
-    if isinstance(node, ast.Name):
-        return node.id
-    if isinstance(node, ast.Attribute):
-        return node.attr
-    return None
-
-
 def _constant_name_hint(node: ast.expr, operand: ast.expr) -> str | None:
     """A MAX_/MIN_-prefixed constant name for the idiomatic `name <op> literal` shape, else None."""
     if not _is_named_threshold_compare(node, operand):
         return None
     prefix = _COMPARISON_PREFIXES.get(type(node.ops[0]))  # type: ignore[union-attr]
-    base = _operand_name(node.left)  # type: ignore[union-attr]
+    base = simple_name(node.left)  # type: ignore[union-attr]
     if prefix is None or base is None:
         return None
     return prefix + "_".join(word.upper() for word in split_identifier(base))

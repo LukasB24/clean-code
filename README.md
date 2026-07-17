@@ -190,19 +190,19 @@ retry_delay_seconds = base_delay * 1.5
 
 ## The rules
 
-44 rules across 9 categories, each with a default severity you can override:
+51 rules across 9 categories, each with a default severity you can override:
 
 | Category | IDs | Count | Catches |
 |----------|-----|-------|---------|
-| Structure | ST101–ST108 | 8 | nesting, length, params, complexity, mixed responsibilities, oversized modules |
+| Structure | ST101–ST109 | 9 | nesting, length, params, complexity, mixed responsibilities, oversized modules, redundant `else` |
 | Naming | NM201–NM203 | 3 | single-letter names, `data`/`tmp`/`process_data`, cryptic abbreviations |
-| Comments & docstrings | CM301–CM305 | 5 | docstrings/comments that just restate the code, comment-heavy files |
+| Comments & docstrings | CM301–CM306 | 6 | docstrings/comments that just restate the code, comment-heavy files, banner comments |
 | Subscripts | SL401–SL402 | 2 | `x[i][j][k]`-style complexity and chaining |
 | Types | TY501 | 1 | uninformative `Any` |
-| Structural smells | SM601–SM619 | 19 | magic numbers, nested comprehensions, redundant ternaries, PyTorch pitfalls, unused bindings, builtin shadowing, nested ternaries, callable indirection, deep expressions, thin wrappers, buried fallbacks, and more |
-| SOLID | SD801–SD802 | 2 | type-switches violating OCP, low-cohesion classes |
+| Structural smells | SM601–SM622 | 22 | magic numbers, nested comprehensions, redundant ternaries, PyTorch pitfalls, unused bindings, builtin shadowing, nested ternaries, callable indirection, deep expressions, thin wrappers, buried fallbacks, returned temporaries, compatibility aliases, trivial property pairs, and more |
+| SOLID | SD801–SD803 | 3 | type-switches violating OCP, low-cohesion classes, all-static namespace classes |
 | Duplication | DP701–DP702 | 2 | copy-pasted and exactly-duplicated function bodies |
-| Correctness | PY901–PY902 | 2 | bare `except:`, silently-discarded exceptions |
+| Correctness | PY901–PY903 | 3 | bare `except:`, silently-discarded exceptions, oversized broad-except `try` blocks |
 
 `cleancode rules` prints the full list from the CLI. For every rule's exact
 default options, severity, and the edge cases each one accounts for (what's

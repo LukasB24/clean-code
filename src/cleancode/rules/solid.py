@@ -307,3 +307,72 @@ class LowCohesionClass(Rule):
             return None
         clusters = [group for group in _method_groups(methods) if len(group) >= 2]
         return clusters if len(clusters) >= 2 else None
+
+
+def _is_docstring_only(statement: ast.stmt) -> bool:
+    return (
+        isinstance(statement, ast.Expr)
+        and isinstance(statement.value, ast.Constant)
+        and isinstance(statement.value.value, str)
+    )
+
+
+def _non_docstring_body(class_def: ast.ClassDef) -> list[ast.stmt]:
+    body = class_def.body
+    if body and _is_docstring_only(body[0]):
+        return body[1:]
+    return body
+
+
+def _is_staticmethod(method: FunctionNode) -> bool:
+    return any(
+        isinstance(decorator, ast.Name) and decorator.id == "staticmethod"
+        for decorator in method.decorator_list
+    )
+
+
+def _is_namespace_class(class_def: ast.ClassDef, min_methods: int) -> bool:
+    if class_def.bases or class_def.keywords or class_def.decorator_list:
+        return False
+    body = _non_docstring_body(class_def)
+    if len(body) < min_methods:
+        return False
+    return all(
+        isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and _is_staticmethod(item)
+        for item in body
+    )
+
+
+class ClassAsNamespace(Rule):
+    id = "SD803"
+    name = "class-as-namespace"
+    default_severity = Severity.WARNING
+    default_options = {"min_methods": 2}
+    description = (
+        "Flags a class with no base classes, no decorators, and no class-level "
+        "state whose entire body (docstring aside) is `min_methods`-or-more "
+        "`@staticmethod`s — the class carries no state, so the module is "
+        "already the namespace it's imitating."
+    )
+    guidance = (
+        "Never wrap a group of unrelated `@staticmethod`s with no shared "
+        "state in a class — put the functions at module level instead; the "
+        "module is already the namespace."
+    )
+
+    def check(self, ctx: FileContext) -> Iterable[Violation]:
+        min_methods = ctx.config.options["min_methods"]
+        for node in ast.walk(ctx.tree):
+            if isinstance(node, ast.ClassDef) and _is_namespace_class(node, min_methods):
+                method_count = len(_non_docstring_body(node))
+                yield self.violation(
+                    ctx,
+                    node,
+                    ViolationDetails(
+                        message=f"class `{node.name}` is a namespace of "
+                        f"{method_count} static methods with no state",
+                        suggestion="move the functions to module level — the "
+                        "module is already the namespace",
+                        symbol=node.name,
+                    ),
+                )

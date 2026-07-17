@@ -373,3 +373,44 @@ class FileCommentDensity(Rule):
             if line_number in counted_inline:
                 comment_lines += 1
         return code_lines, comment_lines
+
+
+_DECORATION = "-=*_~#"
+_BANNER_ONLY = re.compile(rf"^[{_DECORATION}]{{3,}}$")
+_BANNER_FRAMED = re.compile(rf"^[{_DECORATION}]{{3,}}.*[{_DECORATION}]{{3,}}$")
+
+
+def _is_banner(text: str) -> bool:
+    return bool(text) and bool(_BANNER_ONLY.match(text) or _BANNER_FRAMED.match(text))
+
+
+class BannerComment(Rule):
+    id = "CM306"
+    name = "banner-comment"
+    default_severity = Severity.WARNING
+    default_options: dict = {}
+    description = (
+        "Flags a decoration-only comment (`# ----------`) or a decoration-framed "
+        "one (`# ---- Step 1 ----`) — section-divider ceremony that carries no "
+        "information the code doesn't already show. TODO/FIXME/NOTE and tool "
+        "directives are exempt, like the other comment rules."
+    )
+    guidance = (
+        "Never write a section-divider or banner comment (`# ---- Step 1 ----`) "
+        "— if the file has sections, extract them into named functions or "
+        "modules instead."
+    )
+
+    def check(self, ctx: FileContext) -> Iterable[Violation]:
+        for comment in ctx.comments:
+            if _is_exempt(comment) or not _is_banner(comment.text):
+                continue
+            yield self.violation(
+                ctx,
+                comment,
+                ViolationDetails(
+                    message=f"banner/section-divider comment: `# {comment.text}`",
+                    suggestion="delete the banner; if the file has sections, "
+                    "extract them into named functions or modules instead",
+                ),
+            )

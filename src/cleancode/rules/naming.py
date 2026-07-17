@@ -16,7 +16,7 @@ from cleancode.models import FileContext, Severity, Violation, ViolationDetails
 from cleancode.rules.base import (
     FRAMING_VERBS,
     Rule,
-    call_target_name,
+    simple_name,
     split_identifier,
     subscript_base_name,
 )
@@ -154,7 +154,7 @@ def _pluralize(snake_case: str) -> str:
 
 
 def _hint_from_call(call: ast.Call) -> _NameHint | None:
-    callee = call_target_name(call.func)
+    callee = simple_name(call.func)
     if callee is None:
         return None
     words = _strip_leading_verb(split_identifier(callee))
