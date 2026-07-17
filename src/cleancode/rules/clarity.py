@@ -1,8 +1,9 @@
-"""Expression clarity rules (SM614–SM617).
+"""Expression clarity rules (SM614–SM619).
 
 Size limits alone (ST1xx) can be satisfied by compressing logic into denser
 expressions: a nested loop becomes a ternary picking a mutation target, a
-counter hides a boolean cast, logic disappears behind ``functools.partial``.
+counter hides a boolean cast, logic disappears behind ``functools.partial``
+or an extra wrapper hop, a value fallback gets buried mid-expression.
 These rules catch that compression, so generated code stays readable for a
 human reviewer instead of merely passing the structural gates.
 """
@@ -10,11 +11,12 @@ human reviewer instead of merely passing the structural gates.
 from __future__ import annotations
 
 import ast
+import builtins
 from dataclasses import dataclass
 from typing import Iterable, Iterator
 
 from cleancode.models import FileContext, Severity, Violation, ViolationDetails
-from cleancode.rules.base import FunctionNode, Rule, own_scope_walk
+from cleancode.rules.base import FunctionNode, Rule, is_dunder, own_scope_walk
 
 
 class BoolArithmetic(Rule):
@@ -288,3 +290,134 @@ class DeepExpression(Rule):
                         symbol=ctx.enclosing_symbol(statement),
                     ),
                 )
+
+
+_BUILTIN_NAMES = frozenset(vars(builtins))
+
+
+def _is_private_helper(function: FunctionNode) -> bool:
+    return (
+        function.name.startswith("_")
+        and not is_dunder(function.name)
+        and not function.decorator_list
+    )
+
+
+def _sole_returned_call(function: FunctionNode) -> ast.Call | None:
+    """The call a single-statement ``return <call>`` body hands back, else ``None``."""
+    body = function.body
+    if body and _is_docstring(body[0]):
+        body = body[1:]
+    only_returns_a_call = (
+        len(body) == 1 and isinstance(body[0], ast.Return) and isinstance(body[0].value, ast.Call)
+    )
+    return body[0].value if only_returns_a_call else None  # type: ignore[union-attr]
+
+
+def _call_root(func: ast.expr) -> ast.expr:
+    """The leftmost expression a (possibly dotted) call target hangs off."""
+    current = func
+    while isinstance(current, ast.Attribute):
+        current = current.value
+    return current
+
+
+def _parameter_names(function: FunctionNode) -> set[str]:
+    args = function.args
+    params = [*args.posonlyargs, *args.args, *args.kwonlyargs, args.vararg, args.kwarg]
+    return {param.arg for param in params if param is not None}
+
+
+def _delegates_elsewhere(function: FunctionNode, call: ast.Call) -> bool:
+    """True when the returned call is a hop to work living somewhere else.
+
+    A builtin callee (`return any(...)`) keeps its logic in the arguments,
+    and a method on one of the function's own parameters
+    (`return name.startswith("_")`) is already in front of the reader —
+    neither is a hop worth chasing.
+    """
+    root = _call_root(call.func)
+    if not isinstance(root, ast.Name):
+        return True  # e.g. a constructed object's method: Renderer(...).render(...)
+    if root is call.func and root.id in _BUILTIN_NAMES:
+        return False
+    return root.id not in _parameter_names(function)
+
+
+class ThinDelegationWrapper(Rule):
+    id = "SM618"
+    name = "thin-delegation-wrapper"
+    default_severity = Severity.WARNING
+    default_options: dict = {}
+    description = (
+        "Flags a private function whose whole body is `return <one call to another "
+        "function>` — a wrapper that only renames work and adds a hop the reviewer "
+        "must chase. Public functions (API conveniences), decorated functions, "
+        "dunders, builtin-wrapping one-liners (`return any(...)`), and calls on the "
+        "function's own parameters are exempt."
+    )
+
+    def check(self, ctx: FileContext) -> Iterable[Violation]:
+        for function in ctx.functions:
+            if not _is_private_helper(function):
+                continue
+            call = _sole_returned_call(function)
+            if call is None or not _delegates_elsewhere(function, call):
+                continue
+            yield self.violation(
+                ctx,
+                function,
+                ViolationDetails(
+                    message=f"`{function.name}` only hands back one call to another "
+                    "function — a wrapper that renames work",
+                    suggestion=(
+                        "name the called function for its purpose and call it "
+                        "directly; delete this wrapper"
+                    ),
+                    symbol=function.name,
+                ),
+            )
+
+
+def _buried_in_value_context(node: ast.BoolOp) -> bool:
+    """True when the boolean expression's *value* feeds a larger expression.
+
+    Arithmetic operands and subscript positions read as plain values, so an
+    `or`-fallback there is easy to misparse. Boolean contexts (`if`/`while`
+    tests, `not (...)`, a bare `return a or b`) are idiomatic and exempt.
+    """
+    parent = getattr(node, "parent", None)
+    if isinstance(parent, (ast.BinOp, ast.Slice)):
+        return True
+    return isinstance(parent, ast.Subscript) and parent.slice is node
+
+
+class BuriedValueFallback(Rule):
+    id = "SM619"
+    name = "buried-value-fallback"
+    default_severity = Severity.WARNING
+    default_options: dict = {}
+    description = (
+        "Flags an `or`/`and` value fallback buried inside a larger expression "
+        "(`(node.end_lineno or node.lineno) + 1`) — used as an arithmetic operand "
+        "or subscript index, the boolean operator is easy to misread. A bare "
+        "`x = a or b` and ordinary boolean conditions stay exempt."
+    )
+
+    def check(self, ctx: FileContext) -> Iterable[Violation]:
+        for node in ast.walk(ctx.tree):
+            if not isinstance(node, ast.BoolOp) or not _buried_in_value_context(node):
+                continue
+            snippet = ast.get_source_segment(ctx.source, node) or "<fallback>"
+            yield self.violation(
+                ctx,
+                node,
+                ViolationDetails(
+                    message=f"value fallback `{snippet}` is buried inside a larger expression",
+                    suggestion=(
+                        "bind the fallback to a named variable on its own line "
+                        "(e.g. `end = node.end_lineno or node.lineno`) and use the name"
+                    ),
+                    symbol=ctx.enclosing_symbol(node),
+                ),
+            )

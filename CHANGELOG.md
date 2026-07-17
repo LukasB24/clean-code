@@ -14,6 +14,18 @@ whether pre- or post-1.0).
 
 ### Added
 
+- `SM618` `thin-delegation-wrapper` — flags a private function whose whole
+  body is `return <one call to another function>`, a hop that only renames
+  work. Public functions, decorated functions, dunders, builtin callees, and
+  calls on the function's own parameters are exempt.
+- `SM619` `buried-value-fallback` — flags an `or`/`and` value fallback used
+  as an arithmetic operand or subscript index (`(node.end_lineno or
+  node.lineno) + 1`), where the boolean operator is easy to misread. A bare
+  `x = a or b` and ordinary boolean conditions are exempt.
+- `CM301` now also checks class docstrings (reference words: class name +
+  its directly-defined method names), and flags a docstring longer than two
+  lines when *every* line stays within the signature/class-name vocabulary
+  plus generic filler.
 - `ST108` `max-module-length` — flags a module longer than `max_lines`
   (default 500); a file that keeps absorbing helpers becomes a grab-bag.
 - `DP702` `identical-function-implementation` — flags function bodies that
@@ -39,6 +51,13 @@ whether pre- or post-1.0).
 
 ### Changed
 
+- `CM301`'s default `overlap` lowered from 0.8 to 0.7 — pre-1.0, so this is
+  a behavior change, not just a new rule; it now also scores the whole text
+  of a two-line docstring instead of only its first line.
+- `DP701`/`DP702`'s two dump functions merged into one (`SM618` motivated
+  this: two near-duplicate one-liners were themselves the smell), threading
+  an `exact` flag instead of passing a callable through the fingerprinting
+  pipeline.
 - The new clarity rules forced their own cleanup of this codebase (the
   dogfood gate at work): `DP701`/`DP702`'s fingerprint-factory layer is
   replaced by two dump functions with a shared signature passed directly

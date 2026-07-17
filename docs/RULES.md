@@ -19,7 +19,7 @@ quick-start, see the [README](../README.md).
 | NM201 | short-name | `min_length=3, allowed=[i,j,k,n,x,y,_,id,ok,fh]` | warning |
 | NM202 | meaningless-name | configurable ban lists | warning |
 | NM203 | cryptic-abbreviation | `known_abbrevs=[cfg,ctx,idx,…]` | info |
-| CM301 | docstring-restates-name | `overlap=0.8` | warning |
+| CM301 | docstring-restates-name | `overlap=0.7` | warning |
 | CM302 | comment-restates-code | `overlap=0.7, min_words=2` | warning |
 | CM303 | comment-density | `max_ratio=0.3, min_code_lines=5` | info |
 | CM304 | boilerplate-param-docs | `min_uninformative=0.5` | warning |
@@ -44,6 +44,8 @@ quick-start, see the [README](../README.md).
 | SM615 | nested-ternary | — | warning |
 | SM616 | callable-indirection | — | warning |
 | SM617 | deep-expression | `max_depth=4` | warning |
+| SM618 | thin-delegation-wrapper | — | warning |
+| SM619 | buried-value-fallback | — | warning |
 | SD801 | type-switch-violates-ocp | `min_branches=3` | warning |
 | SD802 | low-cohesion-class | `min_methods=4` | warning |
 | DP701 | duplicate-function-body | `min_statements=4` | warning |
@@ -59,6 +61,11 @@ quick-start, see the [README](../README.md).
 - **CM301/CM302 are deterministic, not LLM-judged** — they compare word
   overlap between a docstring/comment and the code it annotates. Comments
   explaining *why* (not *what*) are always exempt.
+- **CM301 also covers class docstrings** (reference words = the class name
+  plus its directly-defined method names) and, for docstrings longer than
+  two lines, flags one whose *every* non-empty line never leaves the
+  signature/class-name vocabulary plus generic parameter nouns — one
+  informative line anywhere is enough to clear it.
 - **CM305 measures comment density file-wide** where CM303 measures it per
   function, so it catches comment sprawl spread across module level and many
   small functions. It counts non-blank comment lines against code lines
@@ -91,6 +98,17 @@ quick-start, see the [README](../README.md).
   calls/comprehensions/f-strings more than `max_depth` levels deep (SM617 —
   a *flat* `and`-chain of conditions stays fine at any length, and
   module-level constant tables are exempt).
+- **SM618 flags a private thin-delegation wrapper**: a function whose whole
+  body is `return <one call to another function>`. Public functions
+  (API conveniences), decorated functions, dunders, calls to a builtin
+  (`return any(...)`), and calls on the function's own parameters
+  (`return name.startswith("_")`) are exempt — only a genuine private hop
+  to unrelated work is flagged.
+- **SM619 flags a boolean fallback (`a or b`) used as a value inside a
+  larger expression** — an arithmetic operand or subscript index, where the
+  operator is easy to misread (`(node.end_lineno or node.lineno) + 1`). A
+  bare `x = a or b` and ordinary boolean conditions (`if`/`while` tests,
+  `not (a and b)`) are exempt.
 - **SM613 reuses the same binding-site collection as the `NM2xx` naming
   rules** (parameters, assignment/`for`/`with ... as`/comprehension targets,
   function/class names), so class/instance attributes (`self.id`), dict keys,

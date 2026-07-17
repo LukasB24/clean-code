@@ -26,6 +26,7 @@ from cleancode.rules.base import (
     Rule,
     content_words,
     docstring_node,
+    end_line,
     split_identifier,
 )
 
@@ -133,7 +134,7 @@ def _docstring_line_span(owner: ast.Module | ast.ClassDef | FunctionNode) -> set
     node = docstring_node(owner)
     if node is None:
         return set()
-    return set(range(node.lineno, (node.end_lineno or node.lineno) + 1))
+    return set(range(node.lineno, end_line(node) + 1))
 
 
 def _all_docstring_lines(tree: ast.Module) -> set[int]:
@@ -277,7 +278,7 @@ class CommentDensity(Rule):
 
         code_lines = 0
         comment_lines = 0
-        for line_number in range(function.lineno, (function.end_lineno or function.lineno) + 1):
+        for line_number in range(function.lineno, end_line(function) + 1):
             stripped = ctx.lines[line_number - 1].strip()
             if not stripped or line_number in docstring_lines:
                 continue

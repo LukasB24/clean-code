@@ -42,6 +42,74 @@ class TestDocstringRestatesName:
         '''
         assert check(source, "CM301") == []
 
+    def test_restatement_on_the_second_line_is_caught(self, check):
+        # regression: only the first line was scored; a 2-line docstring
+        # that restates the signature across both lines used to slip through
+        source = '''
+        def get_user_name(user):
+            """Gets the user name.
+            Returns the name of the user."""
+            return user.name
+        '''
+        assert rule_ids(check(source, "CM301")) == ["CM301"]
+
+    def test_multiline_docstring_that_never_leaves_the_signature_is_flagged(self, check):
+        source = '''
+        def get_user_name(user):
+            """Gets the user name.
+
+            Returns the name for the given user.
+            Gets the name of the user.
+            """
+            return user.name
+        '''
+        assert rule_ids(check(source, "CM301")) == ["CM301"]
+
+    def test_multiline_docstring_with_one_informative_line_passes(self, check):
+        source = '''
+        def get_user_name(user):
+            """Gets the user name.
+
+            Falls back to the email local part when the profile is empty.
+            """
+            return user.name or user.email.split("@")[0]
+        '''
+        assert check(source, "CM301") == []
+
+    def test_flags_class_docstring_restating_name(self, check):
+        source = """
+        class UserManager:
+            \"\"\"User manager.\"\"\"
+
+            def create(self, name):
+                return name
+        """
+        violations = check(source, "CM301")
+        assert rule_ids(violations) == ["CM301"]
+        assert "UserManager" in violations[0].message
+
+    def test_informative_class_docstring_passes(self, check):
+        source = """
+        class UserManager:
+            \"\"\"Coordinates user lifecycle across the profile and billing services.\"\"\"
+
+            def create(self, name):
+                return name
+        """
+        assert check(source, "CM301") == []
+
+    def test_overlap_threshold_default_is_0_7(self, check):
+        # regression: default tightened from 0.8 to 0.7 pre-1.0.
+        # doc words {path, parse, quickly, config} vs signature words
+        # {path, parse, mode, config}: overlap 3/4 = 0.75 -> fires at 0.7, not 0.8
+        source = '''
+        def parse_config(path, mode):
+            """Parse config path quickly."""
+            return path
+        '''
+        assert rule_ids(check(source, "CM301")) == ["CM301"]
+        assert check(source, "CM301", overlap=0.8) == []
+
 
 class TestCommentRestatesCode:
     def test_flags_inline_restatement(self, check):

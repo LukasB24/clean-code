@@ -207,3 +207,120 @@ class TestDeepExpression:
         """
         assert check(source, "SM617") == []
         assert rule_ids(check(source, "SM617", max_depth=2)) == ["SM617"]
+
+
+class TestThinDelegationWrapper:
+    def test_flags_private_wrapper_around_another_function(self, check):
+        source = """
+        def _transform(value):
+            checked = validate(value)
+            return finalize(checked)
+
+        def _renamed(value):
+            return _transform(value)
+        """
+        violations = check(source, "SM618")
+        assert rule_ids(violations) == ["SM618"]
+        assert "_renamed" in violations[0].message
+
+    def test_docstring_before_the_return_is_stripped(self, check):
+        source = """
+        def helper(value):
+            return transform(value)
+
+        def _wrapper(value):
+            \"\"\"Delegates to helper.\"\"\"
+            return helper(value)
+        """
+        assert rule_ids(check(source, "SM618")) == ["SM618"]
+
+    def test_public_wrapper_passes(self, check):
+        # regression: public one-call conveniences are API, not a smell
+        source = """
+        def helper(value):
+            return transform(value)
+
+        def public_alias(value):
+            return helper(value)
+        """
+        assert check(source, "SM618") == []
+
+    def test_builtin_callee_passes(self, check):
+        source = """
+        def _all_valid(items):
+            return all(item.valid for item in items)
+        """
+        assert check(source, "SM618") == []
+
+    def test_call_on_own_parameter_passes(self, check):
+        source = """
+        def _is_private(name):
+            return name.startswith("_")
+        """
+        assert check(source, "SM618") == []
+
+    def test_decorated_function_passes(self, check):
+        source = """
+        class Thing:
+            @staticmethod
+            def _wrapper(value):
+                return helper(value)
+        """
+        assert check(source, "SM618") == []
+
+    def test_dunder_method_passes(self, check):
+        source = """
+        class Box:
+            def __repr__(self):
+                return format_box(self)
+        """
+        assert check(source, "SM618") == []
+
+    def test_multi_statement_body_passes(self, check):
+        source = """
+        def _wrapper(value):
+            checked = validate(value)
+            return transform(checked)
+        """
+        assert check(source, "SM618") == []
+
+
+class TestBuriedValueFallback:
+    def test_flags_fallback_used_as_arithmetic_operand(self, check):
+        source = """
+        def span(node):
+            return (node.end_lineno or node.lineno) + 1
+        """
+        violations = check(source, "SM619")
+        assert rule_ids(violations) == ["SM619"]
+
+    def test_flags_fallback_used_as_subscript_index(self, check):
+        source = """
+        def pick(rows, primary, backup):
+            return rows[primary or backup]
+        """
+        assert rule_ids(check(source, "SM619")) == ["SM619"]
+
+    def test_bare_assignment_passes(self, check):
+        source = """
+        def resolved(node):
+            end = node.end_lineno or node.lineno
+            return end
+        """
+        assert check(source, "SM619") == []
+
+    def test_boolean_condition_passes(self, check):
+        source = """
+        def guard(a, b):
+            if not (a and b):
+                return None
+            return a
+        """
+        assert check(source, "SM619") == []
+
+    def test_bare_return_of_fallback_passes(self, check):
+        source = """
+        def first_available(a, b):
+            return a or b
+        """
+        assert check(source, "SM619") == []

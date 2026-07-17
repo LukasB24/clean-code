@@ -38,6 +38,11 @@ def subscript_base_name(node: ast.Subscript) -> str | None:
     return None
 
 
+def end_line(node: ast.AST) -> int:
+    """The last line of ``node``, falling back to its first when the parser gave no end."""
+    return node.end_lineno or node.lineno  # type: ignore[attr-defined]
+
+
 def docstring_node(owner: ast.Module | ast.ClassDef | FunctionNode) -> ast.Constant | None:
     """The string constant of ``owner``'s docstring, or ``None``."""
     if not owner.body:

@@ -8,9 +8,11 @@ from cleancode.rules.bindings import (
 )
 from cleancode.rules.clarity import (
     BoolArithmetic,
+    BuriedValueFallback,
     CallableIndirection,
     DeepExpression,
     NestedTernary,
+    ThinDelegationWrapper,
 )
 from cleancode.rules.comments import (
     CommentDensity,
@@ -83,6 +85,8 @@ ALL_RULES: list[type[Rule] | type[ProjectRule]] = [
     NestedTernary,
     CallableIndirection,
     DeepExpression,
+    ThinDelegationWrapper,
+    BuriedValueFallback,
     TypeSwitchViolatesOCP,
     LowCohesionClass,
     DuplicateFunctionBody,

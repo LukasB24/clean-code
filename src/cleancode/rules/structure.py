@@ -9,6 +9,7 @@ from cleancode.models import FileContext, ModuleTop, Severity, Violation, Violat
 from cleancode.rules.base import (
     FunctionNode,
     Rule,
+    end_line,
     is_dunder,
     is_elif_branch,
     own_scope_walk,
@@ -130,7 +131,7 @@ class _MaxBlockLength(Rule):
         for node in ast.walk(ctx.tree):
             if not isinstance(node, self.node_types):
                 continue
-            length = (node.end_lineno or node.lineno) - node.lineno + 1
+            length = end_line(node) - node.lineno + 1
             if length > max_lines:
                 yield self.violation(
                     ctx,

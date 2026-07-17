@@ -10,7 +10,7 @@ from __future__ import annotations
 import ast
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, ClassVar, Iterable
+from typing import TYPE_CHECKING, ClassVar, Iterable
 
 from cleancode.models import Location, ParsedFile, Severity, Violation, ViolationDetails
 from cleancode.rules.base import FunctionNode, ProjectRule, import_aliases, is_dunder
@@ -56,12 +56,15 @@ _IDENTIFIER_FIELDS = {(ast.Name, "id"), (ast.Attribute, "attr"), (ast.arg, "arg"
 
 @dataclass(frozen=True)
 class _Renderer:
-    """``ast.dump``-style rendering with identifier fields blanked in place.
+    """Builds DP701's comparison key for a statement: same shape, names blanked.
 
-    Walks the tree read-only via ``ast.iter_fields``, which only visits a
-    node's declared ``_fields`` — the ``parent`` back-reference the engine
-    attaches to every node is never one of those, so it's never touched and
-    can't pull the rest of the module into the render.
+    Its whole purpose is to make *renamed* copies of a statement collide —
+    two bodies that differ only in local names render to the identical
+    string — while ``preserved`` nodes (call targets and imported receivers)
+    keep their names, so bodies calling different APIs stay distinct.
+    Rendering walks read-only via ``ast.iter_fields``, which only visits a
+    node's declared ``_fields``; the ``parent`` back-reference the engine
+    attaches is never one of those, so it can't drag the module in.
     """
 
     preserved: set[ast.AST]
@@ -82,17 +85,6 @@ class _Renderer:
         """The field's value, blanked to ``"_"`` when it is an anonymized identifier."""
         is_identifier = (type(node), name) in _IDENTIFIER_FIELDS and value is not None
         return "_" if is_identifier and node not in self.preserved else value
-
-
-def _normalized_dump(node: ast.AST, imported_names: set[str]) -> str:
-    """Renders ``node`` with variable/parameter/attribute names blanked out.
-
-    Two statements with identical control flow and literals but different
-    names (``rows`` vs ``items``) render to the same string; called function/
-    method names (with any imported-module receiver) and literal constants
-    still tell them apart, so this stays conservative.
-    """
-    return _Renderer(_preserved_nodes(node, imported_names)).render(node)
 
 
 def _is_docstring_expr(statement: ast.stmt) -> bool:
@@ -133,17 +125,21 @@ def _is_stub_body(body: list[ast.stmt]) -> bool:
     return isinstance(statement, ast.Pass) or is_ellipsis or _raises_not_implemented(statement)
 
 
-def _exact_dump(node: ast.AST, imported_names: set[str]) -> str:
-    """``ast.dump`` as written: identifiers are kept, so only true copies collide.
+def _dump(statement: ast.AST, exact: bool, imported_names: set[str]) -> str:
+    """One statement's fingerprint text, in one of two strengths.
 
-    ``imported_names`` is unused; it exists so both dump functions share one
-    signature and can be passed interchangeably to ``_grouped_by_fingerprint``.
+    ``exact`` keeps every identifier (plain ``ast.dump``) so only true copies
+    collide — DP702's contract. Otherwise variable/parameter/attribute names
+    are blanked so renamed copies collide too — DP701's contract; called
+    function/method names (with any imported-module receiver) and literal
+    constants still tell bodies apart.
     """
-    return ast.dump(node, annotate_fields=True, include_attributes=False)
+    if exact:
+        return ast.dump(statement, annotate_fields=True, include_attributes=False)
+    return _Renderer(_preserved_nodes(statement, imported_names)).render(statement)
 
 
 _Member = tuple[ParsedFile, FunctionNode]
-_Dump = Callable[[ast.AST, set[str]], str]
 
 
 def _comparable_body(function: FunctionNode, min_statements: int) -> list[ast.stmt] | None:
@@ -161,7 +157,7 @@ def _comparable_body(function: FunctionNode, min_statements: int) -> list[ast.st
 
 
 def _file_fingerprints(
-    parsed: ParsedFile, min_statements: int, dump: _Dump
+    parsed: ParsedFile, min_statements: int, exact: bool
 ) -> Iterable[tuple[str, _Member]]:
     """(fingerprint, member) for every comparable function in one file."""
     imported = {name for name, _ in import_aliases(parsed.tree)}
@@ -169,17 +165,17 @@ def _file_fingerprints(
         body = _comparable_body(function, min_statements)
         if body is None:
             continue
-        key = "|".join(dump(statement, imported) for statement in body)
+        key = "|".join(_dump(statement, exact, imported) for statement in body)
         yield key, (parsed, function)
 
 
 def _grouped_by_fingerprint(
-    files: list[ParsedFile], min_statements: int, dump: _Dump
+    files: list[ParsedFile], min_statements: int, exact: bool
 ) -> Iterable[list[_Member]]:
     """Groups of two-or-more functions whose fingerprinted bodies collide."""
     groups: dict[str, list[_Member]] = defaultdict(list)
     for parsed in files:
-        for key, member in _file_fingerprints(parsed, min_statements, dump):
+        for key, member in _file_fingerprints(parsed, min_statements, exact):
             groups[key].append(member)
     return [members for members in groups.values() if len(members) >= 2]
 
@@ -224,7 +220,7 @@ class DuplicateFunctionBody(_DuplicationRule):
 
     def check_project(self, files: list[ParsedFile], config: "Config") -> Iterable[Violation]:
         min_statements = config.rules[self.id].options["min_statements"]
-        for members in _grouped_by_fingerprint(files, min_statements, _normalized_dump):
+        for members in _grouped_by_fingerprint(files, min_statements, exact=False):
             yield from self._flag_group(config, members)
 
 
@@ -248,7 +244,7 @@ class IdenticalFunctionImplementation(_DuplicationRule):
     def check_project(self, files: list[ParsedFile], config: "Config") -> Iterable[Violation]:
         min_statements = config.rules[self.id].options["min_statements"]
         dp701 = config.rules[DuplicateFunctionBody.id]
-        for members in _grouped_by_fingerprint(files, min_statements, _exact_dump):
+        for members in _grouped_by_fingerprint(files, min_statements, exact=True):
             if dp701.enabled and self._covered_by_dp701(members, dp701.options["min_statements"]):
                 continue  # DP701 already reports this group; don't double-flag
             yield from self._flag_group(config, members)

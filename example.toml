@@ -71,9 +71,9 @@
 # known_abbrevs = ["cfg", "ctx", "idx", "db", "fn", "env", "src", "dst", "str", "css", "tmp", "xml", "html", "sql", "std", "cmd", "msg", "pkg", "txt", "sdk", "api", "url", "uri", "gcd", "rgb", "csv", "json", "yml", "js", "ts", "np", "df", "kwargs", "args", "cls", "llm"]
 
 # CM301  docstring-restates-name  [warning]
-#   Flags short docstrings whose words all come from the function signature (`def get_user_name`: """Gets the user name.""") — they cost reading time and add nothing.
+#   Flags docstrings that say nothing beyond the signature: a short one (`def get_user_name`: """Gets the user name.""") whose words all come from the function/class name and parameters, or a longer one where every line stays within that same vocabulary plus generic filler nouns.
 # [tool.cleancode.CM301]
-# overlap = 0.8
+# overlap = 0.7
 
 # CM302  comment-restates-code  [warning]
 #   Flags comments that paraphrase the code line they annotate (`x = x + 1  # increment x by 1`, `for k in range(3):  # iterate three times`). TODO/FIXME/NOTE, tool directives, and comments carrying a causal/justification marker (because, since, workaround, ...) are exempt.
@@ -182,6 +182,14 @@
 #   Flags a statement whose expression tree nests operations (calls, arithmetic, ternaries, comprehensions, f-strings) deeper than `max_depth` (default 4). A flat chain of conditions reads fine at any length; five layers of calls-inside-f-strings-inside-comprehensions on one line do not. Module-level statements (constant tables) are exempt. Complements ST101, which limits statement nesting rather than expression nesting.
 # [tool.cleancode.SM617]
 # max_depth = 4
+
+# SM618  thin-delegation-wrapper  [warning]
+#   Flags a private function whose whole body is `return <one call to another function>` — a wrapper that only renames work and adds a hop the reviewer must chase. Public functions (API conveniences), decorated functions, dunders, builtin-wrapping one-liners (`return any(...)`), and calls on the function's own parameters are exempt.
+# [tool.cleancode.SM618]
+
+# SM619  buried-value-fallback  [warning]
+#   Flags an `or`/`and` value fallback buried inside a larger expression (`(node.end_lineno or node.lineno) + 1`) — used as an arithmetic operand or subscript index, the boolean operator is easy to misread. A bare `x = a or b` and ordinary boolean conditions stay exempt.
+# [tool.cleancode.SM619]
 
 # SD801  type-switch-violates-ocp  [warning]
 #   Flags an if/elif chain of `min_branches`-or-more (default 3) branches that each test `isinstance(x, ...)`/`type(x) is ...` against the same variable — adding a new type means editing this chain instead of extending via polymorphism, the classic Open/Closed Principle violation.

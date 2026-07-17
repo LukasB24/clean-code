@@ -392,11 +392,12 @@ class NonIdiomaticEmptinessCheck(Rule):
                 and _is_zero(node.comparators[0])
             ):
                 arg = ast.get_source_segment(ctx.source, node.left.args[0]) or "x"  # type: ignore[attr-defined]
+                operator = _OP_SYMBOLS.get(type(node.ops[0]), "?")
                 yield self.violation(
                     ctx,
                     node,
                     ViolationDetails(
-                        message=f"`len({arg}) {_op_symbol(node.ops[0])} 0` — rely on "
+                        message=f"`len({arg}) {operator} 0` — rely on "
                         "truthiness instead",
                         suggestion=f"use `if {arg}:` or `if not {arg}:` instead of "
                         "comparing length to 0",
@@ -413,7 +414,3 @@ _OP_SYMBOLS: dict[type, str] = {
     ast.Lt: "<",
     ast.LtE: "<=",
 }
-
-
-def _op_symbol(operator: ast.cmpop) -> str:
-    return _OP_SYMBOLS.get(type(operator), "?")
