@@ -73,6 +73,10 @@ class MaxNestingDepth(Rule):
         "Limits how deeply loops, conditionals, `with`, and `try` blocks nest inside a "
         "function. Deep nesting is the hallmark of hard-to-review generated code."
     )
+    guidance = (
+        "Nest at most {max_depth} levels of if/for/while/with/try inside a function — "
+        "prefer guard clauses or extract a helper before adding another level."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         max_depth = ctx.config.options["max_depth"]
@@ -151,6 +155,10 @@ class MaxFunctionLength(_MaxBlockLength):
     default_severity = Severity.WARNING
     default_options = {"max_lines": 60}
     description = "Limits function length (docstring included) so one function fits one screen."
+    guidance = (
+        "Keep functions to {max_lines} lines or fewer (docstring included) — split "
+        "into smaller, single-purpose helpers instead of letting one function grow."
+    )
     node_types = (ast.FunctionDef, ast.AsyncFunctionDef)
     block_kind = "function"
     suggestion = "split the function into smaller, single-purpose helpers"
@@ -162,6 +170,10 @@ class MaxClassLength(_MaxBlockLength):
     default_severity = Severity.WARNING
     default_options = {"max_lines": 200}
     description = "Limits class length; god classes hide too many responsibilities."
+    guidance = (
+        "Keep classes to {max_lines} lines or fewer — split by responsibility, or "
+        "move helpers to module level, instead of growing a god class."
+    )
     node_types = (ast.ClassDef,)
     block_kind = "class"
     suggestion = "split the class by responsibility, or move helpers to module level"
@@ -173,6 +185,10 @@ class MaxParameters(Rule):
     default_severity = Severity.WARNING
     default_options = {"max_params": 3}
     description = "Limits the number of function parameters (self/cls, *args, **kwargs excluded)."
+    guidance = (
+        "Give a function at most {max_params} parameters (self/cls, *args, **kwargs "
+        "excluded) — group related ones into a dataclass or config object."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         max_params = ctx.config.options["max_params"]
@@ -209,6 +225,11 @@ class MaxComplexity(Rule):
     description = (
         "Limits cyclomatic complexity per function: 1 + one per if/for/while/except/"
         "assert/ternary/match-case, per comprehension filter, and per extra and/or operand."
+    )
+    guidance = (
+        "Keep cyclomatic complexity at or below {max_complexity} per function — "
+        "extract decision-heavy blocks into helpers or replace branch chains with a "
+        "dispatch table."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
@@ -263,6 +284,11 @@ class DoOneThing(Rule):
         "(`load_and_save`, `fetch_or_default`). Needing 'and'/'or' to name a "
         "function is a sign it does more than one thing — split it."
     )
+    guidance = (
+        "Never join responsibilities with 'and'/'or' in a function name "
+        "(`load_and_save`) — split into separate, single-purpose functions and let "
+        "the caller compose them."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         conjunctions = set(ctx.config.options["conjunctions"])
@@ -303,6 +329,10 @@ class MaxModuleLength(Rule):
         "Limits how long one module may grow (default 500 lines). A file that keeps "
         "absorbing new classes and helpers turns into a grab-bag nobody can navigate — "
         "split it into focused submodules, one concern per file, before it gets there."
+    )
+    guidance = (
+        "Keep a module to {max_lines} lines or fewer — split into focused "
+        "submodules, one concern per file, before it becomes a grab-bag."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
@@ -379,6 +409,11 @@ class TooManyGuardClauses(Rule):
         "the real work. Filtering piled up next to a decision is a 'more than one "
         "thing' smell (see ST106): split the eligibility checks into their own "
         "filter/predicate function and the remaining logic into another."
+    )
+    guidance = (
+        "String together at most {max_guards} sequential guard clauses ahead of the "
+        "real work — extract the eligibility checks into their own filter/predicate "
+        "function."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:

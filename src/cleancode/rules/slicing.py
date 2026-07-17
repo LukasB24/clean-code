@@ -127,6 +127,11 @@ class ComplexSubscript(Rule):
         "negative index/arithmetic/call, +2 per nested subscript, negative steps "
         "count double) and flags scores above the threshold."
     )
+    guidance = (
+        "Name the index expressions of a complex subscript (multiple dimensions, "
+        "steps, negative indices, nested calls) instead of writing one dense "
+        "one-liner."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         max_score = ctx.config.options["max_score"]
@@ -198,6 +203,11 @@ class ChainedSubscript(Rule):
     description = (
         "Flags subscript chains like `grid[i][j][k]`; bind intermediates to names "
         "or use multi-dimensional indexing `grid[i, j, k]`."
+    )
+    guidance = (
+        "Bind intermediate lookups to named variables instead of chaining "
+        "subscripts more than {max_chain} deep (`grid[i][j][k]`) — or use "
+        "multi-dimensional indexing."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:

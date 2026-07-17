@@ -214,6 +214,10 @@ class DuplicateFunctionBody(_DuplicationRule):
         "NotImplementedError), dunder methods, and bodies shorter than `min_statements` "
         "are exempt."
     )
+    guidance = (
+        "Never copy-paste a function/method body into a second location, even with "
+        "renamed variables — extract the shared logic into a common helper function."
+    )
 
     _VERB = "duplicates the body of"
     _SUGGESTION = "extract the shared logic into a common helper function"
@@ -237,6 +241,7 @@ class IdenticalFunctionImplementation(_DuplicationRule):
         "DP701 without noise; bodies long enough for DP701 to report are left to "
         "DP701. Stub bodies and dunder methods are exempt."
     )
+    guidance = None  # covered by DP701's guidance; see guide.COVERED_BY_SIBLING
 
     _VERB = "is an exact copy of"
     _SUGGESTION = "keep one copy and import/reuse it from the other location"

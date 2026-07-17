@@ -40,6 +40,10 @@ class ComprehensionDensity(Rule):
         "condition is itself an inline ternary — logical over-compression that's "
         "nearly impossible to read at a glance."
     )
+    guidance = (
+        "Never nest a comprehension inside another comprehension's ternary-filtered "
+        "generator — pull the nested comprehension into a named helper function."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         for node in ast.walk(ctx.tree):
@@ -100,6 +104,11 @@ class AnonymousTupleIndexing(Rule):
         "a fixed multi-element tuple — primitive obsession that hides what each "
         "position means. Variadic `tuple[T, ...]` parameters are exempt."
     )
+    guidance = (
+        "Never index a fixed-shape tuple parameter by position (`bounds[0]`) — use "
+        "a NamedTuple/dataclass with named fields, or unpack once at the top of the "
+        "function."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         for function in ctx.functions:
@@ -153,6 +162,10 @@ class MagicStringBranching(Rule):
         "chosen by a hardcoded string prefix/suffix/substring check — the domain "
         "rule hides inside a string literal instead of a named condition."
     )
+    guidance = (
+        "Never branch a ternary on a hardcoded string check — name the condition "
+        "first (`is_transaction_metric = k.startswith('tx_')`)."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         for node in ast.walk(ctx.tree):
@@ -188,6 +201,10 @@ class RedundantBooleanTernary(Rule):
         "Flags ternaries that return explicit `True`/`False` literals for a condition "
         "that already evaluates to a boolean (`True if x == y else False`) — the "
         "ternary itself is the redundant part."
+    )
+    guidance = (
+        "Never write `True if x else False` for an already-boolean condition — use "
+        "the condition (or its negation) directly."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
@@ -240,6 +257,10 @@ class ReduceInsteadOfSum(Rule):
         "Flags `functools.reduce(lambda a, b: a + b, xs)` — a built-in `sum(xs)` "
         "does the same thing, faster and without the lambda indirection."
     )
+    guidance = (
+        "Never use `functools.reduce(lambda a, b: a + b, xs)` — use `sum(xs)`, or "
+        "`''.join(parts)` for strings."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         for node in ast.walk(ctx.tree):
@@ -291,6 +312,10 @@ class RepeatedCollectionIteration(Rule):
         "Flags a comprehension that iterates over a collection expression "
         "(`item[\"metrics\"]`, `self.rows`, `get_data()`) already iterated by an "
         "earlier comprehension in the same function — two passes where one would do."
+    )
+    guidance = (
+        "Never iterate the same collection expression in two separate "
+        "comprehensions within one function — merge into a single pass."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
@@ -348,6 +373,11 @@ class MagicNumber(Rule):
         "(`threshold * 1.2`) instead of a named, typed constant. A configurable "
         "`ignore` list (default 0, 1, -1, 2, 10) exempts domain-agnostic values."
     )
+    guidance = (
+        "Extract numeric literals in comparisons/arithmetic into a named, typed "
+        "constant — don't leave bare numbers like `threshold * 1.2` in the "
+        "expression."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         ignore = set(ctx.config.options["ignore"])
@@ -381,6 +411,10 @@ class NonIdiomaticEmptinessCheck(Rule):
     description = (
         "Flags `len(x) > 0` / `len(x) == 0` style checks — Python sequences are "
         "already truthy/falsy, so PEP 8 prefers `if x:` / `if not x:`."
+    )
+    guidance = (
+        "Never write `len(x) > 0` / `len(x) == 0` — use `if x:` / `if not x:`, "
+        "since sequences are already truthy/falsy."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:

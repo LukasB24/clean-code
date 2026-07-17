@@ -111,6 +111,11 @@ class TypeSwitchViolatesOCP(Rule):
         "adding a new type means editing this chain instead of extending via "
         "polymorphism, the classic Open/Closed Principle violation."
     )
+    guidance = (
+        "Never chain {min_branches}-or-more `isinstance`/`type()` branches on the "
+        "same variable — use polymorphism (a method per type) or a "
+        "`dict[type, Callable]` dispatch table."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         min_branches = ctx.config.options["min_branches"]
@@ -257,6 +262,10 @@ class LowCohesionClass(Rule):
         "helpers are always excluded; classes whose name ends with one of "
         "`exempt_name_suffixes` (default `Mixin`, since mixins are intentionally "
         "composed from independent, reusable behavior) are exempt entirely."
+    )
+    guidance = (
+        "Give a class's methods one shared purpose — if it splits into unrelated "
+        "clusters sharing no state or calls, split it into separate classes."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:

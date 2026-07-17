@@ -14,6 +14,15 @@ whether pre- or post-1.0).
 
 ### Added
 
+- `clean-code guide [PATH]` — a generation-time briefing for an LLM, one
+  imperative bullet per *enabled* rule ("Nest at most 2 levels...", "Never
+  write a bare `except:`..."), rendered with the project's own configured
+  option values so a loosened `max_depth` or a disabled rule shows up
+  correctly. `--agents-md` wraps the same brief with standing instructions
+  for pasting into a project's `CLAUDE.md`/`AGENTS.md`
+  (`clean-code guide --agents-md >> CLAUDE.md`). Every rule carries a new
+  `guidance` string (or is explicitly folded into a sibling's — see
+  `guide.COVERED_BY_SIBLING`), enforced by `tests/test_guide.py`.
 - `SM618` `thin-delegation-wrapper` — flags a private function whose whole
   body is `return <one call to another function>`, a hop that only renames
   work. Public functions, decorated functions, dunders, builtin callees, and

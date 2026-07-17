@@ -128,6 +128,34 @@ def config_template(out_path: Path | None) -> None:
 
 
 @main.command()
+@click.argument(
+    "path", default=".", type=click.Path(exists=True, path_type=Path)
+)
+@click.option(
+    "--config",
+    "config_path",
+    type=click.Path(exists=True, path_type=Path),
+    help="Explicit TOML config file (default: nearest pyproject.toml).",
+)
+@click.option(
+    "--agents-md",
+    "as_agents_md",
+    is_flag=True,
+    help="Wrap the brief with standing instructions for a CLAUDE.md/AGENTS.md file.",
+)
+def guide(path: Path, config_path: Path | None, as_agents_md: bool) -> None:
+    """Print a generation-time brief: write Python this way the first time."""
+    from cleancode.guide import build_agents_md, build_guide
+
+    try:
+        config = Config.load(path, override=config_path)
+    except (ConfigError, ValueError) as error:
+        raise click.UsageError(str(error)) from error
+    text = build_agents_md(config) if as_agents_md else build_guide(config)
+    click.echo(text, nl=False)
+
+
+@main.command()
 def rules() -> None:
     """List every rule with its default threshold and severity."""
     from cleancode.rules import ALL_RULES

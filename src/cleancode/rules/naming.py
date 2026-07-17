@@ -85,6 +85,11 @@ class ShortName(Rule):
         "allowlisted and configurable; functions, classes, and ordinary variables "
         "otherwise always need real names."
     )
+    guidance = (
+        "Give every function, class, and ordinary variable a name of at least "
+        "{min_length} characters that states what the value represents — reserve "
+        "short names for conventional loop/comprehension letters."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         allowed = set(ctx.config.options["allowed"])
@@ -146,6 +151,11 @@ class MeaninglessName(Rule):
         "Flags names that say nothing about their content (tmp, data, foo, do_stuff) "
         "and numbered generics like `data2` or `result1`."
     )
+    guidance = (
+        "Never name a value tmp/data/result/foo/thing or a function "
+        "process/handle/do_stuff — name it for what it holds or does (`raw_rows`, "
+        "`parse_trades`)."
+    )
 
     _NUMBERED_GENERIC = re.compile(
         r"^(data|result|res|temp|tmp|val|var|value|list|dict|arr|out|output|x|obj|item)\d+$"
@@ -196,6 +206,10 @@ class CrypticAbbreviation(Rule):
     description = (
         "Flags vowel-less abbreviation soup like `usr_mgr` or `calc_rslt`. "
         "Known abbreviations (cfg, ctx, idx, ...) are allowlisted and configurable."
+    )
+    guidance = (
+        "Spell words out instead of vowel-less abbreviation soup (`usr_mgr` -> "
+        "`user_manager`) unless the abbreviation is domain-standard."
     )
 
     _VOWELS = frozenset("aeiouy")

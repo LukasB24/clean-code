@@ -33,6 +33,10 @@ class BareExcept(Rule):
         "absorbing signals that should propagate. `except Exception:` is merely "
         "broad, not bare, and is not flagged."
     )
+    guidance = (
+        "Never write a bare `except:` — name the expected exception(s) explicitly "
+        "(`except (ValueError, KeyError):`)."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         for handler in _except_handlers(ctx.tree):
@@ -72,6 +76,10 @@ class EmptyExceptionHandler(Rule):
         "silently discarded with no log, fallback, or re-raise. Handlers that "
         "`continue`/`return`/`break`, log, or re-raise are real control-flow "
         "decisions and are not flagged."
+    )
+    guidance = (
+        "Never leave an exception handler's body inert (`pass`, `...`, a lone "
+        "string) — log it, return an explicit fallback, or re-raise."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:

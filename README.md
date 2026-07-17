@@ -126,6 +126,26 @@ hides a violation that `--fail-on`/`fail_on` would fail the run on: setting
 always see what can fail your build. Set `min_severity` explicitly to
 override that.
 
+## Prime your agent: `clean-code guide`
+
+`clean-code check` is a *reactive* loop — it finds what's already wrong.
+`clean-code guide` is the other half: a short, generation-time brief that
+turns every enabled rule into a "write it this way" instruction, so an LLM
+can follow the rules while it writes instead of fixing them after:
+
+```bash
+clean-code guide src
+```
+
+It's rendered from your project's own config, so a loosened `max_depth` or
+a disabled rule shows up correctly — no drift between what the brief says
+and what `check` actually enforces. Feed it to an agent before it generates
+code, or append it once to your project's `CLAUDE.md`/`AGENTS.md`:
+
+```bash
+clean-code guide --agents-md >> CLAUDE.md
+```
+
 ## Configure it for your project
 
 Out of the box the defaults are strict (max nesting depth 2, max 3

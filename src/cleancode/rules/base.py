@@ -116,6 +116,11 @@ class Rule(ABC):
     default_severity: ClassVar[Severity]
     default_options: ClassVar[dict[str, Any]]
     description: ClassVar[str]
+    # A one-line generation-time imperative ("Nest at most {max_depth} levels...")
+    # rendered by ``guide.py`` with this rule's *configured* option values. ``None``
+    # only when a sibling rule's guidance already covers this one — see
+    # ``guide.COVERED_BY_SIBLING``.
+    guidance: ClassVar[str | None] = None
 
     @abstractmethod
     def check(self, ctx: "FileContext") -> Iterable[Violation]: ...
@@ -146,6 +151,7 @@ class ProjectRule(ABC):
     default_severity: ClassVar[Severity]
     default_options: ClassVar[dict[str, Any]]
     description: ClassVar[str]
+    guidance: ClassVar[str | None] = None
 
     @abstractmethod
     def check_project(

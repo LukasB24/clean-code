@@ -187,6 +187,10 @@ class CommentRestatesCode(Rule):
         "times`). TODO/FIXME/NOTE, tool directives, and comments carrying a "
         "causal/justification marker (because, since, workaround, ...) are exempt."
     )
+    guidance = (
+        "Only write a comment that explains *why*, never one that paraphrases the "
+        "line below it (`x += 1  # increment x`) — delete restating comments."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         for comment, comment_words in self._candidates(ctx):
@@ -247,6 +251,10 @@ class CommentDensity(Rule):
     description = (
         "Flags functions with more than ~1 comment line per 3 code lines — a strong "
         "smell of generated padding. Docstrings are policed by CM301/CM304, not here."
+    )
+    guidance = (
+        "Keep comments sparse inside a function (well under 1 line of comment per 3 "
+        "lines of code) — strip narration and keep only the why."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
@@ -321,6 +329,10 @@ class FileCommentDensity(Rule):
         "(TODO, noqa, `cleancode:`, ...) and docstrings (policed by CM301/CM304) "
         "don't count, and files with fewer than `min_code_lines` code lines are "
         "never flagged."
+    )
+    guidance = (
+        "Keep a file's overall comment density low — file-wide comment sprawl is as "
+        "much a smell as one dense function."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:

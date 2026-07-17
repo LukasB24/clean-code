@@ -74,6 +74,10 @@ class RedundantIsinstanceCheck(Rule):
         "of exactly `T` — the runtime check is hallucinated safety that a type checker "
         "already guarantees, and it costs cycles in hot loops like `__getitem__`."
     )
+    guidance = (
+        "Never `isinstance()`-check a value against the exact type its own "
+        "annotation already declares — trust the static annotation."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         for function in ctx.functions:
@@ -267,6 +271,10 @@ class UnusedBinding(Rule):
         "target is used, and functions that call `locals`/`eval`/`exec` (which "
         "can reference locals dynamically) are all exempt."
     )
+    guidance = (
+        "Remove every import and local variable you don't end up using — don't "
+        "leave dead bindings behind."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         yield from self._check_imports(ctx)
@@ -350,6 +358,10 @@ class BuiltinShadowing(Rule):
         "module rather than a hardcoded copy, so it stays correct across Python "
         "versions. Class-body field declarations (`id: ClassVar[str]`, "
         "`id = \"SM601\"`) are exempt — they're field names, not shadowing locals."
+    )
+    guidance = (
+        "Never name a parameter, variable, or function after a Python builtin "
+        "(`id`, `type`, `list`, ...) — pick a domain-specific name instead."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:

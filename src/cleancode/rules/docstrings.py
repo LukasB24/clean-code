@@ -161,6 +161,10 @@ class DocstringRestatesName(Rule):
         "the function/class name and parameters, or a longer one where every line "
         "stays within that same vocabulary plus generic filler nouns."
     )
+    guidance = (
+        "Only write a docstring if it says something the signature can't — skip it, "
+        "or document why/edge cases/units/invariants, not a restatement of the name."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         overlap_threshold = ctx.config.options["overlap"]
@@ -196,6 +200,11 @@ class BoilerplateParamDocs(Rule):
     description = (
         "Flags Google-style Args:/Returns: sections where entries like "
         "`data: The data.` describe nothing beyond the parameter name."
+    )
+    guidance = (
+        "In an Args:/Returns: docstring section, document only parameters whose "
+        "meaning, units, or constraints aren't obvious from the name — skip entries "
+        "like `data: The data.`"
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:

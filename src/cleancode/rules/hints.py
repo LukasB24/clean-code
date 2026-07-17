@@ -61,6 +61,11 @@ class UninformativeAny(Rule):
         "and `Any | None`) on parameters and return types. `Any` nested in a "
         "container such as `dict[str, Any]` is permitted as a justified exception."
     )
+    guidance = (
+        "Never annotate a parameter or return type with bare `Any` — use a "
+        "structured type (TypedDict, dataclass) or reserve `Any` for container "
+        "payloads like `dict[str, Any]`."
+    )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         for function in ctx.functions:
