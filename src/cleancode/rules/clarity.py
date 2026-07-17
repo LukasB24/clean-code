@@ -10,6 +10,7 @@ human reviewer instead of merely passing the structural gates.
 from __future__ import annotations
 
 import ast
+from dataclasses import dataclass
 from typing import Iterable, Iterator
 
 from cleancode.models import FileContext, Severity, Violation, ViolationDetails
@@ -85,13 +86,52 @@ class NestedTernary(Rule):
                 )
 
 
-def _is_partial_call(node: ast.expr) -> bool:
+@dataclass(frozen=True)
+class _ModuleCallables:
+    """Names in one module that a returned expression could resolve to."""
+
+    functions: frozenset[str]
+    partial_bindings: frozenset[str]  # bound by `from functools import partial [as p]`
+    functools_aliases: frozenset[str]  # bound by `import functools [as ft]`
+
+
+def _bound_names(node: ast.Import | ast.ImportFrom, source_name: str) -> list[str]:
+    """The names one import statement binds for the alias originally called ``source_name``."""
+    return [alias.asname or alias.name for alias in node.names if alias.name == source_name]
+
+
+def _module_callables(ctx: FileContext) -> _ModuleCallables:
+    partial_bindings: set[str] = set()
+    functools_aliases: set[str] = set()
+    for node in ast.walk(ctx.tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "functools":
+            partial_bindings.update(_bound_names(node, "partial"))
+        elif isinstance(node, ast.Import):
+            functools_aliases.update(_bound_names(node, "functools"))
+    return _ModuleCallables(
+        functions=frozenset(function.name for function in ctx.functions),
+        partial_bindings=frozenset(partial_bindings),
+        functools_aliases=frozenset(functools_aliases),
+    )
+
+
+def _is_partial_call(node: ast.expr, callables: _ModuleCallables) -> bool:
+    """True only for calls that resolve to ``functools.partial`` through this module's imports.
+
+    Matching the bare attribute name would misfire on any unrelated
+    ``something.partial(...)`` method and claim it is a ``functools.partial``.
+    """
     if not isinstance(node, ast.Call):
         return False
     func = node.func
     if isinstance(func, ast.Name):
-        return func.id == "partial"
-    return isinstance(func, ast.Attribute) and func.attr == "partial"
+        return func.id in callables.partial_bindings
+    return (
+        isinstance(func, ast.Attribute)
+        and func.attr == "partial"
+        and isinstance(func.value, ast.Name)
+        and func.value.id in callables.functools_aliases
+    )
 
 
 class CallableIndirection(Rule):
@@ -108,17 +148,17 @@ class CallableIndirection(Rule):
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
-        function_names = {function.name for function in ctx.functions}
+        callables = _module_callables(ctx)
         for function in ctx.functions:
-            yield from self._check_function(ctx, function, function_names)
+            yield from self._check_function(ctx, function, callables)
 
     def _check_function(
-        self, ctx: FileContext, function: FunctionNode, function_names: set[str]
+        self, ctx: FileContext, function: FunctionNode, callables: _ModuleCallables
     ) -> Iterator[Violation]:
         for statement in own_scope_walk(function):
             if not isinstance(statement, ast.Return) or statement.value is None:
                 continue
-            reason = self._indirection_reason(function, statement.value, function_names)
+            reason = self._indirection_reason(function, statement, callables)
             if reason is None:
                 continue
             yield self.violation(
@@ -135,26 +175,33 @@ class CallableIndirection(Rule):
             )
 
     def _indirection_reason(
-        self, function: FunctionNode, value: ast.expr, function_names: set[str]
+        self, function: FunctionNode, statement: ast.Return, callables: _ModuleCallables
     ) -> str | None:
+        value = statement.value
         if isinstance(value, ast.Lambda):
             return "returns a lambda"
-        if _is_partial_call(value):
+        if _is_partial_call(value, callables):
             return "returns a `functools.partial`"
-        forwards = self._is_bare_forward(function, value, function_names)
-        return f"does nothing but hand back `{value.id}`" if forwards else None
+        forwards = self._is_bare_forward(function, statement, callables)
+        return f"does nothing but hand back `{value.id}`" if forwards else None  # type: ignore[union-attr]
 
     @staticmethod
     def _is_bare_forward(
-        function: FunctionNode, value: ast.expr, function_names: set[str]
+        function: FunctionNode, statement: ast.Return, callables: _ModuleCallables
     ) -> bool:
-        """True when the function's whole body is ``return <another function's name>``."""
-        if not (isinstance(value, ast.Name) and value.id in function_names):
+        """True when the function's whole body is this very ``return <function name>``.
+
+        Identity against the top-level body matters: a return nested inside a
+        guard ``if`` is conditional dispatch with a ``None`` fallthrough, not
+        a bare forward.
+        """
+        value = statement.value
+        if not (isinstance(value, ast.Name) and value.id in callables.functions):
             return False
         body = function.body
         if body and _is_docstring(body[0]):
             body = body[1:]
-        return len(body) == 1
+        return body == [statement]
 
 
 def _is_docstring(statement: ast.stmt) -> bool:

@@ -63,6 +63,37 @@ class TestMaxNestingDepth:
         # the symbol names the innermost function the offending block sits in
         assert violations[0].symbol == "outer.inner"
 
+    def test_local_class_method_does_not_inherit_enclosing_depth(self, check):
+        # regression: a ClassDef is a scope boundary (as in ST105), so a
+        # factory's local class must not push its methods over the limit
+        source = """
+        def factory(flag):
+            if flag:
+                class Handler:
+                    def process(self, items):
+                        for item in items:
+                            if item.valid:
+                                print(item)
+            return Handler
+        """
+        assert check(source, "ST101", max_depth=2) == []
+
+    def test_local_class_method_is_still_measured_on_its_own(self, check):
+        source = """
+        def factory(flag):
+            if flag:
+                class Handler:
+                    def process(self, items):
+                        for item in items:
+                            if item.valid:
+                                if item.priority:
+                                    print(item)
+            return Handler
+        """
+        violations = check(source, "ST101", max_depth=2)
+        assert lines_of(violations) == [("ST101", 8)]
+        assert "depth 3" in violations[0].message
+
     def test_match_case_offender_reports_at_pattern_line(self, check):
         # regression: a match_case as first offender crashed (no lineno of its own)
         source = """

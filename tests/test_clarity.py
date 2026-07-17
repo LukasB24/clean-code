@@ -104,6 +104,45 @@ class TestCallableIndirection:
         assert rule_ids(violations) == ["SM616"]
         assert "hand back `render_exact`" in violations[0].message
 
+    def test_guarded_dispatch_is_not_a_bare_forward(self, check):
+        # regression: a return nested inside a guard `if` is conditional
+        # dispatch with a None fallthrough, not "does nothing but hand back X"
+        source = """
+        def render_exact(node):
+            return node.dump()
+
+        def pick_renderer(node):
+            if node.kind == "exact":
+                return render_exact
+        """
+        assert check(source, "SM616") == []
+
+    def test_method_named_partial_is_not_functools_partial(self, check):
+        # regression: `.partial(...)` used to match on the attribute name alone
+        source = """
+        def build_retry(retry_policy, attempts):
+            return retry_policy.partial(attempts=attempts)
+        """
+        assert check(source, "SM616") == []
+
+    def test_unimported_partial_name_is_not_functools_partial(self, check):
+        source = """
+        def configure(partial, width):
+            return partial(width)
+        """
+        assert check(source, "SM616") == []
+
+    def test_flags_partial_via_module_alias(self, check):
+        source = """
+        import functools as ft
+
+        def make_formatter(width):
+            return ft.partial(format, width=width)
+        """
+        violations = check(source, "SM616")
+        assert rule_ids(violations) == ["SM616"]
+        assert "functools.partial" in violations[0].message
+
     def test_decorator_returning_nested_def_passes(self, check):
         source = """
         def logged(func):

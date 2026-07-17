@@ -45,10 +45,18 @@ def _clause_statements(child: ast.AST) -> Iterator[ast.stmt]:
         yield child
 
 
-def _enclosing_function(node: ast.AST) -> FunctionNode | None:
-    """The nearest function that ``node`` is nested inside, if any."""
+def _depth_inheriting_function(node: ast.AST) -> FunctionNode | None:
+    """The function whose nesting-depth measurement already covers ``node``.
+
+    Only a *directly* enclosing function counts: a ``ClassDef`` in between is
+    a scope boundary (mirroring ``own_scope_walk``/ST105), so methods of a
+    locally-defined class are measured fresh, not as a continuation of
+    whatever depth the surrounding function had reached.
+    """
     current = getattr(node, "parent", None)
     while current is not None:
+        if isinstance(current, ast.ClassDef):
+            return None
         if isinstance(current, (ast.FunctionDef, ast.AsyncFunctionDef)):
             return current
         current = getattr(current, "parent", None)
@@ -68,7 +76,7 @@ class MaxNestingDepth(Rule):
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         max_depth = ctx.config.options["max_depth"]
         for function in ctx.functions:
-            if _enclosing_function(function) is not None:
+            if _depth_inheriting_function(function) is not None:
                 continue  # measured by the outermost function, depth inherited (not reset)
             deepest, first_offender = self._measure(function, max_depth)
             if first_offender is not None:
@@ -93,6 +101,8 @@ class MaxNestingDepth(Rule):
 
         def walk(statement: ast.stmt, depth: int) -> None:
             nonlocal deepest, first_offender
+            if isinstance(statement, ast.ClassDef):
+                return  # scope boundary: a local class's methods are measured fresh
             if isinstance(statement, _NESTING_NODES) and not is_elif_branch(statement):
                 depth += 1
                 deepest = max(deepest, depth)

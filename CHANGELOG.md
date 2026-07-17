@@ -86,6 +86,15 @@ whether pre- or post-1.0).
   directory of the `pyproject.toml`/`--config` file) in addition to the
   absolute path.
 - `SM612` no longer flags a local variable that is explicitly `del`ed.
+- `SM616` no longer misreports guarded dispatch (`if cond: return handler`)
+  as "does nothing but hand back" — the bare-forward check now requires the
+  `return` to be the function's sole top-level statement.
+- `SM616` only calls a call `functools.partial` when it resolves to one
+  through the module's imports; an unrelated `something.partial(...)`
+  method is no longer flagged.
+- `ST101` treats a `ClassDef` as a scope boundary (matching `ST105`), so
+  methods of a locally-defined class are measured from their own baseline
+  instead of inheriting the enclosing function's depth.
 - `example.toml` regenerated — it had drifted and was missing the four
   0.2.0 rules (`SM612`, `SM613`, `PY901`, `PY902`); a new test now pins it
   to the generator's output.
