@@ -54,6 +54,16 @@ class TestShortName:
         violations = check("cfg = 1\n", "NM201", min_length=4)
         assert rule_lines(violations) == [("NM201", 1)]
 
+    def test_suggestion_derives_from_container_annotation(self, check):
+        violations = check("def f(bs: list[Trade]):\n    pass\n", "NM201")
+        [param_violation] = [v for v in violations if "parameter" in v.message]
+        assert "`trades`" in param_violation.suggestion
+        assert "list[Trade]" in param_violation.suggestion
+
+    def test_suggestion_falls_back_without_a_hint(self, check):
+        violations = check("d = 1\n", "NM201")
+        assert violations[0].suggestion == "use a descriptive name that states what the value represents"
+
 
 class TestMeaninglessName:
     def test_flags_banned_variable_names(self, check):
@@ -78,6 +88,18 @@ class TestMeaninglessName:
     def test_descriptive_names_pass(self, check):
         source = "user_totals = aggregate(raw_rows)\ndef parse_trades(csv_path):\n    return csv_path\n"
         assert check(source, "NM202") == []
+
+    def test_suggestion_derives_from_assigned_call(self, check):
+        violations = check("data = load_users(path)\n", "NM202")
+        assert violations[0].suggestion == "rename to `users` (from `load_users`)"
+
+    def test_suggestion_falls_back_when_callee_is_only_a_verb(self, check):
+        violations = check("data = load()\n", "NM202")
+        assert "raw_rows" in violations[0].suggestion  # the generic fallback text
+
+    def test_suggestion_falls_back_without_a_hint(self, check):
+        violations = check("tmp = 5\n", "NM202")
+        assert "raw_rows" in violations[0].suggestion  # RHS isn't a call, so no hint
 
 
 class TestCrypticAbbreviation:

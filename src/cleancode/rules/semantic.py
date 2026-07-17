@@ -13,7 +13,13 @@ import ast
 from typing import Iterable, Iterator
 
 from cleancode.models import FileContext, Severity, Violation, ViolationDetails
-from cleancode.rules.base import FunctionNode, Rule, subscript_base_name
+from cleancode.rules.base import (
+    FunctionNode,
+    Rule,
+    call_target_name,
+    split_identifier,
+    subscript_base_name,
+)
 
 _COMP_TYPES = (ast.ListComp, ast.DictComp, ast.SetComp, ast.GeneratorExp)
 
@@ -240,14 +246,6 @@ def _is_add_lambda(node: ast.expr) -> bool:
     )
 
 
-def _reduce_name(func: ast.expr) -> str | None:
-    if isinstance(func, ast.Name):
-        return func.id
-    if isinstance(func, ast.Attribute):
-        return func.attr
-    return None
-
-
 class ReduceInsteadOfSum(Rule):
     id = "SM605"
     name = "reduce-instead-of-sum"
@@ -266,7 +264,7 @@ class ReduceInsteadOfSum(Rule):
         for node in ast.walk(ctx.tree):
             if (
                 isinstance(node, ast.Call)
-                and _reduce_name(node.func) == "reduce"
+                and call_target_name(node.func) == "reduce"
                 and node.args
                 and _is_add_lambda(node.args[0])
             ):
@@ -363,6 +361,43 @@ def _numeric_operand_sites(tree: ast.Module) -> Iterator[tuple[ast.expr, ast.exp
             yield from ((node, operand) for operand in (node.left, *node.comparators))
 
 
+_COMPARISON_PREFIXES: dict[type, str] = {
+    ast.Gt: "MAX_",
+    ast.GtE: "MAX_",
+    ast.Lt: "MIN_",
+    ast.LtE: "MIN_",
+}
+
+
+def _operand_name(node: ast.expr) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return None
+
+
+def _constant_name_hint(node: ast.expr, operand: ast.expr) -> str | None:
+    """A MAX_/MIN_-prefixed constant name for the idiomatic `name <op> literal` shape, else None."""
+    if not _is_named_threshold_compare(node, operand):
+        return None
+    prefix = _COMPARISON_PREFIXES.get(type(node.ops[0]))  # type: ignore[union-attr]
+    base = _operand_name(node.left)  # type: ignore[union-attr]
+    if prefix is None or base is None:
+        return None
+    return prefix + "_".join(word.upper() for word in split_identifier(base))
+
+
+def _is_named_threshold_compare(node: ast.expr, operand: ast.expr) -> bool:
+    """True for `<name> <op> <literal>` — the only shape unambiguous enough to name."""
+    return (
+        isinstance(node, ast.Compare)
+        and len(node.ops) == 1
+        and len(node.comparators) == 1
+        and operand is node.comparators[0]
+    )
+
+
 class MagicNumber(Rule):
     id = "SM607"
     name = "magic-number"
@@ -384,12 +419,13 @@ class MagicNumber(Rule):
         for node, operand in _numeric_operand_sites(ctx.tree):
             value = _numeric_value(operand)
             if value is not None and value not in ignore:
+                constant_name = _constant_name_hint(node, operand) or "SOME_DESCRIPTIVE_NAME"
                 yield self.violation(
                     ctx,
                     operand,
                     ViolationDetails(
                         message=f"magic number `{value}` — extract it to a named, typed constant",
-                        suggestion=f"e.g. `SOME_DESCRIPTIVE_NAME = {value}`",
+                        suggestion=f"e.g. `{constant_name} = {value}`",
                         symbol=ctx.enclosing_symbol(node),
                     ),
                 )

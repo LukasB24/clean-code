@@ -28,6 +28,15 @@ def functions(tree: ast.Module) -> Iterator[FunctionNode]:
             yield node
 
 
+def call_target_name(func: ast.expr) -> str | None:
+    """A call's own name: ``reduce(...)`` -> ``"reduce"``, ``obj.load(...)`` -> ``"load"``."""
+    if isinstance(func, ast.Name):
+        return func.id
+    if isinstance(func, ast.Attribute):
+        return func.attr
+    return None
+
+
 def subscript_base_name(node: ast.Subscript) -> str | None:
     """The name a subscript's ``.value`` resolves to: ``x[...]`` -> ``"x"``, ``a.b[...]`` -> ``"b"``."""
     value = node.value

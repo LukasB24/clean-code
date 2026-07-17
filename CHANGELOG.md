@@ -30,6 +30,14 @@ whether pre- or post-1.0).
   `tests/test_examples.py` runs every `bad` and `good` snippet through the
   engine and requires the rule to fire on one and not the other, doubling
   as a permanent regression net.
+- Context-aware suggestions for three high-value rules, falling back to the
+  previous generic text when no hint is available: `NM202`/`NM201` derive a
+  rename candidate from the flagged binding's own annotation (`bounds: list[Trade]`
+  → `trades`) or the call it's assigned from (`data = load_users(path)` →
+  `users`, from `load_users`); `SM607` derives a `MAX_`/`MIN_`-prefixed
+  constant name from the idiomatic `name <op> literal` comparison shape
+  (`if retries > 5` → `MAX_RETRIES = 5`). `Binding` now carries the AST node
+  it was bound at.
 - `SM618` `thin-delegation-wrapper` — flags a private function whose whole
   body is `return <one call to another function>`, a hop that only renames
   work. Public functions, decorated functions, dunders, builtin callees, and
