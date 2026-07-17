@@ -26,12 +26,7 @@ def _is_return_of(statement: ast.stmt, name: str) -> bool:
 
 
 def _is_simple_name_assign(statement: ast.stmt) -> str | None:
-    """The bound name of a plain `name = expr` statement, else ``None``.
-
-    Only a single, un-annotated ``Name`` target counts — an annotated
-    assignment (`name: T = expr`) carries information beyond the expression,
-    so it's exempt.
-    """
+    # An annotated target (`name: T = expr`) is exempt; it carries information.
     if not (isinstance(statement, ast.Assign) and len(statement.targets) == 1):
         return None
     target = statement.targets[0]

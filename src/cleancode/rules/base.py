@@ -23,12 +23,9 @@ def is_dunder(name: str) -> bool:
 
 
 def is_private(name: str) -> bool:
-    """True for a `_`-prefixed internal name, dunders excluded.
-
-    A private name has no external readers to write prose documentation
-    for — only its own (short) body does, so a docstring on one earns its
-    keep at a much stricter bar than a public API's.
-    """
+    # A private name has no external readers to write prose documentation
+    # for — only its own (short) body does, so a docstring on one earns its
+    # keep at a much stricter bar than a public API's.
     return name.startswith("_") and not is_dunder(name)
 
 
@@ -39,11 +36,8 @@ def functions(tree: ast.Module) -> Iterator[FunctionNode]:
 
 
 def simple_name(node: ast.expr) -> str | None:
-    """A bare or dotted expression's own terminal identifier.
-
-    ``reduce`` -> ``"reduce"``, ``obj.load`` -> ``"load"`` — for anything else
-    (a call, a subscript, ...) there is no single name to point at.
-    """
+    """``reduce`` -> ``"reduce"``, ``obj.load`` -> ``"load"`` — anything else
+    (a call, a subscript, ...) has no single name to point at."""
     if isinstance(node, ast.Name):
         return node.id
     if isinstance(node, ast.Attribute):
@@ -52,13 +46,8 @@ def simple_name(node: ast.expr) -> str | None:
 
 
 def statement_blocks(function: FunctionNode) -> Iterator[list[ast.stmt]]:
-    """Every statement list nested directly inside ``function``, one per scope.
-
-    A block is the function body itself, or the body/orelse/finalbody/except/
-    match-case of any statement within it. Nested function and class
-    definitions are skipped — they are examined on their own.
-    """
-
+    # Nested function/class definitions are skipped — they're examined on
+    # their own, not folded into the enclosing function's blocks.
     def walk(statements: list[ast.stmt]) -> Iterator[list[ast.stmt]]:
         yield statements
         for statement in statements:
