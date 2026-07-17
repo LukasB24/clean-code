@@ -109,6 +109,17 @@ whether pre- or post-1.0).
 
 ### Changed
 
+- `CM301` tightened further: default `overlap` lowered from 0.7 to 0.6, and
+  a new `private_overlap` (default 0.35) judges any `_`-prefixed function or
+  class at a much stricter bar — a private name has no external reader to
+  write prose for, only its own (usually short) body. Motivated by a real
+  review finding: a private helper's docstring that paraphrased its own
+  body in different words, with no literal signature-word reuse, scored
+  0.625 against the old single 0.7 threshold and slipped through entirely.
+  `CM302`'s default `overlap` also lowered, 0.7 to 0.5, for the same reason
+  applied to inline/standalone comments. Both are pre-1.0 behavior changes;
+  re-run `clean-code check` after upgrading — code that passed before may
+  not now.
 - `CM301`'s default `overlap` lowered from 0.8 to 0.7 — pre-1.0, so this is
   a behavior change, not just a new rule; it now also scores the whole text
   of a two-line docstring instead of only its first line.

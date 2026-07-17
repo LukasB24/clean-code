@@ -56,7 +56,6 @@ def _references_ast_module(node: ast.expr) -> bool:
 
 
 def _type_check_target(test: ast.expr) -> str | None:
-    """The variable name a branch type-switches on, or ``None`` if it isn't one."""
     if _is_isinstance_call(test):
         type_arg = test.args[1]  # type: ignore[union-attr]
         if _references_ast_module(type_arg):
@@ -87,7 +86,6 @@ def _elif_chain(node: ast.If) -> Iterator[ast.If]:
 
 
 def _common_type_switch(branches: list[ast.If], min_branches: int) -> tuple[str, int] | None:
-    """The (name, count) of a leading run of branches type-switching on one name."""
     targets = [_type_check_target(branch.test) for branch in branches]
     if not targets or targets[0] is None:
         return None
@@ -149,7 +147,6 @@ def _is_non_instance_method(method: FunctionNode) -> bool:
 
 
 def _instance_methods(class_def: ast.ClassDef) -> list[FunctionNode]:
-    """Non-dunder, non-static/classmethod methods — the ones cohesion applies to."""
     return [
         item
         for item in class_def.body

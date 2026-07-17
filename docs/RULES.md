@@ -20,8 +20,8 @@ quick-start, see the [README](../README.md).
 | NM201 | short-name | `min_length=3, allowed=[i,j,k,n,x,y,_,id,ok,fh]` | warning |
 | NM202 | meaningless-name | configurable ban lists | warning |
 | NM203 | cryptic-abbreviation | `known_abbrevs=[cfg,ctx,idx,…]` | info |
-| CM301 | docstring-restates-name | `overlap=0.7` | warning |
-| CM302 | comment-restates-code | `overlap=0.7, min_words=2` | warning |
+| CM301 | docstring-restates-name | `overlap=0.6, private_overlap=0.35` | warning |
+| CM302 | comment-restates-code | `overlap=0.5, min_words=2` | warning |
 | CM303 | comment-density | `max_ratio=0.3, min_code_lines=5` | info |
 | CM304 | boilerplate-param-docs | `min_uninformative=0.5` | warning |
 | CM305 | file-comment-density | `max_ratio=0.2, min_code_lines=30` | warning |
@@ -68,6 +68,11 @@ quick-start, see the [README](../README.md).
 - **CM301/CM302 are deterministic, not LLM-judged** — they compare word
   overlap between a docstring/comment and the code it annotates. Comments
   explaining *why* (not *what*) are always exempt.
+- **CM301 judges a `_`-prefixed (private) function/class at a much stricter
+  `private_overlap` (default 0.35) than a public one (`overlap`, default
+  0.6)** — a private name has no external reader to write prose for, only
+  its own body, which the reader can just read instead. Dunders are judged
+  as public, not private.
 - **CM301 also covers class docstrings** (reference words = the class name
   plus its directly-defined method names) and, for docstrings longer than
   two lines, flags one whose *every* non-empty line never leaves the

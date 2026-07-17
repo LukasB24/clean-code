@@ -10,7 +10,6 @@ from cleancode.rules.base import FunctionNode, Rule, subscript_base_name
 
 
 def _annotations(function: FunctionNode) -> Iterator[tuple[ast.expr, str]]:
-    """Yield (annotation, label) for each annotated parameter and the return type."""
     args = function.args
     params = [*args.posonlyargs, *args.args, *args.kwonlyargs, args.vararg, args.kwarg]
     for arg in params:

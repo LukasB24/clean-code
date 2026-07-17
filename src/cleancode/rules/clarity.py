@@ -57,7 +57,6 @@ def _contains_nested_ternary(ternary: ast.IfExp) -> bool:
 
 
 def _inside_ternary(node: ast.AST) -> bool:
-    """True when ``node`` sits inside another ternary of the same statement."""
     current = getattr(node, "parent", None)
     while current is not None and not isinstance(current, ast.stmt):
         if isinstance(current, ast.IfExp):
@@ -107,7 +106,6 @@ class _ModuleCallables:
 
 
 def _bound_names(node: ast.Import | ast.ImportFrom, source_name: str) -> list[str]:
-    """The names one import statement binds for the alias originally called ``source_name``."""
     return [alias.asname or alias.name for alias in node.names if alias.name == source_name]
 
 
@@ -323,7 +321,6 @@ def _is_private_helper(function: FunctionNode) -> bool:
 
 
 def _sole_returned_call(function: FunctionNode) -> ast.Call | None:
-    """The call a single-statement ``return <call>`` body hands back, else ``None``."""
     body = function.body
     if body and _is_docstring(body[0]):
         body = body[1:]

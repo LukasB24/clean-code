@@ -129,7 +129,6 @@ def _hint_from_annotation(annotation: ast.expr) -> _NameHint | None:
 
 
 def _annotation_leaf_name(annotation: ast.expr) -> str | None:
-    """The type name an annotation is 'about': a container's element type, else its own name."""
     if isinstance(annotation, ast.Subscript) and subscript_base_name(annotation) in _CONTAINER_ANNOTATIONS:
         inner = annotation.slice
         element = inner.elts[0] if isinstance(inner, ast.Tuple) else inner

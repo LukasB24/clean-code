@@ -15,7 +15,6 @@ from cleancode.rules.base import Rule
 
 
 def _is_chain_head(node: ast.Subscript) -> bool:
-    """True when ``node`` is not itself the ``.value`` of an enclosing subscript."""
     parent = getattr(node, "parent", None)
     return not (isinstance(parent, ast.Subscript) and parent.value is node)
 
@@ -35,7 +34,6 @@ def _in_annotation(node: ast.Subscript) -> bool:
 
 
 def _is_annotation_slot(parent: ast.AST, child: ast.AST) -> bool:
-    """True when ``child`` fills the annotation slot of a var/param/return type."""
     if isinstance(parent, (ast.AnnAssign, ast.arg)):
         return child is parent.annotation
     if isinstance(parent, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -65,7 +63,6 @@ def _index_features(index: ast.expr) -> tuple[int, list[str]]:
 
 
 def _score_node(node: ast.AST, negative_steps: set[ast.AST]) -> tuple[int, list[str]] | None:
-    """Score one node inside a subscript index, dispatched by its concrete AST type."""
     scorer = _NODE_SCORERS.get(type(node))
     return scorer(node, negative_steps) if scorer else None
 
@@ -184,7 +181,6 @@ class ComplexSubscript(Rule):
 
 
 def _nested_in_another_index(node: ast.Subscript) -> bool:
-    """True if this subscript lives inside an enclosing subscript's index."""
     child: ast.AST = node
     parent = getattr(node, "parent", None)
     while parent is not None and not isinstance(parent, ast.stmt):

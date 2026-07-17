@@ -31,14 +31,12 @@ _NESTING_NODES = (
 
 
 def _body_statements(node: ast.AST) -> Iterator[ast.stmt]:
-    """Direct child statements of a block node, across all its clauses."""
     for clause in ("body", "orelse", "finalbody", "handlers", "cases"):
         for child in getattr(node, clause, []):
             yield from _clause_statements(child)
 
 
 def _clause_statements(child: ast.AST) -> Iterator[ast.stmt]:
-    """Normalize one clause child into the statements that nest under it."""
     if isinstance(child, ast.ExceptHandler):
         yield from child.body
     elif isinstance(child, ast.match_case):

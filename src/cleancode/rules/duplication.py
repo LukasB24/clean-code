@@ -96,7 +96,6 @@ def _is_docstring_expr(statement: ast.stmt) -> bool:
 
 
 def _significant_body(function: FunctionNode) -> list[ast.stmt]:
-    """The function body with a leading docstring (if any) stripped."""
     body = function.body
     if body and _is_docstring_expr(body[0]):
         return body[1:]
@@ -159,7 +158,6 @@ def _comparable_body(function: FunctionNode, min_statements: int) -> list[ast.st
 def _file_fingerprints(
     parsed: ParsedFile, min_statements: int, exact: bool
 ) -> Iterable[tuple[str, _Member]]:
-    """(fingerprint, member) for every comparable function in one file."""
     imported = {name for name, _ in import_aliases(parsed.tree)}
     for function in parsed.functions:
         body = _comparable_body(function, min_statements)
@@ -187,7 +185,6 @@ class _DuplicationRule(ProjectRule):
     _SUGGESTION: ClassVar[str]
 
     def _flag_group(self, config: "Config", members: list[_Member]) -> Iterable[Violation]:
-        """One violation per member after the first, pointing back at the original."""
         first_parsed, first_function = members[0]
         for parsed, function in members[1:]:
             yield self.violation(

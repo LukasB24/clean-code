@@ -22,6 +22,16 @@ def is_dunder(name: str) -> bool:
     return name.startswith("__") and name.endswith("__")
 
 
+def is_private(name: str) -> bool:
+    """True for a `_`-prefixed internal name, dunders excluded.
+
+    A private name has no external readers to write prose documentation
+    for — only its own (short) body does, so a docstring on one earns its
+    keep at a much stricter bar than a public API's.
+    """
+    return name.startswith("_") and not is_dunder(name)
+
+
 def functions(tree: ast.Module) -> Iterator[FunctionNode]:
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -87,7 +97,6 @@ def end_line(node: ast.AST) -> int:
 
 
 def docstring_node(owner: ast.Module | ast.ClassDef | FunctionNode) -> ast.Constant | None:
-    """The string constant of ``owner``'s docstring, or ``None``."""
     if not owner.body:
         return None
     first = owner.body[0]

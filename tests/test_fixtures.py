@@ -80,6 +80,7 @@ EXPECTED_DIRTY_RULES = {
     },
     "llm_style_noise.py": {
         "CM306",  # two `# ====...====` banner comments
+        "CM302",  # '# Order classification' restates classify_order below it
         "ST109",  # classify_order: if/else both branches return
         "NM202",  # result = sum(...)
         "SM620",  # result = sum(...); return result

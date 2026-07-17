@@ -138,7 +138,6 @@ def _docstring_line_span(owner: ast.Module | ast.ClassDef | FunctionNode) -> set
 
 
 def _all_docstring_lines(tree: ast.Module) -> set[int]:
-    """Line numbers covered by any module, class, or function docstring."""
     lines: set[int] = set()
     for node in ast.walk(tree):
         if isinstance(node, _DOCSTRING_OWNERS):
@@ -163,7 +162,6 @@ def _informative(words: set[str]) -> set[str]:
 
 
 def _code_line_words(code_text: str) -> set[str]:
-    """All words a lazy comment could copy from this line of code."""
     words: set[str] = set()
     for identifier in IDENTIFIER.findall(code_text):
         words.update(split_identifier(identifier))
@@ -180,7 +178,7 @@ class CommentRestatesCode(Rule):
     id = "CM302"
     name = "comment-restates-code"
     default_severity = Severity.WARNING
-    default_options = {"overlap": 0.7, "min_words": 2}
+    default_options = {"overlap": 0.5, "min_words": 2}
     description = (
         "Flags comments that paraphrase the code line they annotate "
         "(`x = x + 1  # increment x by 1`, `for k in range(3):  # iterate three "
@@ -205,7 +203,6 @@ class CommentRestatesCode(Rule):
                 )
 
     def _candidates(self, ctx: FileContext) -> Iterator[tuple[Comment, set[str]]]:
-        """Yield (comment, words) for comments substantial enough to be worth checking."""
         min_words = ctx.config.options["min_words"]
         for comment in ctx.comments:
             if _is_exempt(comment) or not comment.text:
@@ -276,7 +273,6 @@ class CommentDensity(Rule):
 
     @staticmethod
     def _count_lines(ctx: FileContext, function: FunctionNode) -> tuple[int, int]:
-        """Non-blank (code, comment) line counts inside one function body."""
         comment_only_lines: set[int] = set()
         inline_comment_lines: set[int] = set()
         for comment in ctx.comments:
@@ -356,7 +352,6 @@ class FileCommentDensity(Rule):
 
     @staticmethod
     def _count_file_lines(ctx: FileContext) -> tuple[int, int]:
-        """Non-blank (code, comment) line counts across the whole file."""
         standalone_lines, counted_standalone, counted_inline = _comment_line_sets(ctx.comments)
         docstring_lines = _all_docstring_lines(ctx.tree)
         code_lines = 0

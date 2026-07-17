@@ -25,7 +25,6 @@ _COMP_TYPES = (ast.ListComp, ast.DictComp, ast.SetComp, ast.GeneratorExp)
 
 
 def _nested_ternary_comprehension(node: ast.AST) -> ast.AST | None:
-    """A comprehension nested inside ``node`` whose filter is itself a ternary."""
     for child in ast.walk(node):
         if child is node:
             continue
@@ -353,7 +352,6 @@ def _numeric_value(node: ast.expr) -> int | float | None:
 
 
 def _numeric_operand_sites(tree: ast.Module) -> Iterator[tuple[ast.expr, ast.expr]]:
-    """(parent node, operand) for every direct BinOp/Compare operand in the tree."""
     for node in ast.walk(tree):
         if isinstance(node, ast.BinOp):
             yield from ((node, operand) for operand in (node.left, node.right))

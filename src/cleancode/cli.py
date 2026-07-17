@@ -225,7 +225,6 @@ _SNIPPET_TRUNCATE_ABOVE = 14
 
 
 def _print_snippet(code: str) -> None:
-    """Print an indented code snippet, truncating a very long one for readability."""
     lines = code.splitlines()
     if len(lines) <= _SNIPPET_TRUNCATE_ABOVE:
         for line in lines:
@@ -282,7 +281,7 @@ def _apply_ignore(config: Config, ignore: str) -> None:
 def _filter_by_severity(
     file_results: list[CheckResult], min_severity: Severity
 ) -> list[CheckResult]:
-    """Violations at or above ``min_severity`` for display, exit code unaffected."""
+    # Display-only: the exit code is computed separately and ignores this filter.
     return [
         CheckResult(
             path=file_result.path,

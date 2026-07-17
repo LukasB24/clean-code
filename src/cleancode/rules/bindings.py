@@ -50,7 +50,6 @@ def _annotated_names(function: FunctionNode) -> dict[str, str]:
 
 
 def _isinstance_call_args(node: ast.AST) -> tuple[ast.Name, ast.expr] | None:
-    """``(target, type_arg)`` for an ``isinstance(target, type_arg)`` call, else ``None``."""
     if not (
         isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
@@ -211,7 +210,6 @@ def _class_body_field_positions(tree: ast.Module) -> set[tuple[int, int]]:
 
 
 def _flatten_target(target: ast.expr) -> list[ast.Name] | None:
-    """Name leaves of a simple (optionally tuple/list-unpacking) target, else None."""
     if isinstance(target, ast.Name):
         return [target]
     if not isinstance(target, (ast.Tuple, ast.List)):
@@ -327,7 +325,6 @@ class UnusedBinding(Rule):
 
 
 def _class_body_assign_names(target: ast.expr) -> Iterator[ast.Name]:
-    """Name leaves of a class-body assignment target, including tuple/list unpacking."""
     if isinstance(target, ast.Name):
         yield target
     elif isinstance(target, (ast.Tuple, ast.List)):
