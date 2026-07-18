@@ -180,11 +180,16 @@ def _informative(words: set[str]) -> set[str]:
     return filtered or words
 
 
-def _code_line_words(code_text: str) -> set[str]:
-    """All words a lazy comment could copy from this line of code."""
+def _operator_synonym_words(code_text: str) -> set[str]:
+    """Verb-like vocabulary a comment could use to describe this line's *operations*.
+
+    Unlike `_code_line_words`, this skips identifiers entirely — matching a
+    docstring against a whole function body (as CM301's body-paraphrase check
+    does) can't treat "this docstring's noun happens to also be a variable
+    name" as restatement, or every docstring that reuses its own domain
+    vocabulary would get flagged.
+    """
     words: set[str] = set()
-    for identifier in _IDENTIFIER.findall(code_text):
-        words.update(split_identifier(identifier))
     for numeral in _NUMBER.findall(code_text):
         words.add(numeral)
         words.update(_NUMBER_TO_WORDS.get(numeral, ()))
@@ -194,15 +199,57 @@ def _code_line_words(code_text: str) -> set[str]:
     return words
 
 
+def _code_line_words(code_text: str) -> set[str]:
+    """All words a lazy comment could copy from this line of code."""
+    words: set[str] = set()
+    for identifier in _IDENTIFIER.findall(code_text):
+        words.update(split_identifier(identifier))
+    words.update(_operator_synonym_words(code_text))
+    return words
+
+
+def _function_body_words(ctx: FileContext, function: FunctionNode) -> set[str]:
+    """Operator/keyword vocabulary (see `_operator_synonym_words`) for a function's body.
+
+    Unions the per-line synonym words across every body line so a docstring can
+    be compared against what the *implementation does*, not just the signature.
+    Docstring lines and comment-only lines are skipped; a line with a trailing
+    inline comment only contributes its code portion.
+    """
+    docstring_lines = _docstring_line_span(function)
+    comment_only_lines: set[int] = set()
+    inline_comment_columns: dict[int, int] = {}
+    for comment in ctx.comments:
+        if comment.inline:
+            inline_comment_columns[comment.lineno] = comment.col_offset
+        else:
+            comment_only_lines.add(comment.lineno)
+    start = function.body[0].lineno if function.body else function.lineno
+    end = function.end_lineno or function.lineno
+    words: set[str] = set()
+    for line_number in range(start, end + 1):
+        if line_number in docstring_lines or line_number in comment_only_lines:
+            continue
+        text = ctx.lines[line_number - 1]
+        column = inline_comment_columns.get(line_number)
+        words.update(_operator_synonym_words(text[:column] if column is not None else text))
+    return words
+
+
 class DocstringRestatesName(Rule):
     id = "CM301"
     name = "docstring-restates-name"
     default_severity = Severity.WARNING
-    default_options = {"overlap": 0.8}
+    default_options = {"overlap": 0.8, "body_overlap": 0.6}
     description = (
         "Flags short docstrings whose words all come from the function signature "
         '(`def get_user_name`: """Gets the user name.""") — they cost reading time '
-        "and add nothing."
+        "and add nothing. Also flags docstrings that paraphrase what the body does "
+        '(`def add(a, b)`: """Adds a and b and returns the sum.""") using the same '
+        "operator-synonym vocabulary as CM302, so a paraphrase scores the same as a "
+        "verbatim restatement. Docstrings carrying a causal/justification marker "
+        "(because, since, workaround, instead, ...) are exempt from the body check "
+        "— that's a *why*, not a *what*."
     )
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
@@ -222,6 +269,8 @@ class DocstringRestatesName(Rule):
                 message = (
                     f"docstring of `{function.name}` only restates the function signature"
                 )
+            elif self._paraphrases_body(ctx, function, doc_words):
+                message = f"docstring of `{function.name}` only paraphrases the function body"
             else:
                 continue
             yield self.violation(
@@ -236,6 +285,17 @@ class DocstringRestatesName(Rule):
                     symbol=function.name,
                 ),
             )
+
+    def _paraphrases_body(self, ctx: FileContext, function: FunctionNode, doc_words: set[str]) -> bool:
+        """True when the docstring's words mostly duplicate the body's operations in synonym form."""
+        if _stemmed(doc_words) & _WHY_SIGNALS:
+            return False  # carries a rationale marker — that's a *why*, never a restatement
+        informative = _informative(doc_words)
+        body_words = _function_body_words(ctx, function)
+        if not informative or not body_words:
+            return False
+        threshold = ctx.config.options["body_overlap"]
+        return len(_stemmed(informative) & body_words) / len(informative) >= threshold
 
 
 class CommentRestatesCode(Rule):
