@@ -12,7 +12,15 @@ whether pre- or post-1.0).
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- CM301 (`docstring-restates-name`) now also flags docstrings that
+  paraphrase the function body's operations using synonyms (`"""Adds a
+  and b and returns the sum."""` on `return a + b`), reusing CM302's
+  operator-synonym vocabulary so a paraphrase scores the same as a
+  verbatim restatement. Docstrings carrying a causal/justification
+  marker (because, since, workaround, instead, ...) are exempt from
+  this check, same as CM302. New `body_overlap` option (default `0.6`).
 
 ## [0.2.1] - 2026-07-15
 
