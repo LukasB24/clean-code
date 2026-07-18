@@ -12,12 +12,39 @@ This document describes the design as implemented on this branch: a
 **pretrained lightweight backbone with a trained classifier head**, plus the
 deterministic guards that keep its false-positive rate near zero.
 
-## Architecture
+## Relationship to PR #30
 
-Two tiers. Tier 1 is unchanged: the deterministic AST/lexical rules run
-first, and anything they flag never reaches tier 2 (no double reports).
+A second, independent PR (#30, targeting `main`) tackled the same issue with
+a different mechanism: extending CM301 with a deterministic operator-synonym
+overlap check against the whole function body (reusing CM302's
+`_OPERATOR_SYNONYMS` table), with no new dependency. Since `main` is behind
+`dev` (PR #30's CM301 diff predates this branch's tiered short/long-docstring
+architecture), its exact diff can't apply here, and simply *narrowing* CM307
+around a check that doesn't exist on `dev` would have silently regressed
+issue #28's own acceptance example. So this branch implements the same
+concept for real, adapted to `dev`'s current CM301 (see "Three tiers, not
+two" below), rather than deferring to a PR on a different, older base.
+Reconciling the two PRs at merge time (which approach — or both — ultimately
+lands on `main`/`dev`) is a call for the repo owner, not this branch.
+
+## Architecture: three tiers, not two
+
+Tier 1 is CM301/CM302's deterministic word-overlap checks, unchanged except
+for one addition: **CM301 now also catches an operator-synonym-anchored body
+paraphrase** (`"""Adds two numbers and returns the sum."""` over `return a +
+b`), reusing CM302's operator/keyword-synonym table against the whole
+function body instead of one annotated code line (new `body_overlap` option,
+default `0.6`; why-signal docstrings stay exempt). This closes the gap PR #30
+identified without waiting on that PR's merge.
+
 Tier 2 is the new rule **CM307 `docstring-semantic-restatement`**
-(`rules/docstrings.py`), backed by `src/cleancode/semantics/`:
+(`rules/semantic_restatement.py`), backed by `src/cleancode/semantics/`, for
+paraphrases that have no strong operator/keyword anchor at all — loose
+verb-synonym narration tier 1's regex table structurally can't reach. Both
+tiers share one gate: `rules/docstrings.py::_restatement` is CM301's own
+check *and* CM307's tier-1 test (`_semantic_candidate` calls it before
+scoring), so widening tier 1 automatically narrows CM307's territory and the
+two rules can never double-report the same docstring.
 
 - **Backbone (frozen, pretrained):** WordLlama `l2_supercat_256` static token
   embeddings, distilled at build time by `tools/distill_backbone.py` into a
@@ -55,8 +82,9 @@ Tier 2 is the new rule **CM307 `docstring-semantic-restatement`**
   as the one paragraph a reader sees, so a wrapped rationale is never
   split into misleading fragments.
 - Skipped entirely: anything CM301/CM302 at default thresholds already
-  catch, TODO/directive comments, texts carrying a why-signal word
-  (because, workaround, ...), and texts below `min_words` content words.
+  catch — including CM301's operator-synonym body-overlap check — plus
+  TODO/directive comments, texts carrying a why-signal word (because,
+  workaround, ...), and texts below `min_words` content words.
 - Options: `threshold` (default 0.75), `min_words` (3), `max_lines` (3);
   severity and enablement work like every other rule.
 

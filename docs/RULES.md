@@ -20,7 +20,7 @@ quick-start, see the [README](../README.md).
 | NM201 | short-name | `min_length=3, allowed=[i,j,k,n,x,y,_,id,ok,fh]` | warning |
 | NM202 | meaningless-name | configurable ban lists | warning |
 | NM203 | cryptic-abbreviation | `known_abbrevs=[cfg,ctx,idx,…]` | info |
-| CM301 | docstring-restates-name | `overlap=0.6, private_overlap=0.35` | warning |
+| CM301 | docstring-restates-name | `overlap=0.6, private_overlap=0.35, body_overlap=0.6` | warning |
 | CM302 | comment-restates-code | `overlap=0.5, min_words=2` | warning |
 | CM303 | comment-density | `max_ratio=0.3, min_code_lines=5` | info |
 | CM304 | boilerplate-param-docs | `min_uninformative=0.5` | warning |
@@ -74,16 +74,26 @@ quick-start, see the [README](../README.md).
   0.6)** — a private name has no external reader to write prose for, only
   its own body, which the reader can just read instead. Dunders are judged
   as public, not private.
+- **CM301 also catches a *paraphrased* body**, not just a verbatim one: a
+  function docstring whose words are mostly synonyms of its body's
+  operators/keywords (`"""Adds two numbers and returns the sum."""` over
+  `return a + b`) is flagged at `body_overlap`, reusing CM302's
+  operator-synonym table (`+` → add/plus/sum/…, `for` → loop/iterate/…)
+  against the *whole* function body rather than one annotated line. A
+  why-signal docstring (because, workaround, instead, ...) is exempt from
+  this check, same as CM302's comments.
 - **CM307 is the semantic second tier behind CM301/CM302** — a vendored
   pretrained-embedding classifier (pure numpy, no ML framework, deterministic,
   microseconds per comment) scores each *clause* of a docstring/comment as
-  procedural narration vs. rationale, catching synonym paraphrases the
-  word-overlap rules can't see (`"""Adds two numbers and returns the sum."""`
-  over `return a + b`). A text is flagged only when every clause is verb-led
-  narration scoring above `threshold`; one rationale clause, noun-led value
-  contract, or unknown-vocabulary clause clears it. Anything CM301/CM302
-  already flag is skipped (nothing is double-reported), and scope is limited
-  to undecorated function docstrings of at most `max_lines` lines plus
+  procedural narration vs. rationale, catching the more diffuse synonym
+  paraphrases that even CM301's operator-anchored body check can't reach
+  (loose narration with no strong operator/keyword anchor). A text is
+  flagged only when every clause is verb-led narration scoring above
+  `threshold`; one rationale clause, noun-led value contract, or
+  unknown-vocabulary clause clears it. Anything CM301/CM302 already flag —
+  including CM301's operator-synonym body check — is skipped, so the two
+  rules never double-report the same paraphrase; scope is limited to
+  undecorated function docstrings of at most `max_lines` lines plus
   standalone comment blocks.
 - **CM301 also covers class docstrings** (reference words = the class name
   plus its directly-defined method names) and, for docstrings longer than

@@ -14,19 +14,27 @@ whether pre- or post-1.0).
 
 ### Added
 
-- `CM307` `docstring-semantic-restatement` — the semantic second tier behind
-  the deterministic CM301/CM302 word-overlap rules, bringing the total to 52.
-  A vendored pretrained-embedding backbone (distilled from WordLlama
-  `l2_supercat_256` into a 1.2 MB int8 word table by
-  `tools/distill_backbone.py`) with a logistic classifier head (trained
-  reproducibly by `tools/train_head.py` on the labeled clause corpus in
-  `tools/data/what_why.jsonl`) scores each clause of a docstring/comment as
-  procedural narration vs. rationale. It catches synonym paraphrases the
-  lexical rules structurally cannot see (`"""Adds two numbers and returns
-  the sum."""` over `return a + b`) while passing composite comments that
-  also carry rationale ("... to maximize L1 cache hits"). Inference is pure
-  numpy — no ML framework anywhere, deterministic outputs, microseconds per
-  comment.
+- Docstring paraphrase detection for issue #28, in two tiers:
+  - `CM301` (`docstring-restates-name`) now also catches a docstring that
+    paraphrases the function body in synonyms rather than restating it
+    verbatim (`"""Adds two numbers and returns the sum."""` over `return a +
+    b`), reusing CM302's operator/keyword-synonym table against the whole
+    body instead of one annotated line. New `body_overlap` option (default
+    `0.6`); why-signal docstrings are exempt, same as CM302.
+  - `CM307` `docstring-semantic-restatement` — a second, semantic tier for
+    the more diffuse paraphrases CM301's operator-anchored check can't reach
+    (loose verb-synonym narration with no strong operator/keyword anchor),
+    bringing the total to 52. A vendored pretrained-embedding backbone
+    (distilled from WordLlama `l2_supercat_256` into a 1.2 MB int8 word
+    table by `tools/distill_backbone.py`) with a logistic classifier head
+    (trained reproducibly by `tools/train_head.py` on the labeled clause
+    corpus in `tools/data/what_why.jsonl`) scores each clause of a
+    docstring/comment as procedural narration vs. rationale, passing
+    composite comments that also carry rationale ("... to maximize L1 cache
+    hits"). Inference is pure numpy — no ML framework anywhere,
+    deterministic outputs, microseconds per comment. Anything CM301/CM302
+    already flag (including CM301's new body-overlap check) is skipped, so
+    the two tiers never double-report the same paraphrase.
 - `numpy>=1.26` as a runtime dependency (for CM307's embedding lookups); the
   runtime environment remains free of `torch`/`scikit-learn`/any ML
   framework, now enforced by a test.

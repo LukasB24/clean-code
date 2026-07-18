@@ -21,11 +21,7 @@ from cleancode.rules.comments import (
     FileCommentDensity,
 )
 from cleancode.rules.correctness import BareExcept, EmptyExceptionHandler, OversizedTry
-from cleancode.rules.docstrings import (
-    BoilerplateParamDocs,
-    DocstringRestatesName,
-    SemanticRestatement,
-)
+from cleancode.rules.docstrings import BoilerplateParamDocs, DocstringRestatesName
 from cleancode.rules.duplication import DuplicateFunctionBody, IdenticalFunctionImplementation
 from cleancode.rules.hints import UninformativeAny
 from cleancode.rules.naming import CrypticAbbreviation, MeaninglessName, ShortName
@@ -41,6 +37,7 @@ from cleancode.rules.semantic import (
     RedundantBooleanTernary,
     RepeatedCollectionIteration,
 )
+from cleancode.rules.semantic_restatement import SemanticRestatement
 from cleancode.rules.slicing import ChainedSubscript, ComplexSubscript
 from cleancode.rules.solid import ClassAsNamespace, LowCohesionClass, TypeSwitchViolatesOCP
 from cleancode.rules.structure import (

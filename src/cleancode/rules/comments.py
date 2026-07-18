@@ -114,16 +114,30 @@ def _informative(words: set[str]) -> set[str]:
     return filtered or words
 
 
-def _code_line_words(code_text: str) -> set[str]:
+def operator_synonym_words(code_text: str) -> set[str]:
+    """Verb-like vocabulary a comment/docstring could use to describe this code's *operations* — no raw identifiers.
+
+    Excluding identifiers matters for a comparison spanning more than one
+    annotated line (CM301 uses this against a whole function body): folding
+    identifiers in would treat "this text's noun happens to also be a
+    variable name" as a restatement signal, flagging every docstring that
+    reuses its own domain vocabulary.
+    """
     words: set[str] = set()
-    for identifier in IDENTIFIER.findall(code_text):
-        words.update(split_identifier(identifier))
     for numeral in _NUMBER.findall(code_text):
         words.add(numeral)
         words.update(_NUMBER_TO_WORDS.get(numeral, ()))
     for pattern, synonyms in _OPERATOR_SYNONYMS:
         if pattern.search(code_text):
             words.update(synonyms)
+    return words
+
+
+def _code_line_words(code_text: str) -> set[str]:
+    words: set[str] = set()
+    for identifier in IDENTIFIER.findall(code_text):
+        words.update(split_identifier(identifier))
+    words.update(operator_synonym_words(code_text))
     return words
 
 

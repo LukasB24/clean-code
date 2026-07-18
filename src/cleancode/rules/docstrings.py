@@ -1,10 +1,9 @@
-"""Docstring noise rules (CM301, CM304, CM307).
+"""Docstring noise rules (CM301, CM304). CM307 lives in ``semantic_restatement.py``.
 
-CM301/CM304 deterministically detect the classic LLM docstring padding: a
-docstring that restates the signature, and Args sections that document
-nothing. The core trick is word-overlap between the natural-language text
-and the identifiers it describes. CM307 is the semantic second tier for the
-paraphrases word-overlap cannot see — see ``cleancode.semantics``.
+These rules deterministically detect the classic LLM docstring padding: a
+docstring that restates the signature or paraphrases the body (verbatim, or
+in synonym form via the same operator-synonym table CM302 uses), and Args
+sections that document nothing.
 """
 
 from __future__ import annotations
@@ -14,7 +13,7 @@ import re
 from dataclasses import dataclass
 from typing import Iterable, Iterator
 
-from cleancode.models import Comment, FileContext, Severity, Violation, ViolationDetails
+from cleancode.models import FileContext, Severity, Violation, ViolationDetails
 from cleancode.rules.base import (
     FRAMING_VERBS,
     GENERIC_PARAM_WORDS,
@@ -29,7 +28,7 @@ from cleancode.rules.base import (
     split_identifier,
     stemmed,
 )
-from cleancode.rules.comments import is_exempt, lexically_restates_code
+from cleancode.rules.comments import operator_synonym_words
 
 _SECTION_HEADER = re.compile(r"^\s*(args|arguments|parameters|returns|raises|yields)\s*:\s*$", re.IGNORECASE)
 _PARAM_ENTRY = re.compile(r"^\s*(?P<name>\*{0,2}\w+)\s*(?:\((?P<type>[^)]*)\))?\s*:\s*(?P<desc>.*)$")
@@ -69,6 +68,79 @@ def _body_source_words(function: FunctionNode, lines: list[str]) -> set[str]:
         for identifier in IDENTIFIER.findall(lines[line_number - 1]):
             words.update(split_identifier(identifier))
     return words
+
+
+def _nested_def_lines(function: FunctionNode) -> set[int]:
+    """Line numbers owned by a function/class defined inside ``function``.
+
+    ``_function_operator_words`` scans raw line text with plain regexes, not
+    the AST, so without this a nested function's own docstring would be
+    scanned as if it were ``function``'s code — prose inside it can
+    coincidentally hit a keyword pattern (``\\bif\\b`` etc.) and leak
+    unrelated vocabulary into the outer function's body words.
+    """
+    lines: set[int] = set()
+    for node in ast.walk(function):
+        if node is function or not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            continue
+        lines.update(range(node.lineno, end_line(node) + 1))
+    return lines
+
+
+def _comment_line_index(comments: list) -> tuple[set[int], dict[int, int]]:
+    """Bucketed once so callers scanning many source lines never re-walk ``comments`` per candidate."""
+    comment_only_lines: set[int] = set()
+    inline_columns: dict[int, int] = {}
+    for comment in comments:
+        if comment.inline:
+            inline_columns[comment.lineno] = comment.col_offset
+        else:
+            comment_only_lines.add(comment.lineno)
+    return comment_only_lines, inline_columns
+
+
+def _function_operator_words(function: FunctionNode, ctx: FileContext) -> set[str]:
+    """Operator/keyword synonym vocabulary of ``function``'s own body.
+
+    A docstring whose words are mostly synonyms of the body's operators
+    ("Adds two numbers and returns the sum." over ``return a + b``) is a
+    restatement even with zero literal identifier overlap — the same
+    paraphrase pattern CM302 already catches for a single annotated code
+    line, extended here to a whole function body.
+    """
+    doc_node = docstring_node(function)
+    doc_span: set[int] = set()
+    if doc_node is not None:
+        doc_span = set(range(doc_node.lineno, end_line(doc_node) + 1))
+    comment_only_lines, inline_columns = _comment_line_index(ctx.comments)
+    excluded = doc_span | _nested_def_lines(function) | comment_only_lines
+
+    start = function.body[0].lineno if function.body else function.lineno
+    words: set[str] = set()
+    for line_number in range(start, end_line(function) + 1):
+        if line_number in excluded:
+            continue
+        line_text = ctx.lines[line_number - 1]
+        column = inline_columns.get(line_number)
+        words.update(operator_synonym_words(line_text[:column] if column is not None else line_text))
+    return words
+
+
+def _operator_paraphrase_reason(text: str, operator_words: set[str], threshold: float) -> str | None:
+    """Why ``text`` paraphrases the function body's operations in synonym form, else ``None``.
+
+    A docstring carrying a why-signal word is exempt regardless of
+    overlap — same short-circuit CM302 uses for comments — since explaining
+    *why* is never a restatement of *what*.
+    """
+    if not operator_words:
+        return None
+    words = content_words(text, extra_stopwords=FRAMING_VERBS)
+    if not words or stemmed(words) & WHY_SIGNALS:
+        return None
+    informative = words - GENERIC_PARAM_WORDS or words
+    overlap = len(stemmed(informative) & operator_words) / len(informative)
+    return "paraphrases the function body's operations" if overlap >= threshold else None
 
 
 def _class_reference_words(class_def: ast.ClassDef) -> set[str]:
@@ -117,19 +189,31 @@ class _DocstringOwner:
     is what a longer, multi-line docstring is judged against: folding body
     words into that check too would make genuinely informative prose look
     like a restatement merely for reusing the function's own vocabulary.
+    ``operator_words`` is empty for a class — there's no single body to
+    compare operator/keyword vocabulary against.
     """
 
     node: FunctionNode | ast.ClassDef
     name: str
     reference: set[str]
     short_reference: set[str]
+    operator_words: set[str] = frozenset()
+
+
+@dataclass(frozen=True)
+class _OverlapThresholds:
+    """The two thresholds ``_restatement`` judges a docstring against, bundled to keep call sites at one argument."""
+
+    signature: float
+    body_overlap: float
 
 
 def _owners(ctx: FileContext) -> Iterator[_DocstringOwner]:
     for function in ctx.functions:
         signature = _signature_words(function)
         body_words = _body_source_words(function, ctx.lines)
-        yield _DocstringOwner(function, function.name, signature, signature | body_words)
+        operator_words = _function_operator_words(function, ctx)
+        yield _DocstringOwner(function, function.name, signature, signature | body_words, operator_words)
     for node in ast.walk(ctx.tree):
         if isinstance(node, ast.ClassDef):
             reference = _class_reference_words(node)
@@ -137,8 +221,17 @@ def _owners(ctx: FileContext) -> Iterator[_DocstringOwner]:
 
 
 def _restatement(
-    owner: "_DocstringOwner", overlap_threshold: float
+    owner: "_DocstringOwner", thresholds: _OverlapThresholds
 ) -> tuple[ast.Constant, str] | None:
+    """The docstring node and why it's a restatement, or ``None``.
+
+    Three checks, in order: signature/body-identifier overlap (short or long
+    docstring), then — only if that stays silent — operator-synonym overlap
+    against the body's operations. This function is also CM307's tier-1
+    gate (see ``semantic_restatement._semantic_candidate``), so widening any
+    check here automatically narrows CM307's scope too, keeping the two
+    rules from ever double-reporting the same paraphrase.
+    """
     docstring = ast.get_docstring(owner.node, clean=True)
     node = docstring_node(owner.node)
     if docstring is None or node is None:
@@ -147,10 +240,12 @@ def _restatement(
     if not text:
         return None
     reason = (
-        _short_docstring_reason(text, owner.short_reference, overlap_threshold)
+        _short_docstring_reason(text, owner.short_reference, thresholds.signature)
         if len(text.splitlines()) <= 2
         else _long_docstring_reason(text, owner.reference)
     )
+    if reason is None:
+        reason = _operator_paraphrase_reason(text, owner.operator_words, thresholds.body_overlap)
     return (node, reason) if reason is not None else None
 
 
@@ -158,7 +253,7 @@ class DocstringRestatesName(Rule):
     id = "CM301"
     name = "docstring-restates-name"
     default_severity = Severity.WARNING
-    default_options = {"overlap": 0.6, "private_overlap": 0.35}
+    default_options = {"overlap": 0.6, "private_overlap": 0.35, "body_overlap": 0.6}
     description = (
         "Flags docstrings that say nothing beyond the signature: a short one "
         '(`def get_user_name`: """Gets the user name.""") whose words all come from '
@@ -166,7 +261,11 @@ class DocstringRestatesName(Rule):
         "stays within that same vocabulary plus generic filler nouns. A `_`-prefixed "
         "(private) name is judged at the much stricter `private_overlap` — it has no "
         "external reader to write prose for, only its own body, which the reader can "
-        "just read instead."
+        "just read instead. Also flags a function docstring whose words are mostly "
+        "synonyms of its body's operators/keywords (`\"\"\"Adds two numbers and returns "
+        'the sum."""` over `return a + b`), reusing CM302\'s operator-synonym table '
+        "against the whole body instead of one annotated line, at `body_overlap`. "
+        "Why-signal docstrings are exempt from this check, same as CM302."
     )
     guidance = (
         "Only write a docstring if it says something the signature can't — skip it, "
@@ -178,14 +277,16 @@ class DocstringRestatesName(Rule):
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         overlap_threshold = ctx.config.options["overlap"]
         private_overlap_threshold = ctx.config.options["private_overlap"]
+        body_overlap_threshold = ctx.config.options["body_overlap"]
         for owner in _owners(ctx):
-            threshold = private_overlap_threshold if is_private(owner.name) else overlap_threshold
-            yield from self._check_owner(ctx, owner, threshold)
+            signature_threshold = private_overlap_threshold if is_private(owner.name) else overlap_threshold
+            thresholds = _OverlapThresholds(signature_threshold, body_overlap_threshold)
+            yield from self._check_owner(ctx, owner, thresholds)
 
     def _check_owner(
-        self, ctx: FileContext, owner: _DocstringOwner, overlap_threshold: float
+        self, ctx: FileContext, owner: _DocstringOwner, thresholds: _OverlapThresholds
     ) -> Iterable[Violation]:
-        found = _restatement(owner, overlap_threshold)
+        found = _restatement(owner, thresholds)
         if found is None:
             return
         node, reason = found
@@ -281,159 +382,3 @@ class BoilerplateParamDocs(Rule):
             desc_words = content_words(description, extra_stopwords=FRAMING_VERBS)
             uninformative = desc_words <= (reference | GENERIC_PARAM_WORDS)
             yield name, uninformative
-
-
-def _standalone_comment_blocks(ctx: FileContext) -> Iterator[list[Comment]]:
-    """Runs of adjacent same-column standalone comments — the paragraph a reader sees.
-
-    A wrapped comment is one thought split across ``#`` lines; judging the
-    lines separately would strip each fragment of the context (often the
-    rationale) carried by its neighbors.
-    """
-    block: list[Comment] = []
-    for comment in ctx.comments:
-        if comment.inline:
-            continue
-        if block and comment.lineno == block[-1].lineno + 1 and comment.col_offset == block[0].col_offset:
-            block.append(comment)
-            continue
-        if block:
-            yield block
-        block = [comment]
-    if block:
-        yield block
-
-
-def _semantic_candidate(
-    function: FunctionNode, ctx: FileContext, max_lines: int
-) -> tuple[ast.Constant, str] | None:
-    """The docstring ``CM307`` should judge on ``function``, or ``None``.
-
-    Decorated functions are out of scope (property/click/fixture docstrings
-    are framework-facing help text), as is anything ``CM301`` at default
-    thresholds already catches — the deterministic tier stays first and no
-    docstring is ever reported by both rules.
-    """
-    docstring = ast.get_docstring(function, clean=True)
-    node = docstring_node(function)
-    if function.decorator_list or docstring is None or node is None:
-        return None
-    text = docstring.strip()
-    if not text or len(text.splitlines()) > max_lines:
-        return None
-    signature = _signature_words(function)
-    owner = _DocstringOwner(
-        function, function.name, signature, signature | _body_source_words(function, ctx.lines)
-    )
-    cm301_options = DocstringRestatesName.default_options
-    lexical_threshold = (
-        cm301_options["private_overlap"] if is_private(function.name) else cm301_options["overlap"]
-    )
-    return None if _restatement(owner, lexical_threshold) is not None else (node, text)
-
-
-def _judgeable_text(text: str, min_words: int) -> bool:
-    """Cheap pre-filters shared by CM307's docstring and comment paths.
-
-    A why-signal word anywhere exempts the whole text — same short-circuit
-    ``CM302`` uses — and texts with too few content words carry too little
-    signal to judge semantically.
-    """
-    words = content_words(text)
-    if len(words) < min_words:
-        return False
-    return not (stemmed(words) & WHY_SIGNALS)
-
-
-class SemanticRestatement(Rule):
-    id = "CM307"
-    name = "docstring-semantic-restatement"
-    default_severity = Severity.WARNING
-    default_options = {"threshold": 0.75, "min_words": 3, "max_lines": 3}
-    description = (
-        "Flags docstrings and standalone comments that only *narrate* what the "
-        'code does, even when reworded with synonyms ("""Adds two numbers and '
-        'returns the sum.""" over `return a + b`) — paraphrases the lexical '
-        "rules (CM301/CM302) structurally cannot see. Each clause is scored by "
-        "a small pretrained-embedding classifier (see `cleancode.semantics`); "
-        "a text is flagged only when *every* clause reads as procedural "
-        "description, so mixed comments that also carry rationale "
-        '("... to maximize L1 cache hits") always pass. Scope is deliberately '
-        "narrow: plain (undecorated) function docstrings of at most `max_lines` "
-        "lines — a class docstring states responsibility and a decorated "
-        "function's is framework-facing help text — and whole standalone "
-        "comment blocks. Texts CM301/CM302 already flag, TODO/directive "
-        "comments, and why-signal carriers are skipped."
-    )
-    guidance = (
-        "Never narrate what code does in a docstring/comment, even reworded in "
-        "synonyms — give rationale, constraints, units, or edge cases instead."
-    )
-
-    def check(self, ctx: FileContext) -> Iterable[Violation]:
-        yield from self._check_docstrings(ctx)
-        yield from self._check_comments(ctx)
-
-    def _check_docstrings(self, ctx: FileContext) -> Iterable[Violation]:
-        max_lines = ctx.config.options["max_lines"]
-        for function in ctx.functions:
-            found = _semantic_candidate(function, ctx, max_lines)
-            if found is None:
-                continue
-            node, text = found
-            if self._purely_procedural(ctx, text):
-                yield self.violation(
-                    ctx,
-                    node,
-                    ViolationDetails(
-                        message=f"docstring of `{function.name}` only narrates what the code does",
-                        suggestion=(
-                            "delete it, or say what the code cannot: rationale, "
-                            "constraints, units, edge cases"
-                        ),
-                        symbol=function.name,
-                    ),
-                )
-
-    def _check_comments(self, ctx: FileContext) -> Iterable[Violation]:
-        for block in _standalone_comment_blocks(ctx):
-            if any(is_exempt(comment) for comment in block):
-                continue
-            if any(lexically_restates_code(ctx, comment) for comment in block):
-                continue  # CM302's catch — the deterministic tier stays first
-            text = " ".join(comment.text for comment in block)
-            if self._purely_procedural(ctx, text):
-                yield self.violation(
-                    ctx,
-                    block[0],
-                    ViolationDetails(
-                        message=f"comment only narrates what the code does: `# {text}`",
-                        suggestion="delete it, or say why instead of what",
-                    ),
-                )
-
-    def _purely_procedural(self, ctx: FileContext, text: str) -> bool:
-        """True when every clause of ``text`` reads as procedural narration.
-
-        A clause must be narration-shaped (verb-led) *and* score procedural
-        to count. One clause that isn't — a rationale, a noun-led value
-        contract, or one the classifier cannot judge — clears the whole
-        text: for a linter, a missed paraphrase is far cheaper than flagging
-        a comment that carries real information.
-        """
-        if not _judgeable_text(text, ctx.config.options["min_words"]):
-            return False
-        # Imported here so the embedding table only loads once a judgeable
-        # candidate exists, keeping `clean-code` startup free of the cost.
-        from cleancode.semantics.classifier import load_classifier
-        from cleancode.semantics.clauses import clauses, narration_shaped
-
-        classifier = load_classifier()
-        threshold = ctx.config.options["threshold"]
-        parts = clauses(text)
-        return bool(parts) and all(
-            narration_shaped(clause)
-            and (score := classifier.score(clause)) is not None
-            and score >= threshold
-            for clause in parts
-        )
