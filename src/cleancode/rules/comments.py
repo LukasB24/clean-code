@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import ast
 import re
-from typing import Iterable, Iterator
+from typing import Iterable, Iterator, NamedTuple
 
 from cleancode.models import Comment, FileContext, Severity, Violation, ViolationDetails
 from cleancode.rules.base import (
@@ -208,15 +208,21 @@ def _code_line_words(code_text: str) -> set[str]:
     return words
 
 
-def _function_body_words(ctx: FileContext, function: FunctionNode) -> set[str]:
-    """Operator/keyword vocabulary (see `_operator_synonym_words`) for a function's body.
+class _CommentLineIndex(NamedTuple):
+    """Per-file split of `ctx.comments`, built once per `check()` call.
 
-    Unions the per-line synonym words across every body line so a docstring can
-    be compared against what the *implementation does*, not just the signature.
-    Docstring lines and comment-only lines are skipped; a line with a trailing
-    inline comment only contributes its code portion.
+    `_function_body_words` used to rebuild this from `ctx.comments` on every
+    call — once per function in the file — even though it doesn't depend on
+    which function is being scanned. Building it once and threading it
+    through turns that into O(comments) instead of O(functions x comments).
     """
-    docstring_lines = _docstring_line_span(function)
+
+    ctx: FileContext
+    comment_only_lines: set[int]
+    inline_comment_columns: dict[int, int]
+
+
+def _build_comment_line_index(ctx: FileContext) -> _CommentLineIndex:
     comment_only_lines: set[int] = set()
     inline_comment_columns: dict[int, int] = {}
     for comment in ctx.comments:
@@ -224,14 +230,45 @@ def _function_body_words(ctx: FileContext, function: FunctionNode) -> set[str]:
             inline_comment_columns[comment.lineno] = comment.col_offset
         else:
             comment_only_lines.add(comment.lineno)
+    return _CommentLineIndex(ctx, comment_only_lines, inline_comment_columns)
+
+
+def _nested_scope_lines(function: FunctionNode) -> set[int]:
+    """Line numbers owned by a function/class nested inside `function`.
+
+    `_function_body_words` scans raw line text with plain regexes, not the
+    AST, so without this a nested function's own docstring or string
+    literals would be scanned as if they were `function`'s code — English
+    prose inside a nested docstring can coincidentally hit `\\bif\\b`,
+    `\\bfor\\b`, etc. and leak unrelated operator-synonym words into
+    `function`'s body vocabulary.
+    """
+    lines: set[int] = set()
+    for node in ast.walk(function):
+        if node is function or not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            continue
+        lines.update(range(node.lineno, (node.end_lineno or node.lineno) + 1))
+    return lines
+
+
+def _function_body_words(index: _CommentLineIndex, function: FunctionNode) -> set[str]:
+    """Operator/keyword vocabulary (see `_operator_synonym_words`) for a function's own body.
+
+    Unions the per-line synonym words across every body line so a docstring can
+    be compared against what the *implementation does*, not just the signature.
+    Docstring lines, comment-only lines, and any nested function/class's own
+    lines are skipped; a line with a trailing inline comment only contributes
+    its code portion.
+    """
+    excluded = _docstring_line_span(function) | _nested_scope_lines(function) | index.comment_only_lines
     start = function.body[0].lineno if function.body else function.lineno
     end = function.end_lineno or function.lineno
     words: set[str] = set()
     for line_number in range(start, end + 1):
-        if line_number in docstring_lines or line_number in comment_only_lines:
+        if line_number in excluded:
             continue
-        text = ctx.lines[line_number - 1]
-        column = inline_comment_columns.get(line_number)
+        text = index.ctx.lines[line_number - 1]
+        column = index.inline_comment_columns.get(line_number)
         words.update(_operator_synonym_words(text[:column] if column is not None else text))
     return words
 
@@ -254,6 +291,7 @@ class DocstringRestatesName(Rule):
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         overlap_threshold = ctx.config.options["overlap"]
+        comment_index = _build_comment_line_index(ctx)
         for function in functions(ctx.tree):
             docstring = ast.get_docstring(function, clean=True)
             node = _docstring_node(function)
@@ -269,7 +307,7 @@ class DocstringRestatesName(Rule):
                 message = (
                     f"docstring of `{function.name}` only restates the function signature"
                 )
-            elif self._paraphrases_body(ctx, function, doc_words):
+            elif self._paraphrases_body(comment_index, function, doc_words):
                 message = f"docstring of `{function.name}` only paraphrases the function body"
             else:
                 continue
@@ -286,15 +324,15 @@ class DocstringRestatesName(Rule):
                 ),
             )
 
-    def _paraphrases_body(self, ctx: FileContext, function: FunctionNode, doc_words: set[str]) -> bool:
+    def _paraphrases_body(self, index: _CommentLineIndex, function: FunctionNode, doc_words: set[str]) -> bool:
         """True when the docstring's words mostly duplicate the body's operations in synonym form."""
         if _stemmed(doc_words) & _WHY_SIGNALS:
             return False  # carries a rationale marker — that's a *why*, never a restatement
         informative = _informative(doc_words)
-        body_words = _function_body_words(ctx, function)
+        body_words = _function_body_words(index, function)
         if not informative or not body_words:
             return False
-        threshold = ctx.config.options["body_overlap"]
+        threshold = index.ctx.config.options["body_overlap"]
         return len(_stemmed(informative) & body_words) / len(informative) >= threshold
 
 
