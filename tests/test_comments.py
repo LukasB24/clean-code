@@ -68,6 +68,21 @@ class TestDocstringRestatesName:
         '''
         assert check(source, "CM301") == []
 
+    def test_nested_function_docstring_excluded_from_outer_body_scan(self, check):
+        # Without excluding the nested function's own lines, its docstring's
+        # "if"/"for" would leak the operator-synonym words "whether"/"case"
+        # into outer's body vocabulary and falsely match outer's own
+        # docstring, which never actually mentions what `helper` does.
+        source = '''
+        def outer(x):
+            """Whether the case fits."""
+            def helper():
+                """Applies only if needed, for safety."""
+                return x
+            return helper()
+        '''
+        assert check(source, "CM301") == []
+
 
 class TestCommentRestatesCode:
     def test_flags_inline_restatement(self, check):
