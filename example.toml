@@ -66,9 +66,10 @@
 # known_abbrevs = ["cfg", "ctx", "idx", "db", "fn", "env", "src", "dst", "str", "css", "tmp", "xml", "html", "sql", "std", "cmd", "msg", "pkg", "txt", "sdk", "api", "url", "uri", "gcd", "rgb", "csv", "json", "yml", "js", "ts", "np", "df", "kwargs", "args", "cls", "llm"]
 
 # CM301  docstring-restates-name  [warning]
-#   Flags short docstrings whose words all come from the function signature (`def get_user_name`: """Gets the user name.""") — they cost reading time and add nothing.
+#   Flags short docstrings whose words all come from the function signature (`def get_user_name`: """Gets the user name.""") — they cost reading time and add nothing. Also flags docstrings that paraphrase what the body does (`def add(a, b)`: """Adds a and b and returns the sum.""") using the same operator-synonym vocabulary as CM302, so a paraphrase scores the same as a verbatim restatement. Docstrings carrying a causal/justification marker (because, since, workaround, instead, ...) are exempt from the body check — that's a *why*, not a *what*.
 # [tool.cleancode.CM301]
 # overlap = 0.8
+# body_overlap = 0.6
 
 # CM302  comment-restates-code  [warning]
 #   Flags comments that paraphrase the code line they annotate (`x = x + 1  # increment x by 1`, `for k in range(3):  # iterate three times`). TODO/FIXME/NOTE, tool directives, and comments carrying a causal/justification marker (because, since, workaround, ...) are exempt.

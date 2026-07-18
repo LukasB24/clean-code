@@ -18,7 +18,7 @@ quick-start, see the [README](../README.md).
 | NM201 | short-name | `min_length=3, allowed=[i,j,k,n,x,y,_,id,ok,fh]` | warning |
 | NM202 | meaningless-name | configurable ban lists | warning |
 | NM203 | cryptic-abbreviation | `known_abbrevs=[cfg,ctx,idx,…]` | info |
-| CM301 | docstring-restates-name | `overlap=0.8` | warning |
+| CM301 | docstring-restates-name | `overlap=0.8, body_overlap=0.6` | warning |
 | CM302 | comment-restates-code | `overlap=0.7, min_words=2` | warning |
 | CM303 | comment-density | `max_ratio=0.3, min_code_lines=5` | info |
 | CM304 | boilerplate-param-docs | `min_uninformative=0.5` | warning |
@@ -50,8 +50,12 @@ quick-start, see the [README](../README.md).
   where it's introduced. Loop/comprehension/lambda letters, `except ... as e`,
   `TypeVar`, and `ALL_CAPS` constants are exempt.
 - **CM301/CM302 are deterministic, not LLM-judged** — they compare word
-  overlap between a docstring/comment and the code it annotates. Comments
-  explaining *why* (not *what*) are always exempt.
+  overlap between a docstring/comment and the code it annotates. CM301 checks
+  overlap against both the function signature and, via the same
+  operator-synonym vocabulary as CM302, the body's operations — so a
+  paraphrase ("adds a and b and returns the sum") scores the same as a
+  verbatim restatement. Comments and docstrings explaining *why* (not *what*)
+  are always exempt.
 - **SL401/SL402 score subscript complexity** (dimensions, steps, nesting,
   chaining) and ignore type annotations like `dict[str, int]`.
 - **SM6xx catches structural smells node-counting misses**: nested

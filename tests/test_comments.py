@@ -42,6 +42,32 @@ class TestDocstringRestatesName:
         '''
         assert check(source, "CM301") == []
 
+    def test_flags_docstring_that_paraphrases_the_body(self, check):
+        # Low overlap with the signature ("adds"/"sum" aren't "add"/"a"/"b"
+        # verbatim), but the operator-synonym vocabulary from CM302 shows it's
+        # just a paraphrase of `return a + b`.
+        source = '''
+        def add(a, b):
+            """Adds a and b and returns the sum."""
+            return a + b
+        '''
+        violations = check(source, "CM301")
+        assert rule_ids(violations) == ["CM301"]
+        assert "paraphrases the function body" in violations[0].message
+
+    def test_why_signal_exempts_body_paraphrase(self, check):
+        # Mentions the implementation ("adds items one at a time") but also
+        # carries a rationale ("instead of", "avoid") — a *why*, not a *what*.
+        source = '''
+        def compute_running_total(items):
+            """Adds items one at a time instead of using sum(), to avoid loading the whole list into memory at once."""
+            total = 0
+            for item in items:
+                total += item
+            return total
+        '''
+        assert check(source, "CM301") == []
+
 
 class TestCommentRestatesCode:
     def test_flags_inline_restatement(self, check):
