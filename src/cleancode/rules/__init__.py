@@ -21,7 +21,11 @@ from cleancode.rules.comments import (
     FileCommentDensity,
 )
 from cleancode.rules.correctness import BareExcept, EmptyExceptionHandler, OversizedTry
-from cleancode.rules.docstrings import BoilerplateParamDocs, DocstringRestatesName
+from cleancode.rules.docstrings import (
+    BoilerplateParamDocs,
+    DocstringRestatesName,
+    SemanticRestatement,
+)
 from cleancode.rules.duplication import DuplicateFunctionBody, IdenticalFunctionImplementation
 from cleancode.rules.hints import UninformativeAny
 from cleancode.rules.naming import CrypticAbbreviation, MeaninglessName, ShortName
@@ -70,6 +74,7 @@ ALL_RULES: list[type[Rule] | type[ProjectRule]] = [
     BoilerplateParamDocs,
     FileCommentDensity,
     BannerComment,
+    SemanticRestatement,
     ComplexSubscript,
     ChainedSubscript,
     UninformativeAny,

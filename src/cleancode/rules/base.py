@@ -251,6 +251,55 @@ FRAMING_VERBS = frozenset(
 )
 
 
+# Causal/justification markers: a comment carrying one of these explains
+# *why*, so the restatement checks exempt it regardless of overlap. One base
+# form per concept; ``stem_candidates`` handles inflected forms
+# (avoiding/avoids -> avoid, fixes/fixed -> fix, ...).
+WHY_SIGNALS = frozenset(
+    """
+    because since due workaround avoid prevent otherwise unless until
+    require legacy compat compatible compatibility spec edge bug fix
+    upstream vendor quirk compensate deliberately intentionally although
+    though despite instead rather
+    """.split()
+)
+
+# (suffix, replacement endings to try once the suffix is stripped). "ing"/"ed"
+# also try restoring a silent "e" (iterating -> iterat -> iterate).
+_STEM_SUFFIX_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("ies", ("y",)),
+    ("es", ("",)),
+    ("ing", ("", "e")),
+    ("ed", ("", "e")),
+    ("s", ("",)),
+)
+_MIN_STEM_LENGTH = 2
+
+
+def stem_candidates(word: str) -> frozenset[str]:
+    """Heuristic English stem guesses for matching a word against a base-word dict.
+
+    Not a real lemmatizer — over-generates candidates (multiple suffix-strip
+    guesses, some of them non-words) so at least one hits the dict's base
+    form; safe because the dicts this is matched against are small and
+    hand-curated, not open vocabulary.
+    """
+    candidates = {word}
+    for suffix, replacements in _STEM_SUFFIX_RULES:
+        if suffix == "s" and word.endswith("ss"):
+            continue
+        if not word.endswith(suffix) or len(word) - len(suffix) < _MIN_STEM_LENGTH:
+            continue
+        stem = word[: -len(suffix)]
+        candidates.update(stem + replacement for replacement in replacements)
+    return frozenset(candidates)
+
+
+def stemmed(words: set[str]) -> set[str]:
+    """Union of every word's stem candidates, so plural/tense variants match a base-word dict."""
+    return {stem for word in words for stem in stem_candidates(word)}
+
+
 def split_identifier(name: str) -> list[str]:
     """Split a snake_case / camelCase / PascalCase identifier into lowercase words.
 

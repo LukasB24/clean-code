@@ -70,7 +70,11 @@ EXPECTED_DIRTY_RULES = {
         "SM610",  # .cuda() inside __init__
         "CM303",  # comment-heavy __getitem__
         "CM305",  # comment-heavy file overall (7 comment lines / 32 code lines)
+        "CM307",  # '# Return the total number of samples' — paraphrase CM302 misses
         "SM611",  # isinstance(spec, torch.Tensor)
+    },
+    "llm_style_paraphrase.py": {
+        "CM307",  # synonym paraphrases in docstrings and a comment; CM301/CM302 see no overlap
     },
     "llm_style_solid.py": {
         "SD801",  # compute_area type-switches on Circle/Square/Triangle

@@ -19,7 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Quality Assurance",
 ]
-dependencies = ["click>=8.1"]
+dependencies = ["click>=8.1", "numpy>=1.26"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6"]

@@ -9,9 +9,9 @@ from cleancode.config import Config
 from cleancode.guide import COVERED_BY_SIBLING, build_agents_md, build_guide
 from cleancode.rules import ALL_RULES, RULES_BY_ID
 
-# ~2000 tokens at ~4 chars/token — generous for a 44-rule set, still cheap
+# ~2050 tokens at ~4 chars/token — generous for a 52-rule set, still cheap
 # to prime an LLM with on every generation turn.
-_MAX_GUIDE_CHARS = 8000
+_MAX_GUIDE_CHARS = 8200
 
 
 class TestBuildGuide:

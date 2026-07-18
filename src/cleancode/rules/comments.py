@@ -22,12 +22,14 @@ from cleancode.models import (
 from cleancode.rules.base import (
     GENERIC_PARAM_WORDS,
     IDENTIFIER,
+    WHY_SIGNALS,
     FunctionNode,
     Rule,
     content_words,
     docstring_node,
     end_line,
     split_identifier,
+    stemmed,
 )
 
 # Comment prefixes that are directives or markers, never prose noise.
@@ -38,7 +40,7 @@ _EXEMPT_PREFIXES = (
 
 # Maps operators/keywords on a code line to the words a comment would use to
 # describe them, so `x = x + 1  # increment x by one` scores as a restatement.
-# Each set holds one base word per concept; `_stem_candidates` normalizes
+# Each set holds one base word per concept; `stem_candidates` normalizes
 # comment words (adds -> add, iterating -> iterate, ...) before matching, so
 # inflected forms don't need their own entries here.
 _OPERATOR_SYNONYMS: list[tuple[re.Pattern[str], frozenset[str]]] = [
@@ -78,55 +80,6 @@ _NUMBER_TO_WORDS: dict[str, frozenset[str]] = {
     for target in set(_NUMBER_WORDS.values())
 }
 
-# Causal/justification markers: a comment carrying one of these explains
-# *why*, so it's exempt from the restatement check regardless of overlap.
-# One base form per concept; see `_stem_candidates` for the inflected-form
-# matching (avoiding/avoids -> avoid, fixes/fixed -> fix, ...).
-_WHY_SIGNALS = frozenset(
-    """
-    because since due workaround avoid prevent otherwise unless until
-    require legacy compat compatible compatibility spec edge bug fix
-    upstream vendor quirk compensate deliberately intentionally although
-    though despite instead rather
-    """.split()
-)
-
-# (suffix, replacement endings to try once the suffix is stripped). "ing"/"ed"
-# also try restoring a silent "e" (iterating -> iterat -> iterate).
-_STEM_SUFFIX_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("ies", ("y",)),
-    ("es", ("",)),
-    ("ing", ("", "e")),
-    ("ed", ("", "e")),
-    ("s", ("",)),
-)
-_MIN_STEM_LENGTH = 2
-
-
-def _stem_candidates(word: str) -> frozenset[str]:
-    """Heuristic English stem guesses for matching a word against a base-word dict.
-
-    Not a real lemmatizer — over-generates candidates (multiple suffix-strip
-    guesses, some of them non-words) so at least one hits the dict's base
-    form; safe because the dicts this is matched against are small and
-    hand-curated, not open vocabulary.
-    """
-    candidates = {word}
-    for suffix, replacements in _STEM_SUFFIX_RULES:
-        if suffix == "s" and word.endswith("ss"):
-            continue
-        if not word.endswith(suffix) or len(word) - len(suffix) < _MIN_STEM_LENGTH:
-            continue
-        stem = word[: -len(suffix)]
-        candidates.update(stem + replacement for replacement in replacements)
-    return frozenset(candidates)
-
-
-def _stemmed(words: set[str]) -> set[str]:
-    """Union of every word's stem candidates, so plural/tense variants match a base-word dict."""
-    return {stem for word in words for stem in _stem_candidates(word)}
-
-
 _DOCSTRING_OWNERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
 
 
@@ -145,7 +98,7 @@ def _all_docstring_lines(tree: ast.Module) -> set[int]:
     return lines
 
 
-def _is_exempt(comment: Comment) -> bool:
+def is_exempt(comment: Comment) -> bool:
     lowered = comment.text.lower()
     return any(lowered.startswith(prefix) for prefix in _EXEMPT_PREFIXES)
 
@@ -205,10 +158,10 @@ class CommentRestatesCode(Rule):
     def _candidates(self, ctx: FileContext) -> Iterator[tuple[Comment, set[str]]]:
         min_words = ctx.config.options["min_words"]
         for comment in ctx.comments:
-            if _is_exempt(comment) or not comment.text:
+            if is_exempt(comment) or not comment.text:
                 continue
             comment_words = content_words(comment.text)
-            if _stemmed(comment_words) & _WHY_SIGNALS:
+            if stemmed(comment_words) & WHY_SIGNALS:
                 continue  # explains *why*, not *what* — never a restatement
             if len(comment_words) >= min_words:
                 yield comment, _informative(comment_words)
@@ -222,7 +175,7 @@ class CommentRestatesCode(Rule):
             return False
         overlap_threshold = ctx.config.options["overlap"]
         code_words = _code_line_words(code_text)
-        return len(_stemmed(comment_words) & code_words) / len(comment_words) >= overlap_threshold
+        return len(stemmed(comment_words) & code_words) / len(comment_words) >= overlap_threshold
 
     def _annotated_code(self, ctx: FileContext, comment: Comment) -> str | None:
         if comment.inline:
@@ -238,6 +191,25 @@ class CommentRestatesCode(Rule):
             column = comment_columns.get(line_number)
             return text[:column] if column is not None else text
         return None
+
+
+def lexically_restates_code(ctx: FileContext, comment: Comment) -> bool:
+    """Whether ``CM302`` at default thresholds would flag ``comment``.
+
+    ``CM307`` gates on this so the deterministic lexical check stays the
+    first tier and no comment is ever reported by both rules.
+    """
+    from cleancode.config import RuleConfig
+
+    rule = CommentRestatesCode()
+    words = content_words(comment.text)
+    if len(words) < rule.default_options["min_words"]:
+        return False
+    gate_ctx = FileContext(
+        parsed=ctx.parsed,
+        config=RuleConfig(severity=rule.default_severity, options=dict(rule.default_options)),
+    )
+    return rule._restates_code(gate_ctx, comment, _informative(words))
 
 
 class CommentDensity(Rule):
@@ -306,7 +278,7 @@ def _comment_line_sets(comments: list[Comment]) -> tuple[set[int], set[int], set
     counted_inline: set[int] = set()
     for comment in comments:
         counted = counted_inline if comment.inline else counted_standalone
-        if not _is_exempt(comment):
+        if not is_exempt(comment):
             counted.add(comment.lineno)
         if not comment.inline:
             standalone.add(comment.lineno)
@@ -398,7 +370,7 @@ class BannerComment(Rule):
 
     def check(self, ctx: FileContext) -> Iterable[Violation]:
         for comment in ctx.comments:
-            if _is_exempt(comment) or not _is_banner(comment.text):
+            if is_exempt(comment) or not _is_banner(comment.text):
                 continue
             yield self.violation(
                 ctx,

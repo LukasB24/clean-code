@@ -26,6 +26,7 @@ quick-start, see the [README](../README.md).
 | CM304 | boilerplate-param-docs | `min_uninformative=0.5` | warning |
 | CM305 | file-comment-density | `max_ratio=0.2, min_code_lines=30` | warning |
 | CM306 | banner-comment | — | warning |
+| CM307 | docstring-semantic-restatement | `threshold=0.75, min_words=3, max_lines=3` | warning |
 | SL401 | complex-subscript | `max_score=5` | warning |
 | SL402 | chained-subscript | `max_chain=2` | warning |
 | TY501 | uninformative-any | — | warning |
@@ -73,6 +74,17 @@ quick-start, see the [README](../README.md).
   0.6)** — a private name has no external reader to write prose for, only
   its own body, which the reader can just read instead. Dunders are judged
   as public, not private.
+- **CM307 is the semantic second tier behind CM301/CM302** — a vendored
+  pretrained-embedding classifier (pure numpy, no ML framework, deterministic,
+  microseconds per comment) scores each *clause* of a docstring/comment as
+  procedural narration vs. rationale, catching synonym paraphrases the
+  word-overlap rules can't see (`"""Adds two numbers and returns the sum."""`
+  over `return a + b`). A text is flagged only when every clause is verb-led
+  narration scoring above `threshold`; one rationale clause, noun-led value
+  contract, or unknown-vocabulary clause clears it. Anything CM301/CM302
+  already flag is skipped (nothing is double-reported), and scope is limited
+  to undecorated function docstrings of at most `max_lines` lines plus
+  standalone comment blocks.
 - **CM301 also covers class docstrings** (reference words = the class name
   plus its directly-defined method names) and, for docstrings longer than
   two lines, flags one whose *every* non-empty line never leaves the

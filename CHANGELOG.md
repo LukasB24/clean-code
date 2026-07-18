@@ -14,6 +14,22 @@ whether pre- or post-1.0).
 
 ### Added
 
+- `CM307` `docstring-semantic-restatement` — the semantic second tier behind
+  the deterministic CM301/CM302 word-overlap rules, bringing the total to 52.
+  A vendored pretrained-embedding backbone (distilled from WordLlama
+  `l2_supercat_256` into a 1.2 MB int8 word table by
+  `tools/distill_backbone.py`) with a logistic classifier head (trained
+  reproducibly by `tools/train_head.py` on the labeled clause corpus in
+  `tools/data/what_why.jsonl`) scores each clause of a docstring/comment as
+  procedural narration vs. rationale. It catches synonym paraphrases the
+  lexical rules structurally cannot see (`"""Adds two numbers and returns
+  the sum."""` over `return a + b`) while passing composite comments that
+  also carry rationale ("... to maximize L1 cache hits"). Inference is pure
+  numpy — no ML framework anywhere, deterministic outputs, microseconds per
+  comment.
+- `numpy>=1.26` as a runtime dependency (for CM307's embedding lookups); the
+  runtime environment remains free of `torch`/`scikit-learn`/any ML
+  framework, now enforced by a test.
 - Seven new rules targeting patterns common in freshly-generated Python,
   bringing the total to 51:
   - `ST109` `redundant-else` — a plain two-way `if`/`else` whose `if` branch
