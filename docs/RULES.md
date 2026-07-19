@@ -185,6 +185,10 @@ quick-start, see the [README](../README.md).
   directive-comment exemptions as CM303/CM305 (TODO/FIXME/NOTE, `noqa`,
   `cleancode:`, ...); a plain narrative comment with no decoration characters
   (`# Step 1: parse the input`) is left to CM302/CM305, not flagged here.
+  The reverse holds too — CM302 exempts anything CM306 would flag, so a
+  banner that happens to reuse a nearby line's vocabulary (`# --- sweep
+  overrides ---` above a `sweep_override = ...` line) isn't also reported
+  as a restatement.
 - **SD801 flags a same-variable type-switch** (`isinstance`/`type()` chain) —
   an Open/Closed Principle smell. Dispatching on Python's own `ast.*` node
   types is exempt, since that's routine AST tooling, not the smell targeted.

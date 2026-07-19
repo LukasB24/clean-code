@@ -149,8 +149,9 @@ class CommentRestatesCode(Rule):
     description = (
         "Flags comments that paraphrase the code line they annotate "
         "(`x = x + 1  # increment x by 1`, `for k in range(3):  # iterate three "
-        "times`). TODO/FIXME/NOTE, tool directives, and comments carrying a "
-        "causal/justification marker (because, since, workaround, ...) are exempt."
+        "times`). TODO/FIXME/NOTE, tool directives, comments carrying a "
+        "causal/justification marker (because, since, workaround, ...), and "
+        "banner/section-divider comments (CM306's territory) are exempt."
     )
     guidance = (
         "Only write a comment that explains *why*, never one that paraphrases the "
@@ -172,8 +173,8 @@ class CommentRestatesCode(Rule):
     def _candidates(self, ctx: FileContext) -> Iterator[tuple[Comment, set[str]]]:
         min_words = ctx.config.options["min_words"]
         for comment in ctx.comments:
-            if is_exempt(comment) or not comment.text:
-                continue
+            if is_exempt(comment) or not comment.text or _is_banner(comment.text):
+                continue  # CM306's territory — a banner isn't a restatement, it's decoration
             comment_words = content_words(comment.text)
             if stemmed(comment_words) & WHY_SIGNALS:
                 continue  # explains *why*, not *what* — never a restatement
