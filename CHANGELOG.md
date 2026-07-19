@@ -38,6 +38,21 @@ whether pre- or post-1.0).
 - `numpy>=1.26` as a runtime dependency (for CM307's embedding lookups); the
   runtime environment remains free of `torch`/`scikit-learn`/any ML
   framework, now enforced by a test.
+- `NOTICE` and `src/cleancode/semantics/THIRD_PARTY_NOTICES/`: CM307's
+  vendored `embeddings.npz` is a derivative of Llama-2-derived token
+  embeddings (via WordLlama's `l2_supercat_256`), so it ships with the
+  attribution notice, a full copy of the LLAMA 2 Community License
+  Agreement, and the Acceptable Use Policy it incorporates by reference —
+  required by that license, and separate from clean-code's own Apache-2.0
+  license.
+- `tools/train_head.py` now fits the classifier head on an 80/10/10
+  train/val/test split (`cleancode.semantics.training.split_dataset`,
+  deterministic by row position, no seed needed) instead of the full
+  corpus, and `head.json`'s `training` block reports all three accuracies.
+  The previous single `accuracy` figure was training accuracy only —
+  measured on the same 449 examples the head was fit on — which
+  overstated how well the classifier generalizes; held-out test accuracy
+  on the current corpus is 0.750, versus 0.919 training accuracy.
 - Seven new rules targeting patterns common in freshly-generated Python,
   bringing the total to 51:
   - `ST109` `redundant-else` — a plain two-way `if`/`else` whose `if` branch

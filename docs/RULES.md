@@ -94,7 +94,13 @@ quick-start, see the [README](../README.md).
   including CM301's operator-synonym body check — is skipped, so the two
   rules never double-report the same paraphrase; scope is limited to
   undecorated function docstrings of at most `max_lines` lines plus
-  standalone comment blocks.
+  standalone comment blocks. The backbone (`embeddings.npz`) is a Llama
+  2-derived asset under its own license, not this project's Apache-2.0 —
+  see `src/cleancode/semantics/THIRD_PARTY_NOTICES/`. Its classifier head
+  is fit on an 80/10/10 train/val/test split of `tools/data/what_why.jsonl`
+  (`tools/train_head.py`); `head.json`'s `training.accuracy` reports all
+  three so the checked-in figure reflects held-out generalization, not
+  just training-set fit.
 - **CM301 also covers class docstrings** (reference words = the class name
   plus its directly-defined method names) and, for docstrings longer than
   two lines, flags one whose *every* non-empty line never leaves the
