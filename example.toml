@@ -258,3 +258,4 @@
 #   Flags a `try` block with more than `max_statements` top-level statements feeding a bare or `except Exception`/`BaseException` handler — the handler can't know which of several steps actually failed. A `try` narrowed to a specific exception, or a broad handler wrapping few statements, is not flagged.
 # [tool.cleancode.PY903]
 # max_statements = 3
+
