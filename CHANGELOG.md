@@ -57,7 +57,15 @@ whether pre- or post-1.0).
   `1e-4`, train accuracy reached 0.9194 while test sat at 0.7500; at
   `1.5e-4`, val accuracy is unchanged (0.8444) and test rises to 0.7727,
   the largest penalty short of pushing issue #28's own held-out acceptance
-  example below CM307's 0.75 default threshold.
+  example below CM307's default threshold.
+- `CM307`'s default `threshold` lowered from `0.75` to `0.5`: measured on
+  the labeled corpus's held-out val/test splits, `0.75` missed 40-45% of
+  genuinely procedural clauses (recall 0.60 val / 0.55 test); `0.5` raises
+  recall to 0.80 on both, for a precision cost only on test (0.786 →
+  0.727 — val precision actually improves slightly, 0.800 → 0.842).
+  Deliberate: for a linter meant to flag comments an LLM should rework, a
+  false positive costs a wasted re-check, while a false negative is a
+  paraphrase nobody looks at again.
 - Seven new rules targeting patterns common in freshly-generated Python,
   bringing the total to 51:
   - `ST109` `redundant-else` — a plain two-way `if`/`else` whose `if` branch

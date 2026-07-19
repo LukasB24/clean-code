@@ -13,6 +13,7 @@ from pathlib import Path
 
 import numpy as np
 
+from cleancode.rules.semantic_restatement import SemanticRestatement
 from cleancode.semantics.backbone import load_table
 from cleancode.semantics.classifier import load_classifier
 from cleancode.semantics.clauses import clauses, narration_shaped
@@ -21,6 +22,7 @@ from cleancode.semantics.training import fit_logistic_regression, split_dataset
 REPO_ROOT = Path(__file__).parent.parent
 DATASET = REPO_ROOT / "tools" / "data" / "what_why.jsonl"
 HEAD = REPO_ROOT / "src" / "cleancode" / "semantics" / "head.json"
+DEFAULT_THRESHOLD = SemanticRestatement.default_options["threshold"]
 
 
 class TestClauses:
@@ -63,10 +65,10 @@ class TestNarrationShaped:
 
 class TestClassifier:
     def test_procedural_paraphrase_scores_above_default_threshold(self):
-        assert load_classifier().score("Adds two numbers and returns the sum") >= 0.75
+        assert load_classifier().score("Adds two numbers and returns the sum") >= DEFAULT_THRESHOLD
 
     def test_rationale_clause_scores_below_default_threshold(self):
-        assert load_classifier().score("to maximize L1 cache hits") < 0.75
+        assert load_classifier().score("to maximize L1 cache hits") < DEFAULT_THRESHOLD
 
     def test_unknown_vocabulary_is_unjudgeable(self):
         assert load_classifier().score("qwzx bnmp vrtk") is None

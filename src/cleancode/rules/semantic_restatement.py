@@ -99,7 +99,7 @@ class SemanticRestatement(Rule):
     id = "CM307"
     name = "docstring-semantic-restatement"
     default_severity = Severity.WARNING
-    default_options = {"threshold": 0.75, "min_words": 3, "max_lines": 3}
+    default_options = {"threshold": 0.5, "min_words": 3, "max_lines": 3}
     description = (
         "Flags docstrings and standalone comments that only *narrate* what the "
         'code does, even when reworded with synonyms ("""Adds two numbers and '
@@ -169,8 +169,9 @@ class SemanticRestatement(Rule):
         A clause must be narration-shaped (verb-led) *and* score procedural
         to count. One clause that isn't — a rationale, a noun-led value
         contract, or one the classifier cannot judge — clears the whole
-        text: for a linter, a missed paraphrase is far cheaper than flagging
-        a comment that carries real information.
+        text. The default `threshold` favors recall over precision: an
+        LLM fixer re-checking a comment that turns out fine costs little,
+        while a paraphrase this rule never flags gets no second look at all.
         """
         if not _judgeable_text(text, ctx.config.options["min_words"]):
             return False
