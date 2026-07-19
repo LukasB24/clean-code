@@ -82,7 +82,7 @@
 # body_overlap = 0.6
 
 # CM302  comment-restates-code  [warning]
-#   Flags comments that paraphrase the code line they annotate (`x = x + 1  # increment x by 1`, `for k in range(3):  # iterate three times`). TODO/FIXME/NOTE, tool directives, and comments carrying a causal/justification marker (because, since, workaround, ...) are exempt.
+#   Flags comments that paraphrase the code line they annotate (`x = x + 1  # increment x by 1`, `for k in range(3):  # iterate three times`). TODO/FIXME/NOTE, tool directives, comments carrying a causal/justification marker (because, since, workaround, ...), and banner/section-divider comments (CM306's territory) are exempt.
 # [tool.cleancode.CM302]
 # overlap = 0.5
 # min_words = 2
