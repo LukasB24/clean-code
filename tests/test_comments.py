@@ -1,6 +1,4 @@
-"""Tests for the comment/docstring noise rules (CM301-CM307) and the type-hint rule (TY501)."""
-
-import textwrap
+"""Tests for the comment/docstring noise rules CM301–CM305."""
 
 
 def rule_ids(violations):
@@ -8,146 +6,246 @@ def rule_ids(violations):
 
 
 class TestDocstringRestatesName:
-    def test_flags_docstring_restating_short_signature(self, check):
-        source = textwrap.dedent('''
-            def get_user_name(user):
-                """Gets the user name."""
-                return user.name
-            ''')
+    def test_flags_signature_restatement(self, check):
+        source = '''
+        def get_user_name(user):
+            """Gets the user name."""
+            return user.name
+        '''
         assert rule_ids(check(source, "CM301")) == ["CM301"]
 
-    def test_docstring_adding_context_passes(self, check):
-        source = textwrap.dedent('''
-            def get_user_name(user):
-                """Falls back to the anonymized id when no display name is set."""
-                return user.name
-            ''')
+    def test_flags_contentless_docstring(self, check):
+        source = '''
+        def frobnicate(widget):
+            """Do the thing."""
+            return widget
+        '''
+        assert rule_ids(check(source, "CM301")) == ["CM301"]
+
+    def test_informative_docstring_passes(self, check):
+        source = '''
+        def get_user_name(user):
+            """Falls back to the email local part when the profile is empty."""
+            return user.name or user.email.split("@")[0]
+        '''
+        assert check(source, "CM301") == []
+
+    def test_short_docstring_restating_the_body_is_caught(self, check):
+        # regression: a docstring that paraphrases the function's own body
+        # (not just its name/params) used to slip past CM301 entirely —
+        # this is the PR reviewer's flagged real-world example
+        source = '''
+        def _section_entries(self, docstring, function):
+            """Yield (entry_name, is_uninformative) for Args:/Returns: style entries."""
+            in_section = False
+            section_name = ""
+            for line in docstring.splitlines():
+                header = SECTION_HEADER.match(line)
+                if header:
+                    in_section = True
+                    section_name = header.group(1).lower()
+                    continue
+                if not in_section:
+                    continue
+                if line.strip() and not line.startswith((" ", "\t")):
+                    in_section = False
+                    continue
+                entry = PARAM_ENTRY.match(line)
+                if entry is None:
+                    continue
+                name = entry.group("name").lstrip("*")
+                description = entry.group("desc").strip()
+                if section_name in ("returns", "raises", "yields"):
+                    reference = set(split_identifier(function.name))
+                else:
+                    reference = set(split_identifier(name))
+                desc_words = content_words(description, extra_stopwords=FRAMING_VERBS)
+                uninformative = desc_words <= (reference | GENERIC_PARAM_WORDS)
+                yield name, uninformative
+        '''
+        violations = check(source, "CM301")
+        assert rule_ids(violations) == ["CM301"]
+        assert "_section_entries" in violations[0].message
+
+    def test_short_docstring_using_body_vocabulary_to_add_real_info_passes(self, check):
+        # a short docstring can legitimately reuse a few of the body's words
+        # while still adding information the code doesn't already say
+        source = '''
+        def _section_entries(self, docstring, function):
+            """Judges Returns/Raises/Yields entries against the function name, not a param."""
+            for line in docstring.splitlines():
+                pass
+        '''
+        assert check(source, "CM301") == []
+
+    def test_substantive_multiline_docstring_passes(self, check):
+        source = '''
+        def get_user_name(user):
+            """Gets the user name.
+
+            Resolution order: profile name, then display name, then the email
+            local part. Never returns an empty string.
+            """
+            return user.name
+        '''
+        assert check(source, "CM301") == []
+
+    def test_restatement_on_the_second_line_is_caught(self, check):
+        # regression: only the first line was scored; a 2-line docstring
+        # that restates the signature across both lines used to slip through
+        source = '''
+        def get_user_name(user):
+            """Gets the user name.
+            Returns the name of the user."""
+            return user.name
+        '''
+        assert rule_ids(check(source, "CM301")) == ["CM301"]
+
+    def test_multiline_docstring_that_never_leaves_the_signature_is_flagged(self, check):
+        source = '''
+        def get_user_name(user):
+            """Gets the user name.
+
+            Returns the name for the given user.
+            Gets the name of the user.
+            """
+            return user.name
+        '''
+        assert rule_ids(check(source, "CM301")) == ["CM301"]
+
+    def test_multiline_docstring_with_one_informative_line_passes(self, check):
+        source = '''
+        def get_user_name(user):
+            """Gets the user name.
+
+            Falls back to the email local part when the profile is empty.
+            """
+            return user.name or user.email.split("@")[0]
+        '''
         assert check(source, "CM301") == []
 
     def test_flags_class_docstring_restating_name(self, check):
-        source = textwrap.dedent('''
-            class UserRepository:
-                """Repository for users."""
+        source = """
+        class UserManager:
+            \"\"\"User manager.\"\"\"
 
-                def find(self, id):
-                    return self._store.get(id)
-            ''')
-        assert rule_ids(check(source, "CM301")) == ["CM301"]
+            def create(self, name):
+                return name
+        """
+        violations = check(source, "CM301")
+        assert rule_ids(violations) == ["CM301"]
+        assert "UserManager" in violations[0].message
 
-    def test_class_docstring_with_real_content_passes(self, check):
-        source = textwrap.dedent('''
-            class UserRepository:
-                """Caches lookups for five minutes to absorb request bursts."""
+    def test_informative_class_docstring_passes(self, check):
+        source = """
+        class UserManager:
+            \"\"\"Coordinates user lifecycle across the profile and billing services.\"\"\"
 
-                def find(self, id):
-                    return self._store.get(id)
-            ''')
+            def create(self, name):
+                return name
+        """
         assert check(source, "CM301") == []
 
     def test_overlap_threshold_default_is_0_6(self, check):
+        # regression: default tightened from 0.7 to 0.6 pre-1.0.
+        # doc words {path, parse, quickly, config} vs signature words
         # {path, parse, mode, config}: overlap 3/4 = 0.75 -> fires at 0.6, not 0.8
-        source = textwrap.dedent('''
-            def parse(path):
-                """Parses the path in the given mode using the config."""
-                return _do_parse(path)
-            ''')
+        source = '''
+        def parse_config(path, mode):
+            """Parse config path quickly."""
+            return path
+        '''
         assert rule_ids(check(source, "CM301")) == ["CM301"]
+        assert check(source, "CM301", overlap=0.8) == []
 
     def test_private_helper_uses_the_stricter_private_overlap_threshold(self, check):
-        source = textwrap.dedent('''
-            def _resolve(target):
-                """Resolves the target by walking up until it finds a match."""
-                return _walk(target)
-            ''')
+        # regression: this exact docstring/body pair (from a real PR review)
+        # scored 0.625 overlap against the public default -- well under the
         # old 0.7 threshold, so it slipped past CM301 entirely
+        source = '''
+        def _used_elsewhere(function, name, skip):
+            """True if `name` appears as a Name node anywhere in the function besides `skip`."""
+            for node in ast.walk(function):
+                if isinstance(node, ast.Name) and node.id == name and node not in skip:
+                    return True
+            return False
+        '''
         assert rule_ids(check(source, "CM301")) == ["CM301"]
 
-    def test_public_function_at_same_overlap_passes_default_threshold(self, check):
-        source = textwrap.dedent('''
-            def resolve(target):
-                """Resolves the target by walking up until it finds a match."""
-                return _walk(target)
-            ''')
+    def test_private_helper_with_real_information_still_passes(self, check):
+        source = '''
+        def _merge_config(base, overrides):
+            """Overrides win on key conflicts; nested dicts are merged recursively."""
+            return base
+        '''
         assert check(source, "CM301") == []
 
     def test_private_overlap_threshold_is_configurable(self, check):
-        source = textwrap.dedent('''
-            def _resolve(target):
-                """Resolves the target by walking up until it finds a match."""
-                return _walk(target)
-            ''')
-        assert check(source, "CM301", private_overlap=0.9) == []
+        source = '''
+        def _load(path):
+            """Reads the file at path."""
+            return path
+        '''
+        assert check(source, "CM301") == []
+        assert rule_ids(check(source, "CM301", private_overlap=0.1)) == ["CM301"]
 
-    def test_dunder_is_judged_as_public_not_private(self, check):
-        source = textwrap.dedent('''
-            class Point:
-                def __repr__(self):
-                    """Returns the repr of the point."""
-                    return f"Point({self.x}, {self.y})"
-            ''')
-        assert rule_ids(check(source, "CM301")) == ["CM301"]
+    def test_dunder_method_is_not_judged_as_private(self, check):
+        source = '''
+        class Point:
+            def __repr__(self):
+                """Falls back to the default repr format when coordinates are unset."""
+                return "Point"
+        '''
+        assert check(source, "CM301") == []
 
-    def test_flags_body_operator_paraphrase(self, check):
-        source = textwrap.dedent('''
-            def add(a, b):
-                """Adds a and b and returns the sum."""
-                return a + b
-            ''')
-        assert rule_ids(check(source, "CM301")) == ["CM301"]
+    def test_flags_docstring_that_paraphrases_the_body_in_synonyms(self, check):
+        # Zero literal overlap with "paraphrase_body"/"a"/"b" beyond "a"/"b"
+        # themselves, but "adds"/"sum" are synonyms of the `+`/`return`
+        # operators CM302 already maps — this is the same paraphrase pattern
+        # CM302 catches for one annotated line, applied to a whole body.
+        source = '''
+        def paraphrase_body(a, b):
+            """Adds a and b and returns the sum."""
+            return a + b
+        '''
+        violations = check(source, "CM301")
+        assert rule_ids(violations) == ["CM301"]
+        assert "paraphrases the function body" in violations[0].message
 
-    def test_body_paraphrase_with_why_signal_is_exempt(self, check):
-        source = textwrap.dedent('''
-            def add(a, b):
-                """Adds a and b instead of using sum(), to avoid the overhead."""
-                return a + b
-            ''')
+    def test_why_signal_exempts_body_paraphrase(self, check):
+        source = '''
+        def compute_running_total(items):
+            """Adds items one at a time instead of using sum(), because
+            the input can be a lazy generator that must only be walked once."""
+            total = 0
+            for item in items:
+                total += item
+            return total
+        '''
+        assert check(source, "CM301") == []
+
+    def test_nested_function_docstring_excluded_from_outer_body_scan(self, check):
+        # Without excluding the nested function's own lines, its docstring's
+        # "if"/"for" would leak unrelated operator-synonym words into
+        # outer's body vocabulary and falsely match outer's own docstring.
+        source = '''
+        def outer(x):
+            """Whether the case fits."""
+            def helper():
+                """Applies only if needed, for safety."""
+                return x
+            return helper()
+        '''
         assert check(source, "CM301") == []
 
     def test_body_overlap_threshold_is_configurable(self, check):
-        source = textwrap.dedent('''
-            def add(a, b):
-                """Adds a and b and returns the sum."""
-                return a + b
-            ''')
-        assert check(source, "CM301", body_overlap=0.95) == []
-
-    def test_paraphrase_that_reuses_own_variable_names_passes(self, check):
-        source = textwrap.dedent('''
-            def branches(count):
-                """Returns branches based on count."""
-                if count > 0:
-                    return count
-                return 0
-            ''')
+        source = '''
+        def combine_pair(first_value, second_value):
+            """Adds the two inputs together and returns their total."""
+            return first_value + second_value
+        '''
         assert check(source, "CM301") == []
-
-
-class TestBoilerplateParamDocs:
-    def test_flags_uninformative_param_docs(self, check):
-        source = textwrap.dedent('''
-            def process(data, config):
-                """Processes data.
-
-                Args:
-                    data: The data.
-                    config: The config.
-                """
-                return _run(data, config)
-            ''')
-        assert rule_ids(check(source, "CM304")) == ["CM304"]
-
-    def test_informative_param_docs_pass(self, check):
-        source = textwrap.dedent('''
-            def process(data, config):
-                """Processes data.
-
-                Args:
-                    data: Rows already deduplicated by the caller.
-                    config: Feature flags for this pipeline run.
-                """
-                return _run(data, config)
-            ''')
-        assert check(source, "CM304") == []
+        assert rule_ids(check(source, "CM301", body_overlap=0.1)) == ["CM301"]
 
 
 class TestCommentRestatesCode:
@@ -227,88 +325,126 @@ class TestCommentDensity:
         def padded(values):
             """Docstring line one.
 
-            Docstring line two.
+            More padding here.
             """
-            # step 1
-            total = 0
-            # step 2
-            for value in values:
-                # add it
-                total += value
-            # step 3
-            return total
+            # first we do a thing
+            first = values[0]
+            # then another thing entirely
+            second = values[1]
+            # and finally combine somehow
+            third = first + second
+            fourth = third * 2
+            fifth = fourth - 1
+            return fifth
         '''
-        assert rule_ids(check(source, "CM303")) == ["CM303"]
+        violations = check(source, "CM303")
+        assert rule_ids(violations) == ["CM303"]
 
     def test_sparse_comments_pass(self, check):
-        source = '''
-        def clean(values):
-            total = 0
-            for value in values:
-                total += value
-            return total
-        '''
+        source = """
+        def lean(values):
+            first = values[0]
+            second = values[1]
+            third = first + second
+            fourth = third * 2
+            fifth = fourth - 1
+            return fifth
+        """
         assert check(source, "CM303") == []
 
-    def test_short_function_below_min_lines_passes(self, check):
-        source = '''
-        def tiny():
-            # a comment
-            return 1
-        '''
+    def test_small_functions_are_ignored(self, check):
+        source = "def tiny():\n    # a comment\n    # another comment\n    return 1\n"
         assert check(source, "CM303") == []
 
-    def test_max_ratio_is_configurable(self, check):
+
+class TestBoilerplateParamDocs:
+    def test_flags_args_section_that_restates_names(self, check):
         source = '''
-        def padded(values):
-            # step 1
-            total = 0
-            # step 2
-            for value in values:
-                total += value
-            return total
+        def transfer(amount, account):
+            """Move money between ledgers.
+
+            Args:
+                amount: The amount.
+                account (str): the account
+
+            Returns:
+                The transfer.
+            """
+            return amount, account
         '''
-        assert check(source, "CM303", max_ratio=0.9) == []
+        violations = check(source, "CM304")
+        assert rule_ids(violations) == ["CM304"]
+        assert "amount" in violations[0].message
+
+    def test_informative_args_section_passes(self, check):
+        source = '''
+        def transfer(amount, account):
+            """Move money between ledgers.
+
+            Args:
+                amount: Minor units (cents); must be positive.
+                account: IBAN of the receiving side.
+            """
+            return amount, account
+        '''
+        assert check(source, "CM304") == []
+
+    def test_docstring_without_sections_is_ignored(self, check):
+        source = '''
+        def transfer(amount, account):
+            """Move money between ledgers, validating both sides."""
+            return amount, account
+        '''
+        assert check(source, "CM304") == []
 
 
 class TestFileCommentDensity:
-    def test_flags_dense_file(self, check):
-        lines = []
-        for i in range(20):
-            lines.append(f"# comment number {i}")
-            lines.append(f"value_{i} = {i}")
-        source = "\n".join(lines) + "\n"
-        assert rule_ids(check(source, "CM305", min_code_lines=10)) == ["CM305"]
+    @staticmethod
+    def _commented_module(code_lines, comment_lines):
+        code = [f"CONSTANT_{index} = {index}" for index in range(code_lines)]
+        comments = [f"# narration line number {index}" for index in range(comment_lines)]
+        return "\n".join(comments + code) + "\n"
 
-    def test_sparse_file_passes(self, check):
-        lines = []
-        for i in range(20):
-            lines.append(f"value_{i} = {i}")
-        source = "\n".join(lines) + "\n"
+    def test_flags_comment_heavy_file(self, check):
+        source = self._commented_module(code_lines=10, comment_lines=4)
+        violations = check(source, "CM305", min_code_lines=10)
+        assert rule_ids(violations) == ["CM305"]
+        assert violations[0].line == 1
+        assert "4 comment lines for 10 code lines" in violations[0].message
+        assert "every comment" in violations[0].suggestion
+
+    def test_file_at_the_ratio_passes(self, check):
+        source = self._commented_module(code_lines=10, comment_lines=2)
+        assert check(source, "CM305", min_code_lines=10) == []
+
+    def test_small_file_passes_even_when_dense(self, check):
+        source = self._commented_module(code_lines=5, comment_lines=5)
         assert check(source, "CM305", min_code_lines=10) == []
 
     def test_directive_comments_do_not_count(self, check):
-        lines = []
-        for i in range(20):
-            lines.append("# TODO: revisit")
-            lines.append(f"value_{i} = {i}")
-        source = "\n".join(lines) + "\n"
+        directives = "\n".join(
+            ["# TODO: revisit", "# noqa", "# cleancode: disable=NM202", "# fmt: off"]
+        )
+        code = "\n".join(f"CONSTANT_{index} = {index}" for index in range(10))
+        source = f"{directives}\n{code}\n"
         assert check(source, "CM305", min_code_lines=10) == []
 
-    def test_docstrings_do_not_count_toward_density(self, check):
-        lines = ['"""', "Module docstring spanning", "several lines of text.", '"""']
-        for i in range(20):
-            lines.append(f"value_{i} = {i}")
-        source = "\n".join(lines) + "\n"
-        assert check(source, "CM305", min_code_lines=10) == []
+    def test_docstring_lines_count_toward_neither_side(self, check):
+        docstring = '"""Module docstring.\n\n' + "\n".join("Padding." for _ in range(20)) + '\n"""'
+        source = docstring + "\n" + self._commented_module(code_lines=10, comment_lines=4)
+        violations = check(source, "CM305", min_code_lines=10)
+        assert rule_ids(violations) == ["CM305"]
+        assert "4 comment lines for 10 code lines" in violations[0].message
 
-    def test_below_min_code_lines_never_flagged(self, check):
-        lines = []
-        for i in range(5):
-            lines.append(f"# comment {i}")
-            lines.append(f"value_{i} = {i}")
+    def test_inline_comments_count(self, check):
+        lines = [
+            f"CONSTANT_{index} = {index}  # states the value again" if index < 4 else f"CONSTANT_{index} = {index}"
+            for index in range(10)
+        ]
         source = "\n".join(lines) + "\n"
-        assert check(source, "CM305", min_code_lines=10) == []
+        violations = check(source, "CM305", min_code_lines=10)
+        assert rule_ids(violations) == ["CM305"]
+        assert "4 comment lines for 10 code lines" in violations[0].message
 
 
 class TestBannerComment:
