@@ -203,6 +203,11 @@ whether pre- or post-1.0).
 
 ### Fixed
 
+- `CM302` no longer double-reports a banner/section-divider comment that
+  CM306 already flags — a banner that happens to share vocabulary with a
+  nearby line (`# --- sweep overrides ---` above a `sweep_override = ...`
+  line) was scoring as a restatement too, so the same comment produced two
+  warnings.
 - Checking a medium project no longer takes double-digit seconds
   (`clean-code check src` on this repo: 13.5s → 0.9s). `DP701`'s
   fingerprinting deep-copied each statement's AST, and the `parent`
