@@ -14,7 +14,6 @@
   <a href="https://pypi.org/project/clean-code/"><img src="https://img.shields.io/pypi/v/clean-code.svg" alt="PyPI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+"></a>
-  <img src="https://img.shields.io/badge/deps-click_only-informational.svg" alt="Only dependency: click">
   <img src="https://img.shields.io/badge/analysis-deterministic-informational.svg" alt="No LLM calls, no API key">
 </p>
 
@@ -46,8 +45,8 @@ to review its own code:
 pip install clean-code
 ```
 
-That's it — you get a `clean-code` command. Requires Python 3.11+, and the
-only dependency is `click`.
+That's it — you get a `clean-code` command. Requires Python 3.11+; its
+runtime dependencies are `click` and `numpy`.
 
 Working on clean-code itself? See [`CONTRIBUTING.md`](CONTRIBUTING.md) for
 an editable install (`pip install -e ".[dev]"`).
