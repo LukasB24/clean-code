@@ -15,4 +15,10 @@ numpy, no ML framework, deterministic, and microseconds per clause. To
 retrain: edit the dataset and run ``python tools/train_head.py``; to rebuild
 the backbone table: ``python tools/distill_backbone.py`` (needs ``wordllama``,
 a tools-only dependency).
+
+``embeddings.npz`` is a derivative of Llama-2-derived token embeddings and is
+subject to the LLAMA 2 Community License Agreement, not this project's own
+Apache-2.0 license — see ``THIRD_PARTY_NOTICES/`` in this directory (shipped
+as part of the installed package) for the required attribution, the license
+text, and the Acceptable Use Policy it incorporates by reference.
 """

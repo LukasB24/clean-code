@@ -16,7 +16,7 @@ import numpy as np
 from cleancode.semantics.backbone import load_table
 from cleancode.semantics.classifier import load_classifier
 from cleancode.semantics.clauses import clauses, narration_shaped
-from cleancode.semantics.training import fit_logistic_regression
+from cleancode.semantics.training import fit_logistic_regression, split_dataset
 
 REPO_ROOT = Path(__file__).parent.parent
 DATASET = REPO_ROOT / "tools" / "data" / "what_why.jsonl"
@@ -201,6 +201,32 @@ class TestNoEnvironmentBloat:
         assert names == ["click", "numpy"]
 
 
+class TestTrainValTestSplit:
+    def test_split_is_deterministic_and_partitions_every_row(self):
+        features = np.arange(37).reshape(37, 1).astype(float)
+        labels = np.array([index % 2 for index in range(37)])
+
+        (train_features, train_labels), (val_features, val_labels), (test_features, test_labels) = split_dataset(
+            features, labels
+        )
+
+        assert len(train_labels) + len(val_labels) + len(test_labels) == 37
+        assert len(val_labels) == 3  # rows 8, 18, 28
+        assert len(test_labels) == 3  # rows 9, 19, 29
+        assert set(train_features.flatten()) | set(val_features.flatten()) | set(test_features.flatten()) == set(
+            features.flatten()
+        )
+
+    def test_split_is_stable_across_calls(self):
+        features = np.arange(60).reshape(60, 1).astype(float)
+        labels = np.zeros(60, dtype=int)
+        first = split_dataset(features, labels)
+        second = split_dataset(features, labels)
+        for (features_a, labels_a), (features_b, labels_b) in zip(first, second):
+            assert np.array_equal(features_a, features_b)
+            assert np.array_equal(labels_a, labels_b)
+
+
 class TestHeadReproducibility:
     def test_checked_in_head_matches_retraining_on_the_checked_in_corpus(self):
         table = load_table()
@@ -209,8 +235,22 @@ class TestHeadReproducibility:
             record = json.loads(line)
             features.append(table.embed(record["text"]))
             labels.append(1 if record["label"] == "what" else 0)
-        weights, bias = fit_logistic_regression(np.array(features), np.array(labels))
+        (train_features, train_labels), _, _ = split_dataset(np.array(features), np.array(labels))
+        weights, bias = fit_logistic_regression(train_features, train_labels)
 
         head = json.loads(HEAD.read_text(encoding="utf-8"))
         assert np.allclose(weights, head["weights"], atol=1e-6)
         assert np.isclose(bias, head["bias"], atol=1e-6)
+
+    def test_head_reports_train_val_test_accuracy_from_held_out_splits(self):
+        head = json.loads(HEAD.read_text(encoding="utf-8"))
+        accuracy = head["training"]["accuracy"]
+        samples = head["training"]["samples"]
+        assert set(accuracy) == {"train", "val", "test"}
+        assert set(samples) == {"train", "val", "test"}
+        assert all(0.0 <= score <= 1.0 for score in accuracy.values())
+        # The val/test splits are held out of fitting, so with a corpus this
+        # small they're a noisier, and typically lower, estimate than the
+        # training accuracy the model was directly fit to reach.
+        assert accuracy["val"] <= accuracy["train"]
+        assert accuracy["test"] <= accuracy["train"]

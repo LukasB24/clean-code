@@ -15,6 +15,36 @@ import numpy as np
 RIDGE_PENALTY = 1e-4
 LEARNING_RATE = 1.0
 ITERATIONS = 15000
+DECISION_THRESHOLD = 0.5
+
+# Row i of the corpus goes to test when i % SPLIT_MODULUS == TEST_REMAINDER,
+# validation when i % SPLIT_MODULUS == VAL_REMAINDER, else train — an 80/10/10
+# split with no shuffling, so it stays reproducible without a random seed the
+# same way full-batch gradient descent from a zero start already is.
+SPLIT_MODULUS = 10
+VAL_REMAINDER = 8
+TEST_REMAINDER = 9
+
+
+def split_dataset(
+    features: np.ndarray, labels: np.ndarray
+) -> tuple[tuple[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray]]:
+    """Deterministic 80/10/10 ``(train, val, test)`` split, each ``(features, labels)``.
+
+    Splitting by row position rather than a random shuffle means re-running
+    against the same corpus always yields the exact same three sets — no
+    seed to pin down, no risk of a shuffle implementation changing across
+    numpy versions.
+    """
+    positions = np.arange(len(labels))
+    is_test = positions % SPLIT_MODULUS == TEST_REMAINDER
+    is_val = positions % SPLIT_MODULUS == VAL_REMAINDER
+    is_train = ~(is_test | is_val)
+    return (
+        (features[is_train], labels[is_train]),
+        (features[is_val], labels[is_val]),
+        (features[is_test], labels[is_test]),
+    )
 
 
 def fit_logistic_regression(features: np.ndarray, labels: np.ndarray) -> tuple[np.ndarray, float]:
@@ -35,3 +65,13 @@ def fit_logistic_regression(features: np.ndarray, labels: np.ndarray) -> tuple[n
         weights -= LEARNING_RATE * (samples.T @ error / len(targets) + RIDGE_PENALTY * weights)
         bias -= LEARNING_RATE * float(error.mean())
     return weights, bias
+
+
+def accuracy(weights: np.ndarray, bias: float, dataset: tuple[np.ndarray, np.ndarray]) -> float:
+    """Fraction of ``dataset`` (features, labels), e.g. one split of ``split_dataset``, classified correctly."""
+    features, labels = dataset
+    logits = features @ weights + bias
+    predictions = 1.0 / (1.0 + np.exp(-logits))
+    predicted_positive = predictions >= DECISION_THRESHOLD
+    actual_positive = labels == 1
+    return float((predicted_positive == actual_positive).mean())

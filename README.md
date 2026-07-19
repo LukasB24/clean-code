@@ -225,4 +225,6 @@ adding a rule, [`CHANGELOG.md`](CHANGELOG.md) for what's shipped, and
 
 ## License
 
-[Apache 2.0](LICENSE).
+[Apache 2.0](LICENSE). See [`NOTICE`](NOTICE) for a third-party asset
+(CM307's vendored, Llama-2-derived embedding table) that is licensed
+separately.

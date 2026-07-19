@@ -15,6 +15,13 @@ the linter's runtime environment. Run it from a throwaway virtualenv:
 The output is deterministic for a given wordllama version: the token
 vocabulary is sorted, PCA uses numpy's deterministic SVD with a fixed sign
 convention, and quantization is a pure function of the projected vectors.
+
+``l2_supercat_256`` is trained in part on Llama 2's token-embedding codebook,
+so the ``embeddings.npz`` this script produces is a Llama 2 derivative work
+and ships with the attribution notice, license text, and Acceptable Use
+Policy the LLAMA 2 Community License Agreement requires — see
+``src/cleancode/semantics/THIRD_PARTY_NOTICES/``. This tool must not be used
+to train or improve any other large language model with that codebook.
 """
 
 from __future__ import annotations

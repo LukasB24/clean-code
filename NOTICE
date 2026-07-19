@@ -1,0 +1,17 @@
+clean-code
+Copyright the clean-code contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product bundles a third-party asset that is not covered by the
+Apache-2.0 license above:
+
+* `src/cleancode/semantics/embeddings.npz` — a derivative word-embedding
+  table built from Llama-2-derived token embeddings (via WordLlama's
+  `l2_supercat_256` model). It is subject to the LLAMA 2 Community License
+  Agreement, Copyright (c) Meta Platforms, Inc. All Rights Reserved.
+
+  Full details, the required attribution notice, a copy of the license
+  agreement, and the Acceptable Use Policy it incorporates by reference are
+  in `src/cleancode/semantics/THIRD_PARTY_NOTICES/` — that directory ships
+  as part of the installed `cleancode` package alongside the asset itself.
