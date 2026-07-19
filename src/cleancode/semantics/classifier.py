@@ -27,7 +27,11 @@ class WhatWhyClassifier:
         self._bias = bias
 
     def score(self, clause: str) -> float | None:
-        """P(procedural) in [0, 1], or ``None`` when the clause has no known words."""
+        """P(procedural) in [0, 1]; ``None`` when unjudgeable.
+
+        Never a low score by default — an out-of-vocabulary clause must be
+        skipped, not mistaken for confident rationale.
+        """
         embedding = self._table.embed(clause)
         if embedding is None:
             return None

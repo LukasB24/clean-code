@@ -15,7 +15,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+"></a>
   <img src="https://img.shields.io/badge/deps-click_only-informational.svg" alt="Only dependency: click">
-  <img src="https://img.shields.io/badge/analysis-100%25_deterministic-informational.svg" alt="No LLM calls, no API key">
+  <img src="https://img.shields.io/badge/analysis-deterministic-informational.svg" alt="No LLM calls, no API key">
 </p>
 
 ---
@@ -27,9 +27,14 @@ nobody understands why.
 clean-code closes that gap. Two things make it different from asking an LLM
 to review its own code:
 
-- **Finding violations is free and deterministic.** It's plain `ast` parsing,
-  not another model — same input, same output, every time, and every result
-  traces back to the exact rule that raised it.
+- **Finding violations is deterministic and needs no API key.** Every rule
+  but one is plain `ast` parsing — same input, same output, every time, and
+  every result traces back to the exact rule that raised it. The one
+  exception, `CM307`, scores a docstring/comment against a small, frozen
+  classifier that's trained offline and checked into the package (see
+  [`docs/RULES.md`](docs/RULES.md#a-few-details-worth-knowing)) — no LLM
+  call, no network access, and its output is just as reproducible as every
+  other rule's: the same clause always scores the same.
 - **Every violation comes with an actual fix.** Instead of a vague "too
   complex," you get a specific instruction — rename this, extract that,
   flatten this branch — that you, or the agent that wrote the code, can act
