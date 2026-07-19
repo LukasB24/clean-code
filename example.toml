@@ -65,7 +65,7 @@
 # NM202  meaningless-name  [warning]
 #   Flags names that say nothing about their content (tmp, data, foo, do_stuff) and numbered generics like `data2` or `result1`.
 # [tool.cleancode.NM202]
-# banned = ["tmp", "temp", "data", "result", "res", "ret", "retval", "foo", "bar", "baz", "stuff", "things", "obj", "var", "info", "output", "my_var", "temp_var", "my_list", "my_dict", "arr", "lst", "l"]
+# banned = ["tmp", "temp", "data", "result", "res", "ret", "retval", "foo", "bar", "baz", "stuff", "thing", "things", "obj", "var", "info", "output", "my_var", "temp_var", "my_list", "my_dict", "arr", "lst", "l"]
 # banned_functions = ["process", "handle", "run_stuff", "do_stuff", "do_it", "do_something", "do_work", "process_data", "handle_data", "my_func", "func", "helper", "do_the_thing", "main2"]
 # allowed_in_loops = ["item", "value", "val", "element", "entry", "key"]
 
@@ -258,4 +258,3 @@
 #   Flags a `try` block with more than `max_statements` top-level statements feeding a bare or `except Exception`/`BaseException` handler — the handler can't know which of several steps actually failed. A `try` narrowed to a specific exception, or a broad handler wrapping few statements, is not flagged.
 # [tool.cleancode.PY903]
 # max_statements = 3
-
