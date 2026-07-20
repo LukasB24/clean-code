@@ -14,7 +14,8 @@ import numpy as np
 
 # Tuned against the validation split, never test (1e-4 overfit: train 0.9194
 # vs test 0.7500). Larger penalties compress scores toward 0.5, so this stops
-# just short of dropping issue #28's held-out acceptance example below 0.75.
+# just short of pushing issue #28's held-out acceptance example's score down
+# to CM307's default threshold.
 RIDGE_PENALTY = 1.5e-4
 LEARNING_RATE = 1.0
 ITERATIONS = 15000
