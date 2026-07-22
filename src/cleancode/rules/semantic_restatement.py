@@ -99,7 +99,7 @@ class SemanticRestatement(Rule):
     id = "CM307"
     name = "docstring-semantic-restatement"
     default_severity = Severity.WARNING
-    default_options = {"threshold": 0.3, "min_words": 3, "max_lines": 3}
+    default_options = {"threshold": 0.25, "min_words": 3, "max_lines": 3}
     description = (
         "Flags docstrings and standalone comments that only *narrate* what the "
         'code does, even when reworded with synonyms ("""Adds two numbers and '

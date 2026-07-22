@@ -111,7 +111,7 @@
 # CM307  docstring-semantic-restatement  [warning]
 #   Flags docstrings and standalone comments that only *narrate* what the code does, even when reworded with synonyms ("""Adds two numbers and returns the sum.""" over `return a + b`) — paraphrases the lexical rules (CM301/CM302) structurally cannot see. Each clause is scored by a small pretrained-embedding classifier (see `cleancode.semantics`); a text is flagged only when *every* clause reads as procedural description, so mixed comments that also carry rationale ("... to maximize L1 cache hits") always pass. Scope is deliberately narrow: plain (undecorated) function docstrings of at most `max_lines` lines — a class docstring states responsibility and a decorated function's is framework-facing help text — and whole standalone comment blocks. Texts CM301/CM302 already flag (including CM301's operator-synonym body-overlap check), TODO/directive comments, and why-signal carriers are skipped.
 # [tool.cleancode.CM307]
-# threshold = 0.3
+# threshold = 0.25
 # min_words = 3
 # max_lines = 3
 

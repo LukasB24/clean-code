@@ -80,6 +80,31 @@ whether pre- or post-1.0).
   lowered `0.5` → `0.3`: val recall reaches `1.0` (from `0.80`) and test
   recall `0.926` (from `0.80`), while the acceptance example's score (0.198)
   still clears the new threshold by a safe margin.
+- `tools/data/what_why.jsonl` grown further, 556 → 633 clauses (317 what /
+  316 why), with samples paraphrased from real-world good/bad comment and
+  docstring examples collected from published clean-code sources (Stack
+  Overflow's engineering blog, freeCodeCamp, Jack Franklin, Coding Horror,
+  the `luzkan.github.io` code-smells catalog, PEP 257 discussions) — each
+  reduced to the corpus's terse single-clause style rather than quoted
+  verbatim, to keep the Apache-2.0 dataset free of third-party prose.
+  Covers subtle restatements (a docstring that just narrates a method's own
+  name in different words) alongside strong ones, and rationale patterns
+  the corpus was thin on (workarounds, deprecation/compatibility, retry and
+  caching policy, algorithm-choice trade-offs).
+- `tools/tune_head.py` rewritten from a `RIDGE_PENALTY`/`threshold` grid
+  search to Hyperband (Li et al., 2016): it now also searches
+  `LEARNING_RATE`, treating training iterations as Hyperband's resource
+  budget so cheap partial fits eliminate weak `(learning_rate,
+  ridge_penalty)` configs before spending the full 15,000-iteration budget
+  on the survivors. The winner is refit at the full budget, then `CM307`'s
+  threshold is chosen exactly as before (max validation recall, tie-broken
+  by precision, subject to a precision floor and a margin over issue #28's
+  *two* held-out acceptance examples — the guard now also keeps the
+  procedural one comfortably above threshold, not just the rationale one
+  below it). Search is seeded, so it reproduces its own selection exactly.
+  Result on the grown corpus: `LEARNING_RATE` 1.0 → 3.9987,
+  `RIDGE_PENALTY` 1e-3 → 4.9017e-4, `CM307`'s default `threshold` 0.3 → 0.25.
+  Val recall stays at `1.0`; test recall rises `0.926` → `0.938`.
 - Seven new rules targeting patterns common in freshly-generated Python,
   bringing the total to 51:
   - `ST109` `redundant-else` — a plain two-way `if`/`else` whose `if` branch

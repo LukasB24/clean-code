@@ -554,3 +554,80 @@
 {"text": "the parser is strict so a malformed file is rejected rather than silently misread", "label": "why"}
 {"text": "batched inserts reduce round trips to the database", "label": "why"}
 {"text": "the index is unique so a duplicate key fails fast instead of corrupting data", "label": "why"}
+{"text": "adds one to the running counter", "label": "what"}
+{"text": "sets the session id to zero", "label": "what"}
+{"text": "creates a new expiry date object", "label": "what"}
+{"text": "creates the user record", "label": "what"}
+{"text": "checks whether the response body is empty", "label": "what"}
+{"text": "sets the response to the default value", "label": "what"}
+{"text": "multiplies x by two", "label": "what"}
+{"text": "assigns the result to the total variable", "label": "what"}
+{"text": "declares a variable to hold the count", "label": "what"}
+{"text": "stores the current timestamp in a variable", "label": "what"}
+{"text": "opens a file handle for the given path", "label": "what"}
+{"text": "closes the file handle after writing", "label": "what"}
+{"text": "returns the computed result of the operation", "label": "what"}
+{"text": "returns whether the input passed validation", "label": "what"}
+{"text": "processes each item in the input list", "label": "what"}
+{"text": "handles the incoming user request", "label": "what"}
+{"text": "instantiates the class with the given arguments", "label": "what"}
+{"text": "calls the helper and stores its return value", "label": "what"}
+{"text": "loops through the array and prints each entry", "label": "what"}
+{"text": "sets the flag to true", "label": "what"}
+{"text": "sets the flag to false", "label": "what"}
+{"text": "increases the attack value by the given amount", "label": "what"}
+{"text": "decreases the health value by the given amount", "label": "what"}
+{"text": "returns the average of the input values", "label": "what"}
+{"text": "returns the total of the input values", "label": "what"}
+{"text": "builds a list of the matching entries", "label": "what"}
+{"text": "builds a dictionary from the input pairs", "label": "what"}
+{"text": "removes duplicate entries from the list", "label": "what"}
+{"text": "checks whether the list is empty", "label": "what"}
+{"text": "returns early when the list is empty", "label": "what"}
+{"text": "converts the input to a string before returning it", "label": "what"}
+{"text": "reads the configuration file into memory", "label": "what"}
+{"text": "writes the updated configuration back to disk", "label": "what"}
+{"text": "computes the product of the two operands", "label": "what"}
+{"text": "computes the difference between the two operands", "label": "what"}
+{"text": "this function performs the requested calculation", "label": "what"}
+{"text": "this method carries out the update operation", "label": "what"}
+{"text": "this class is responsible for managing application state", "label": "what"}
+{"text": "this function is responsible for handling errors", "label": "what"}
+{"text": "the constructor sets up the initial state of the object", "label": "what"}
+{"text": "the destructor releases resources held by the object", "label": "what"}
+{"text": "iterates through the collection and applies the callback", "label": "what"}
+{"text": "the loop body updates the running total each iteration", "label": "what"}
+{"text": "the helper function wraps the underlying api call", "label": "what"}
+{"text": "the wrapper function forwards its arguments to the callee", "label": "what"}
+{"text": "returns a new list containing the transformed elements", "label": "what"}
+{"text": "returns a new object with the merged fields", "label": "what"}
+{"text": "compensates for an edge case caused by an inconsistent api response format", "label": "why"}
+{"text": "doubled here to account for the current inflation-adjusted rate", "label": "why"}
+{"text": "tracks only entries that passed validation, not every attempt", "label": "why"}
+{"text": "works around a known flush bug in this version of the messaging library", "label": "why"}
+{"text": "disabled for this field because the security policy requires real-time reads", "label": "why"}
+{"text": "backs off exponentially so the rate-limited third-party api is never overwhelmed", "label": "why"}
+{"text": "handled separately because the payment api treats empty strings and nulls differently", "label": "why"}
+{"text": "chosen over binary search because it measured faster on this data distribution", "label": "why"}
+{"text": "kept only for one release cycle so downstream consumers have time to migrate", "label": "why"}
+{"text": "left in place so callers on the old interface don't break mid-rollout", "label": "why"}
+{"text": "the annotation names the version this will be removed in, per the deprecation policy", "label": "why"}
+{"text": "disabled in this environment because the sandboxed network has no internet access", "label": "why"}
+{"text": "the extra round trip is intentional so the write is durable before we acknowledge", "label": "why"}
+{"text": "the delay is tuned to the upstream service's documented rate limit", "label": "why"}
+{"text": "the special case exists because the vendor's api rejects an empty payload", "label": "why"}
+{"text": "the fallback only triggers when the primary provider times out", "label": "why"}
+{"text": "the order of these checks matters because the cheaper one should run first", "label": "why"}
+{"text": "guards against a null pointer that only appears on the very first request", "label": "why"}
+{"text": "the retry cap prevents a permanent outage from spinning forever", "label": "why"}
+{"text": "the extra copy avoids a race with a background thread that reads this field", "label": "why"}
+{"text": "the manual unlock is needed because the raii wrapper isn't available in this codepath", "label": "why"}
+{"text": "matches the byte order the wire protocol mandates, not the host's native order", "label": "why"}
+{"text": "the buffer is oversized to leave room for a header the driver prepends", "label": "why"}
+{"text": "skips validation here because the caller already validated further upstream", "label": "why"}
+{"text": "the sleep is a deliberate backoff, not a leftover debugging statement", "label": "why"}
+{"text": "the cast is safe because the range was already checked above", "label": "why"}
+{"text": "the lock order here avoids a deadlock with the other module's lock order", "label": "why"}
+{"text": "reverted to the older algorithm because the new one regressed on small inputs", "label": "why"}
+{"text": "the threshold was picked empirically from production traffic, not a guess", "label": "why"}
+{"text": "the constant matches the value the spec document defines for this field", "label": "why"}

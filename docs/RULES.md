@@ -26,7 +26,7 @@ quick-start, see the [README](../README.md).
 | CM304 | boilerplate-param-docs | `min_uninformative=0.5` | warning |
 | CM305 | file-comment-density | `max_ratio=0.2, min_code_lines=30` | warning |
 | CM306 | banner-comment | — | warning |
-| CM307 | docstring-semantic-restatement | `threshold=0.3, min_words=3, max_lines=3` | warning |
+| CM307 | docstring-semantic-restatement | `threshold=0.25, min_words=3, max_lines=3` | warning |
 | SL401 | complex-subscript | `max_score=5` | warning |
 | SL402 | chained-subscript | `max_chain=2` | warning |
 | TY501 | uninformative-any | — | warning |
@@ -90,7 +90,7 @@ quick-start, see the [README](../README.md).
   (loose narration with no strong operator/keyword anchor). A text is
   flagged only when every clause is verb-led narration scoring above
   `threshold`; one rationale clause, noun-led value contract, or
-  unknown-vocabulary clause clears it. The default `threshold` (0.3) favors
+  unknown-vocabulary clause clears it. The default `threshold` (0.25) favors
   recall over precision — re-checking a comment that turns out fine costs
   an LLM fixer little, while a paraphrase this rule never flags gets no
   second look at all. Anything CM301/CM302 already flag —
