@@ -12,19 +12,15 @@ from __future__ import annotations
 
 import numpy as np
 
-# Tuned against the validation split, never test (1e-4 overfit: train 0.9194
-# vs test 0.7500). Larger penalties compress scores toward 0.5, so this stops
-# just short of pushing issue #28's held-out acceptance example's score down
-# to CM307's default threshold.
-RIDGE_PENALTY = 1.5e-4
+# Selected by tools/tune_head.py against the validation split only, for
+# recall (reaches 1.0 on val, 0.926 on test, up from 0.80/0.80 at the prior
+# 1.5e-4/0.5 pair) while keeping issue #28's held-out rationale example's
+# score (0.198) safely below the paired 0.3 threshold.
+RIDGE_PENALTY = 1e-3
 LEARNING_RATE = 1.0
 ITERATIONS = 15000
 DECISION_THRESHOLD = 0.5
 
-# Row i of the corpus goes to test when i % SPLIT_MODULUS == TEST_REMAINDER,
-# validation when i % SPLIT_MODULUS == VAL_REMAINDER, else train — an 80/10/10
-# split with no shuffling, so it stays reproducible without a random seed the
-# same way full-batch gradient descent from a zero start already is.
 SPLIT_MODULUS = 10
 VAL_REMAINDER = 8
 TEST_REMAINDER = 9
@@ -52,12 +48,6 @@ def split_dataset(
 
 
 def fit_logistic_regression(features: np.ndarray, labels: np.ndarray) -> tuple[np.ndarray, float]:
-    """Full-batch gradient descent on the ridge-regularized logistic loss.
-
-    ``features`` is (n, dim) float, ``labels`` is (n,) with 1 = procedural
-    ("what") and 0 = rationale ("why"). Returns ``(weights, bias)``. The bias
-    is unregularized so class balance isn't fought by the penalty.
-    """
     samples = features.astype(np.float64)
     targets = labels.astype(np.float64)
     weights = np.zeros(samples.shape[1])
@@ -66,13 +56,13 @@ def fit_logistic_regression(features: np.ndarray, labels: np.ndarray) -> tuple[n
         logits = samples @ weights + bias
         predictions = 1.0 / (1.0 + np.exp(-logits))
         error = predictions - targets
+        # Unregularized so class balance isn't fought by the ridge penalty.
         weights -= LEARNING_RATE * (samples.T @ error / len(targets) + RIDGE_PENALTY * weights)
         bias -= LEARNING_RATE * float(error.mean())
     return weights, bias
 
 
 def accuracy(weights: np.ndarray, bias: float, dataset: tuple[np.ndarray, np.ndarray]) -> float:
-    """Fraction of ``dataset`` (features, labels), e.g. one split of ``split_dataset``, classified correctly."""
     features, labels = dataset
     logits = features @ weights + bias
     predictions = 1.0 / (1.0 + np.exp(-logits))

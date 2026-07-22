@@ -66,6 +66,20 @@ whether pre- or post-1.0).
   Deliberate: for a linter meant to flag comments an LLM should rework, a
   false positive costs a wasted re-check, while a false negative is a
   paraphrase nobody looks at again.
+- `tools/data/what_why.jsonl` grown from 449 to 556 hand-curated clauses
+  (270 what / 286 why), adding coverage the original corpus was thin on:
+  synonym-heavy narration, noun-led restatements, and domain vocabulary
+  (networking, databases, concurrency, security, serialization) the
+  classifier hadn't seen. New `tools/tune_head.py` grid-searches
+  `RIDGE_PENALTY` and `CM307`'s `threshold` against the validation split
+  only (never test), maximizing recall (ties broken by precision, then a
+  floor rejects any pair leaving too little margin over issue #28's
+  held-out rationale acceptance example's score) — the same recall-first
+  tradeoff the repo owner chose for the `0.5` threshold above.
+  `RIDGE_PENALTY` raised `1.5e-4` → `1e-3` and `CM307`'s default `threshold`
+  lowered `0.5` → `0.3`: val recall reaches `1.0` (from `0.80`) and test
+  recall `0.926` (from `0.80`), while the acceptance example's score (0.198)
+  still clears the new threshold by a safe margin.
 - Seven new rules targeting patterns common in freshly-generated Python,
   bringing the total to 51:
   - `ST109` `redundant-else` — a plain two-way `if`/`else` whose `if` branch

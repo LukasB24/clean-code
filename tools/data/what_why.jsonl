@@ -447,3 +447,110 @@
 {"text": "the attributes two methods both touch", "label": "why"}
 {"text": "the exports listed in the module's public interface in order", "label": "why"}
 {"text": "reads or deliberate deletions anywhere in the module", "label": "why"}
+{"text": "full-batch gradient descent on the ridge-regularized logistic loss", "label": "what"}
+{"text": "fraction of the dataset classified correctly", "label": "what"}
+{"text": "sends a get request and parses the json body", "label": "what"}
+{"text": "opens a socket and listens for incoming connections", "label": "what"}
+{"text": "parses the query string into a dictionary of parameters", "label": "what"}
+{"text": "matches the pattern against the input and returns the groups", "label": "what"}
+{"text": "compiles the regular expression once and reuses it", "label": "what"}
+{"text": "splits the path into its directory and file name", "label": "what"}
+{"text": "walks the directory tree and yields each file path", "label": "what"}
+{"text": "hashes the password before storing it", "label": "what"}
+{"text": "verifies the signature against the payload", "label": "what"}
+{"text": "encrypts the message with the given key", "label": "what"}
+{"text": "decrypts the ciphertext back into plain text", "label": "what"}
+{"text": "acquires the lock before modifying the shared counter", "label": "what"}
+{"text": "releases the lock once the critical section finishes", "label": "what"}
+{"text": "spawns a new thread to handle the request", "label": "what"}
+{"text": "schedules the coroutine on the event loop", "label": "what"}
+{"text": "awaits the response before continuing", "label": "what"}
+{"text": "cancels the pending task", "label": "what"}
+{"text": "retries the request up to three times", "label": "what"}
+{"text": "builds the argument parser and registers each flag", "label": "what"}
+{"text": "parses the command line arguments into a namespace", "label": "what"}
+{"text": "prints the usage message and exits", "label": "what"}
+{"text": "reads the environment variable and falls back to a default", "label": "what"}
+{"text": "merges the user config with the default settings", "label": "what"}
+{"text": "validates the schema against the incoming payload", "label": "what"}
+{"text": "serializes the dataclass into a dictionary", "label": "what"}
+{"text": "deserializes the bytes back into an object", "label": "what"}
+{"text": "computes the hash of the file contents", "label": "what"}
+{"text": "compares the two checksums for equality", "label": "what"}
+{"text": "pushes the element onto the heap", "label": "what"}
+{"text": "pops the smallest element off the heap", "label": "what"}
+{"text": "appends the node to the end of the linked list", "label": "what"}
+{"text": "removes the node from the linked list", "label": "what"}
+{"text": "traverses the tree in depth first order", "label": "what"}
+{"text": "visits each node in breadth first order", "label": "what"}
+{"text": "builds an adjacency list from the edge pairs", "label": "what"}
+{"text": "finds the shortest path between the two nodes", "label": "what"}
+{"text": "detects whether the graph contains a cycle", "label": "what"}
+{"text": "topologically sorts the dependency graph", "label": "what"}
+{"text": "partitions the array around the pivot", "label": "what"}
+{"text": "merges the two sorted halves back together", "label": "what"}
+{"text": "binary searches the sorted array for the target", "label": "what"}
+{"text": "shuffles the deck before dealing the cards", "label": "what"}
+{"text": "renders the template with the given context", "label": "what"}
+{"text": "escapes the html before inserting it into the page", "label": "what"}
+{"text": "formats the date according to the given pattern", "label": "what"}
+{"text": "parses the timestamp into a datetime object", "label": "what"}
+{"text": "converts the datetime to the local timezone", "label": "what"}
+{"text": "computes the difference between the two dates", "label": "what"}
+{"text": "opens the database connection and begins a transaction", "label": "what"}
+{"text": "commits the transaction once every statement succeeds", "label": "what"}
+{"text": "rolls back the transaction on failure", "label": "what"}
+{"text": "executes the migration against the schema", "label": "what"}
+{"text": "binds the parameters to the prepared statement", "label": "what"}
+{"text": "closes the cursor when the query finishes", "label": "what"}
+{"text": "mocks the external call for the duration of the test", "label": "what"}
+{"text": "patches the module attribute before running the test", "label": "what"}
+{"text": "asserts that the two values are equal", "label": "what"}
+{"text": "captures the exception raised by the callback", "label": "what"}
+{"text": "records the elapsed time for the benchmark", "label": "what"}
+{"text": "logs the stack trace when the handler fails", "label": "what"}
+{"text": "sockets are closed explicitly because the os limits how many stay open", "label": "why"}
+{"text": "the regex is compiled once because compiling it per call dominated the profile", "label": "why"}
+{"text": "hashed rather than encrypted because the plaintext is never needed again", "label": "why"}
+{"text": "salted per user so a leaked table cannot be reversed with a single rainbow table", "label": "why"}
+{"text": "constant time comparison prevents leaking timing information about the key", "label": "why"}
+{"text": "the lock is reentrant because the same thread may acquire it twice during recursion", "label": "why"}
+{"text": "daemon threads so a hung worker cannot block process exit", "label": "why"}
+{"text": "the event loop is single threaded so callbacks must never block", "label": "why"}
+{"text": "cancellation is cooperative so a task can clean up before stopping", "label": "why"}
+{"text": "capped at three retries so a permanent outage fails fast instead of hanging", "label": "why"}
+{"text": "flags are parsed eagerly so a bad argument is reported before any work starts", "label": "why"}
+{"text": "the default lives in one place so every caller stays consistent if it changes", "label": "why"}
+{"text": "the schema validates at the boundary so downstream code can trust the shape", "label": "why"}
+{"text": "dataclasses serialize this way to stay compatible with the existing api clients", "label": "why"}
+{"text": "the checksum guards against a corrupted download rather than malicious tampering", "label": "why"}
+{"text": "the heap keeps the smallest element accessible in constant time", "label": "why"}
+{"text": "the linked list avoids the cost of shifting elements that an array would require", "label": "why"}
+{"text": "breadth first here because the shortest path matters more than memory", "label": "why"}
+{"text": "topological order is required because a step cannot run before its dependencies", "label": "why"}
+{"text": "the pivot is chosen randomly to avoid worst case behavior on sorted input", "label": "why"}
+{"text": "the merge step needs extra space because it cannot sort in place", "label": "why"}
+{"text": "binary search assumes the array is already sorted", "label": "why"}
+{"text": "the template escapes output by default to prevent cross site scripting", "label": "why"}
+{"text": "timestamps are stored in utc so comparisons never depend on server timezone", "label": "why"}
+{"text": "the transaction wraps every statement so a partial failure leaves nothing committed", "label": "why"}
+{"text": "rollback happens automatically so callers cannot forget to clean up", "label": "why"}
+{"text": "prepared statements avoid sql injection from user supplied values", "label": "why"}
+{"text": "the cursor is closed promptly because the driver limits open cursors per connection", "label": "why"}
+{"text": "external calls are mocked so tests do not depend on network availability", "label": "why"}
+{"text": "the patch is undone after each test so state cannot leak between tests", "label": "why"}
+{"text": "elapsed time is recorded outside the loop so setup cost is not included", "label": "why"}
+{"text": "the stack trace is logged only on failure to keep normal logs quiet", "label": "why"}
+{"text": "the socket timeout matches the load balancer's idle limit", "label": "why"}
+{"text": "buffered writes reduce the number of system calls on the hot path", "label": "why"}
+{"text": "the connection pool is bounded so a burst of requests cannot exhaust file descriptors", "label": "why"}
+{"text": "retried with jitter so clients do not all reconnect at the same instant", "label": "why"}
+{"text": "the cache key includes the version so a schema change cannot serve stale data", "label": "why"}
+{"text": "compression is skipped for small payloads because the overhead outweighs the savings", "label": "why"}
+{"text": "the worker pool size matches the number of cpu cores", "label": "why"}
+{"text": "backpressure is applied so a fast producer cannot overwhelm a slow consumer", "label": "why"}
+{"text": "the session token is rotated to limit the damage from a leaked cookie", "label": "why"}
+{"text": "input is normalized to nfc so visually identical strings compare equal", "label": "why"}
+{"text": "the parser is strict so a malformed file is rejected rather than silently misread", "label": "why"}
+{"text": "batched inserts reduce round trips to the database", "label": "why"}
+{"text": "the index is unique so a duplicate key fails fast instead of corrupting data", "label": "why"}

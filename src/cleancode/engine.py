@@ -17,7 +17,6 @@ _SUPPRESSION = re.compile(r"cleancode:\s*disable(?:\s*=\s*(?P<ids>[A-Z]{2}\d{3}(
 
 
 def parse_file(source: str, path: str = "<string>") -> ParsedFile:
-    """Parse ``source`` into the artifact every rule operates on. Raises ``SyntaxError``."""
     tree = ast.parse(source)
     _attach_parents(tree)
     return ParsedFile(
