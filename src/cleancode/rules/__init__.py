@@ -37,6 +37,7 @@ from cleancode.rules.semantic import (
     RedundantBooleanTernary,
     RepeatedCollectionIteration,
 )
+from cleancode.rules.semantic_restatement import SemanticRestatement
 from cleancode.rules.slicing import ChainedSubscript, ComplexSubscript
 from cleancode.rules.solid import ClassAsNamespace, LowCohesionClass, TypeSwitchViolatesOCP
 from cleancode.rules.structure import (
@@ -70,6 +71,7 @@ ALL_RULES: list[type[Rule] | type[ProjectRule]] = [
     BoilerplateParamDocs,
     FileCommentDensity,
     BannerComment,
+    SemanticRestatement,
     ComplexSubscript,
     ChainedSubscript,
     UninformativeAny,

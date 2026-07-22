@@ -1,0 +1,633 @@
+{"text": "adds the two values and returns the total", "label": "what"}
+{"text": "sums the elements of the array", "label": "what"}
+{"text": "subtracts the offset from each value", "label": "what"}
+{"text": "multiplies each element by the given factor", "label": "what"}
+{"text": "divides the total by the count", "label": "what"}
+{"text": "increments the counter by one", "label": "what"}
+{"text": "decrements the remaining attempts", "label": "what"}
+{"text": "computes the difference between the two numbers", "label": "what"}
+{"text": "computes the average of the numbers", "label": "what"}
+{"text": "computes the mean and standard deviation of the values", "label": "what"}
+{"text": "calculates the product of the inputs", "label": "what"}
+{"text": "calculates the remainder of the division", "label": "what"}
+{"text": "raises the base to the given power", "label": "what"}
+{"text": "returns the absolute value of the input", "label": "what"}
+{"text": "rounds the number to two decimal places", "label": "what"}
+{"text": "computes the dot product of the two vectors", "label": "what"}
+{"text": "multiplies the two matrices together", "label": "what"}
+{"text": "applies the function to each element of the matrix", "label": "what"}
+{"text": "takes two numbers and gives back their combined value", "label": "what"}
+{"text": "adds up all the items and stores the result", "label": "what"}
+{"text": "appends the item to the list", "label": "what"}
+{"text": "adds the element to the end of the collection", "label": "what"}
+{"text": "removes the element from the dictionary", "label": "what"}
+{"text": "deletes the entry with the given key", "label": "what"}
+{"text": "inserts the value at the given position", "label": "what"}
+{"text": "pops the last element off the stack", "label": "what"}
+{"text": "iterates over the items in the list", "label": "what"}
+{"text": "loops through each entry in the dictionary", "label": "what"}
+{"text": "goes through every element one by one", "label": "what"}
+{"text": "iterates over the dictionary keys and values", "label": "what"}
+{"text": "enumerates the items together with their indices", "label": "what"}
+{"text": "walks over each row of the table", "label": "what"}
+{"text": "loops until the queue is empty", "label": "what"}
+{"text": "repeats the operation for every input", "label": "what"}
+{"text": "sorts the list in ascending order", "label": "what"}
+{"text": "orders the entries alphabetically", "label": "what"}
+{"text": "reverses the order of the elements", "label": "what"}
+{"text": "returns the sorted values", "label": "what"}
+{"text": "finds the maximum value in the list", "label": "what"}
+{"text": "finds the smallest element", "label": "what"}
+{"text": "returns the length of the list", "label": "what"}
+{"text": "counts the occurrences of each word", "label": "what"}
+{"text": "counts how many items match", "label": "what"}
+{"text": "filters out the empty entries", "label": "what"}
+{"text": "keeps only the values above the limit", "label": "what"}
+{"text": "maps the function over the list", "label": "what"}
+{"text": "collects the outputs into a list", "label": "what"}
+{"text": "flattens the nested list into a single list", "label": "what"}
+{"text": "groups the records by their key", "label": "what"}
+{"text": "zips the two lists together", "label": "what"}
+{"text": "unpacks the tuple into separate variables", "label": "what"}
+{"text": "slices the first ten elements", "label": "what"}
+{"text": "extracts the first element of each pair", "label": "what"}
+{"text": "indexes into the array at the given position", "label": "what"}
+{"text": "accumulates the running total", "label": "what"}
+{"text": "builds a mapping from name to identifier", "label": "what"}
+{"text": "constructs a dictionary of results", "label": "what"}
+{"text": "merges the two dictionaries into one", "label": "what"}
+{"text": "updates the dictionary with the new values", "label": "what"}
+{"text": "makes a copy of the input list", "label": "what"}
+{"text": "copies the configuration into a new object", "label": "what"}
+{"text": "swaps the two elements", "label": "what"}
+{"text": "converts the string to lowercase", "label": "what"}
+{"text": "converts the value to an integer", "label": "what"}
+{"text": "casts the input to a float", "label": "what"}
+{"text": "turns the list into a set", "label": "what"}
+{"text": "splits the text on commas", "label": "what"}
+{"text": "splits the string into words", "label": "what"}
+{"text": "joins the parts with a separator", "label": "what"}
+{"text": "concatenates the two strings", "label": "what"}
+{"text": "strips the whitespace from the string", "label": "what"}
+{"text": "removes leading and trailing spaces", "label": "what"}
+{"text": "replaces occurrences of the substring", "label": "what"}
+{"text": "pads the list with zeros", "label": "what"}
+{"text": "truncates the string to the maximum length", "label": "what"}
+{"text": "formats the message with the given values", "label": "what"}
+{"text": "builds the url from its parts", "label": "what"}
+{"text": "escapes the special characters in the text", "label": "what"}
+{"text": "converts the text to a list of characters", "label": "what"}
+{"text": "changes each letter to its uppercase form", "label": "what"}
+{"text": "checks if the key exists in the dictionary", "label": "what"}
+{"text": "checks whether the number is even", "label": "what"}
+{"text": "tests if the string is empty", "label": "what"}
+{"text": "determines if the flag is set", "label": "what"}
+{"text": "returns true if the value is present", "label": "what"}
+{"text": "returns whether the two inputs are equal", "label": "what"}
+{"text": "compares the two values and returns the larger one", "label": "what"}
+{"text": "verifies that the list is sorted", "label": "what"}
+{"text": "looks up the entry in the table", "label": "what"}
+{"text": "searches the list for the target value", "label": "what"}
+{"text": "scans the directory for python files", "label": "what"}
+{"text": "walks the tree and visits each node", "label": "what"}
+{"text": "recursively traverses the child nodes", "label": "what"}
+{"text": "gets the value for the given key", "label": "what"}
+{"text": "retrieves the user name from the record", "label": "what"}
+{"text": "fetches the record from the database", "label": "what"}
+{"text": "reads the row with the matching identifier", "label": "what"}
+{"text": "queries the table for matching rows", "label": "what"}
+{"text": "obtains a reference to the current object", "label": "what"}
+{"text": "accesses the attribute of the instance", "label": "what"}
+{"text": "sets the attribute on the object", "label": "what"}
+{"text": "assigns the result to the variable", "label": "what"}
+{"text": "stores the value in the mapping", "label": "what"}
+{"text": "saves the result into the output list", "label": "what"}
+{"text": "updates the field with the new value", "label": "what"}
+{"text": "mutates the list in place", "label": "what"}
+{"text": "modifies the internal state", "label": "what"}
+{"text": "changes the value of the member variable", "label": "what"}
+{"text": "resets the counter to zero", "label": "what"}
+{"text": "clears the contents of the buffer", "label": "what"}
+{"text": "empties the queue", "label": "what"}
+{"text": "fills the array with default values", "label": "what"}
+{"text": "populates the table with the parsed rows", "label": "what"}
+{"text": "toggles the boolean flag", "label": "what"}
+{"text": "creates a new instance of the class", "label": "what"}
+{"text": "initializes the member variables", "label": "what"}
+{"text": "constructs the object with the given arguments", "label": "what"}
+{"text": "instantiates the parser and processes the file", "label": "what"}
+{"text": "defines a helper that squares its input", "label": "what"}
+{"text": "declares the constants used below", "label": "what"}
+{"text": "imports the required modules", "label": "what"}
+{"text": "opens the file and reads its contents", "label": "what"}
+{"text": "reads each line of the file", "label": "what"}
+{"text": "writes the data to disk", "label": "what"}
+{"text": "saves the output to the given path", "label": "what"}
+{"text": "closes the connection when done", "label": "what"}
+{"text": "loads the configuration from the file", "label": "what"}
+{"text": "parses the json into a dictionary", "label": "what"}
+{"text": "serializes the object to json", "label": "what"}
+{"text": "decodes the bytes into a string", "label": "what"}
+{"text": "encodes the string as bytes", "label": "what"}
+{"text": "sends the request and returns the response", "label": "what"}
+{"text": "receives the message and stores it", "label": "what"}
+{"text": "downloads the file from the server", "label": "what"}
+{"text": "uploads the payload to the endpoint", "label": "what"}
+{"text": "prints the result to the console", "label": "what"}
+{"text": "logs the message at info level", "label": "what"}
+{"text": "displays the output to the user", "label": "what"}
+{"text": "shows the current value on the screen", "label": "what"}
+{"text": "returns the result of the computation", "label": "what"}
+{"text": "returns the final answer", "label": "what"}
+{"text": "gives back the processed output", "label": "what"}
+{"text": "yields each item one at a time", "label": "what"}
+{"text": "produces the transformed values", "label": "what"}
+{"text": "outputs the list of matches", "label": "what"}
+{"text": "wraps the value in a list", "label": "what"}
+{"text": "raises an exception when the input is invalid", "label": "what"}
+{"text": "throws an error on failure", "label": "what"}
+{"text": "catches the exception and logs it", "label": "what"}
+{"text": "calls the helper function with the arguments", "label": "what"}
+{"text": "invokes the callback with the result", "label": "what"}
+{"text": "delegates to the underlying implementation", "label": "what"}
+{"text": "forwards the call to the wrapped object", "label": "what"}
+{"text": "executes the query against the database", "label": "what"}
+{"text": "runs the main processing loop", "label": "what"}
+{"text": "performs the calculation and stores the result", "label": "what"}
+{"text": "carries out the requested operation", "label": "what"}
+{"text": "handles each item in turn", "label": "what"}
+{"text": "processes the input data", "label": "what"}
+{"text": "transforms the raw values into records", "label": "what"}
+{"text": "applies the transformation to each row", "label": "what"}
+{"text": "aggregates the results into a summary", "label": "what"}
+{"text": "combines the partial results", "label": "what"}
+{"text": "generates the report from the records", "label": "what"}
+{"text": "produces the final output file", "label": "what"}
+{"text": "this function returns the parsed value", "label": "what"}
+{"text": "helper that converts the values", "label": "what"}
+{"text": "a wrapper around the standard library call", "label": "what"}
+{"text": "utility for building the request object", "label": "what"}
+{"text": "method that updates the record", "label": "what"}
+{"text": "takes the input and returns the output", "label": "what"}
+{"text": "does the main work of the module", "label": "what"}
+{"text": "clamps the value between the two bounds", "label": "what"}
+{"text": "normalizes the vector to unit length", "label": "what"}
+{"text": "applies softmax to the logits", "label": "what"}
+{"text": "computes the mean of the tensor", "label": "what"}
+{"text": "moves the tensors to the device", "label": "what"}
+{"text": "loads the dataset from disk", "label": "what"}
+{"text": "saves the model checkpoint", "label": "what"}
+{"text": "trains the model for the given number of epochs", "label": "what"}
+{"text": "evaluates the model on the test set", "label": "what"}
+{"text": "predicts the labels for the inputs", "label": "what"}
+{"text": "tokenizes the text into words", "label": "what"}
+{"text": "converts the labels to integers", "label": "what"}
+{"text": "shuffles the samples and splits them into batches", "label": "what"}
+{"text": "skips the blank lines", "label": "what"}
+{"text": "breaks out of the loop when the target is found", "label": "what"}
+{"text": "continues to the next iteration", "label": "what"}
+{"text": "checks the condition and branches accordingly", "label": "what"}
+{"text": "sets up the variables before the loop", "label": "what"}
+{"text": "starts the worker and waits for it to finish", "label": "what"}
+{"text": "stops the timer and records the elapsed time", "label": "what"}
+{"text": "gets the current timestamp", "label": "what"}
+{"text": "creates the directory if it does not exist", "label": "what"}
+{"text": "lists the files in the folder", "label": "what"}
+{"text": "renames the file to the new name", "label": "what"}
+{"text": "validates the input and returns a boolean", "label": "what"}
+{"text": "checks the arguments and raises on error", "label": "what"}
+{"text": "because the upstream api returns milliseconds", "label": "why"}
+{"text": "because python rounds half to even", "label": "why"}
+{"text": "because the caller may mutate the input", "label": "why"}
+{"text": "because the list is always sorted at this point", "label": "why"}
+{"text": "because the value changes on every request", "label": "why"}
+{"text": "since the legacy format omits the header", "label": "why"}
+{"text": "since older clients still send the deprecated field", "label": "why"}
+{"text": "so that retries do not duplicate the payment", "label": "why"}
+{"text": "so that the diff stays stable across runs", "label": "why"}
+{"text": "so that a partial failure leaves the file untouched", "label": "why"}
+{"text": "to avoid quadratic behavior on large inputs", "label": "why"}
+{"text": "to avoid loading the whole file into memory", "label": "why"}
+{"text": "to prevent a race when two workers start at the same time", "label": "why"}
+{"text": "to keep the hot path free of allocations", "label": "why"}
+{"text": "to keep memory usage below the container limit", "label": "why"}
+{"text": "to minimize round trips to the server", "label": "why"}
+{"text": "to preserve the original insertion order for readers", "label": "why"}
+{"text": "to stay compatible with the version two wire format", "label": "why"}
+{"text": "otherwise the connection pool leaks sockets", "label": "why"}
+{"text": "otherwise a crash here would corrupt the index", "label": "why"}
+{"text": "works around a bug in the vendor driver", "label": "why"}
+{"text": "workaround for the broken proxy in the staging environment", "label": "why"}
+{"text": "needed for backward compatibility with version two clients", "label": "why"}
+{"text": "kept for compatibility until the old importer is retired", "label": "why"}
+{"text": "the spec requires the checksum to be computed before compression", "label": "why"}
+{"text": "required by the protocol even though the field is unused", "label": "why"}
+{"text": "the standard mandates network byte order here", "label": "why"}
+{"text": "chosen because profiling showed this loop dominates the runtime", "label": "why"}
+{"text": "profiling showed the string copy was the bottleneck", "label": "why"}
+{"text": "empirically faster than the naive approach for large inputs", "label": "why"}
+{"text": "measured to be twice as fast on the production workload", "label": "why"}
+{"text": "the threshold was tuned on the validation set", "label": "why"}
+{"text": "the constant comes from the published reference implementation", "label": "why"}
+{"text": "the magic number is defined by the file format specification", "label": "why"}
+{"text": "this mirrors the algorithm from the original paper", "label": "why"}
+{"text": "matches the behavior of the c implementation", "label": "why"}
+{"text": "uses binary search because the entries are kept sorted", "label": "why"}
+{"text": "batching amortizes the cost of the network round trip", "label": "why"}
+{"text": "the retry uses exponential backoff to avoid overwhelming the service", "label": "why"}
+{"text": "the lock prevents concurrent writers from corrupting the file", "label": "why"}
+{"text": "holding the lock here would deadlock with the scheduler", "label": "why"}
+{"text": "not thread safe so callers must hold the lock", "label": "why"}
+{"text": "safe to call twice because the operation is idempotent", "label": "why"}
+{"text": "idempotent so replayed messages are harmless", "label": "why"}
+{"text": "the copy is required because the caller keeps a reference", "label": "why"}
+{"text": "the extra pass is cheaper than allocating an intermediate list", "label": "why"}
+{"text": "deliberately not cached because the value depends on the request", "label": "why"}
+{"text": "intentionally swallows the error to keep the ui responsive", "label": "why"}
+{"text": "we intentionally ignore unknown keys for forward compatibility", "label": "why"}
+{"text": "float comparison needs a tolerance because of accumulated rounding error", "label": "why"}
+{"text": "the epsilon absorbs floating point noise from the summation", "label": "why"}
+{"text": "the sentinel distinguishes a missing value from an explicit none", "label": "why"}
+{"text": "utc everywhere avoids daylight saving bugs", "label": "why"}
+{"text": "storing utc avoids ambiguity during clock changes", "label": "why"}
+{"text": "the timeout matches the gateway limit of thirty seconds", "label": "why"}
+{"text": "the buffer size mirrors the kernel default", "label": "why"}
+{"text": "kept separate from the parser for testability", "label": "why"}
+{"text": "extracted so the expensive setup runs only once", "label": "why"}
+{"text": "public api so the name cannot change without a deprecation cycle", "label": "why"}
+{"text": "downstream consumers rely on this field being present", "label": "why"}
+{"text": "the order of the checks matters with the cheapest first", "label": "why"}
+{"text": "the guard runs first because the common case is an empty list", "label": "why"}
+{"text": "the cache is bounded to prevent unbounded memory growth", "label": "why"}
+{"text": "eviction is lru because recent entries are the likeliest to repeat", "label": "why"}
+{"text": "invalid rows are skipped so one bad record does not abort the batch", "label": "why"}
+{"text": "raises early so a misconfiguration is caught at startup", "label": "why"}
+{"text": "failing fast here surfaces configuration errors before the first request", "label": "why"}
+{"text": "assumes the input was validated by the caller", "label": "why"}
+{"text": "the caller guarantees the list is non empty", "label": "why"}
+{"text": "the seed is pinned so the test data is reproducible", "label": "why"}
+{"text": "pinned versions keep the build reproducible", "label": "why"}
+{"text": "guarantees the invariant that identifiers are unique", "label": "why"}
+{"text": "maintains the invariant that the heap root is the minimum", "label": "why"}
+{"text": "the striped layout keeps neighboring accesses in the same cache line", "label": "why"}
+{"text": "blocking improves cache locality on large matrices", "label": "why"}
+{"text": "trades accuracy for speed on very large batches", "label": "why"}
+{"text": "accepts a small false positive rate in exchange for constant memory", "label": "why"}
+{"text": "sacrifices precision here because the display only shows two digits", "label": "why"}
+{"text": "returns none when the user does not exist", "label": "why"}
+{"text": "returns an empty list for an empty input rather than raising", "label": "why"}
+{"text": "raises valueerror if the amount is negative", "label": "why"}
+{"text": "duplicate keys keep the last value seen", "label": "why"}
+{"text": "the input list is never modified", "label": "why"}
+{"text": "may return fewer items than requested when the source is exhausted", "label": "why"}
+{"text": "treats missing fields as empty strings", "label": "why"}
+{"text": "comparison is case insensitive", "label": "why"}
+{"text": "leading zeros are preserved in the output", "label": "why"}
+{"text": "supports negative indices like the built in slice", "label": "why"}
+{"text": "times out after thirty seconds and raises timeouterror", "label": "why"}
+{"text": "amounts are in cents to avoid floating point money bugs", "label": "why"}
+{"text": "distances are measured in meters", "label": "why"}
+{"text": "the interval is in milliseconds not seconds", "label": "why"}
+{"text": "angles are radians throughout the module", "label": "why"}
+{"text": "the rate is a fraction between zero and one not a percentage", "label": "why"}
+{"text": "expects timestamps in iso format with an explicit offset", "label": "why"}
+{"text": "the id must be unique across all tenants", "label": "why"}
+{"text": "only safe to call after the pool has been started", "label": "why"}
+{"text": "must run before the first request is accepted", "label": "why"}
+{"text": "callers must close the returned handle", "label": "why"}
+{"text": "the result is cached so repeated calls are cheap", "label": "why"}
+{"text": "reuses the previous buffer when the size has not changed", "label": "why"}
+{"text": "lazy so importing the module stays fast", "label": "why"}
+{"text": "loaded on first use because startup time matters more than first call latency", "label": "why"}
+{"text": "the recursion depth is bounded by the tree height which is logarithmic", "label": "why"}
+{"text": "linear scan is fine because the list never exceeds a dozen entries", "label": "why"}
+{"text": "a dict would be slower here because the keys are dense small integers", "label": "why"}
+{"text": "the quadratic fallback only triggers on adversarial input", "label": "why"}
+{"text": "kept quadratic for clarity since inputs are tiny", "label": "why"}
+{"text": "avoids the regex engine because the pattern is a fixed prefix", "label": "why"}
+{"text": "hand rolled because the standard parser rejects the vendor dialect", "label": "why"}
+{"text": "the vendor api silently truncates names longer than sixty four bytes", "label": "why"}
+{"text": "the driver misreports the row count on empty result sets", "label": "why"}
+{"text": "older firmware pads the payload with trailing nulls", "label": "why"}
+{"text": "the header casing differs between proxy versions", "label": "why"}
+{"text": "retried once because the first call can hit a cold cache", "label": "why"}
+{"text": "backoff is capped so a long outage does not park workers for hours", "label": "why"}
+{"text": "jitter prevents synchronized retries from all clients at once", "label": "why"}
+{"text": "the queue is drained before shutdown so no message is lost", "label": "why"}
+{"text": "messages are acknowledged only after the write is durable", "label": "why"}
+{"text": "writes go through a temporary file so readers never see a partial state", "label": "why"}
+{"text": "the rename is atomic on posix which makes the update safe", "label": "why"}
+{"text": "double checked locking is safe here because the field is volatile", "label": "why"}
+{"text": "the copy on write keeps readers lock free", "label": "why"}
+{"text": "sharding by user id keeps related rows on the same node", "label": "why"}
+{"text": "denormalized because the join was too slow at this scale", "label": "why"}
+{"text": "the index covers the query so no table lookup is needed", "label": "why"}
+{"text": "soft delete so the audit trail survives", "label": "why"}
+{"text": "history is append only for auditability", "label": "why"}
+{"text": "the schema allows nulls here for rows migrated from the old system", "label": "why"}
+{"text": "kept nullable until the backfill completes", "label": "why"}
+{"text": "feature flagged so the rollout can be reverted instantly", "label": "why"}
+{"text": "behind a flag because the regression risk is high", "label": "why"}
+{"text": "logged at debug level to keep production logs quiet", "label": "why"}
+{"text": "the warning fires once per process to avoid log spam", "label": "why"}
+{"text": "sampled at one percent because full tracing is too expensive", "label": "why"}
+{"text": "redacted before logging because the payload may contain credentials", "label": "why"}
+{"text": "hashing the token keeps secrets out of the logs", "label": "why"}
+{"text": "the comparison is constant time to prevent timing attacks", "label": "why"}
+{"text": "escaped to prevent sql injection", "label": "why"}
+{"text": "the nonce must never be reused with the same key", "label": "why"}
+{"text": "rate limited per account so one tenant cannot starve the rest", "label": "why"}
+{"text": "the allow list is explicit because the default deny posture is safer", "label": "why"}
+{"text": "validated at the boundary so internal code can trust the shape", "label": "why"}
+{"text": "normalized early so later comparisons are simple equality", "label": "why"}
+{"text": "the enum is closed so exhaustive matching stays possible", "label": "why"}
+{"text": "stringly typed here because the config file predates the enum", "label": "why"}
+{"text": "kept as strings to round trip unknown values untouched", "label": "why"}
+{"text": "ordering matters because later patches override earlier ones", "label": "why"}
+{"text": "applied in reverse so indices remain valid during removal", "label": "why"}
+{"text": "iterating a snapshot because the handler may unsubscribe itself", "label": "why"}
+{"text": "copied first because the callback can mutate the registry", "label": "why"}
+{"text": "the generation counter detects concurrent modification", "label": "why"}
+{"text": "versioned so old readers can skip fields they do not understand", "label": "why"}
+{"text": "the format is line oriented so a truncated file is still parseable", "label": "why"}
+{"text": "newline delimited so the file can be processed as a stream", "label": "why"}
+{"text": "chunked because the whole result does not fit in memory", "label": "why"}
+{"text": "streamed to keep peak memory constant regardless of input size", "label": "why"}
+{"text": "bounded channel so a slow consumer applies backpressure", "label": "why"}
+{"text": "dropped rather than queued because stale updates are worthless", "label": "why"}
+{"text": "the ttl matches the upstream cache expiry", "label": "why"}
+{"text": "expiry is randomized so entries do not all expire together", "label": "why"}
+{"text": "warmed at startup because the first miss is user visible", "label": "why"}
+{"text": "precomputed because the table never changes after startup", "label": "why"}
+{"text": "recomputed on demand because staleness is worse than latency here", "label": "why"}
+{"text": "monotonic clock so a system time change cannot make the duration negative", "label": "why"}
+{"text": "wall clock here because the value is shown to the user", "label": "why"}
+{"text": "rounded down so we never overcharge", "label": "why"}
+{"text": "banker rounding to match the accounting system", "label": "why"}
+{"text": "the tolerance mirrors the sensor resolution", "label": "why"}
+{"text": "clamped because the physical actuator cannot exceed this range", "label": "why"}
+{"text": "saturates instead of wrapping because overflow here means a bug upstream", "label": "why"}
+{"text": "checked addition because the counter can legitimately reach the limit", "label": "why"}
+{"text": "unsigned because a negative count is meaningless here", "label": "why"}
+{"text": "the extra byte leaves room for the terminating null", "label": "why"}
+{"text": "aligned to the page size for direct io", "label": "why"}
+{"text": "padded so the struct layout matches the wire format", "label": "why"}
+{"text": "little endian because the file format was defined on x86", "label": "why"}
+{"text": "the reserved field keeps the layout stable for future extensions", "label": "why"}
+{"text": "the dotted name of the innermost enclosing function", "label": "why"}
+{"text": "every binding occurrence in the file collected in one cached walk", "label": "why"}
+{"text": "the last line of the node when the parser records no explicit end", "label": "why"}
+{"text": "the lookup tables the recorder needs to place a violation", "label": "why"}
+{"text": "the words a summary may legitimately restate", "label": "why"}
+{"text": "the parsed artifact every downstream consumer operates on", "label": "why"}
+{"text": "a position anchor for module level findings", "label": "why"}
+{"text": "one file's parse result shared by every check", "label": "why"}
+{"text": "anything with a source location attached", "label": "why"}
+{"text": "a comment extracted from the token stream with the leading hash stripped", "label": "why"}
+{"text": "the configured option values for this rule", "label": "why"}
+{"text": "words that carry no information when compared against identifiers", "label": "why"}
+{"text": "generic filler that adds nothing to a parameter description", "label": "why"}
+{"text": "prefixes that mark directives never prose", "label": "why"}
+{"text": "the pieces the check needs independent of the node kind", "label": "why"}
+{"text": "the single entry point the command line calls", "label": "why"}
+{"text": "the set of lines one directive covers", "label": "why"}
+{"text": "the identifier words a description is judged against", "label": "why"}
+{"text": "true for branches the syntax tree nests inside the parent", "label": "why"}
+{"text": "the deepest chain of nested operations under the given node", "label": "why"}
+{"text": "the leftmost expression a dotted call target hangs off", "label": "why"}
+{"text": "the field's value blanked when it is an anonymized identifier", "label": "why"}
+{"text": "groups of functions whose fingerprints collide", "label": "why"}
+{"text": "the instance attributes a method touches directly", "label": "why"}
+{"text": "names read anywhere in the module including deliberate deletions", "label": "why"}
+{"text": "the string elements of a module level export list", "label": "why"}
+{"text": "bound name and alias node for every import in the module", "label": "why"}
+{"text": "the words appearing anywhere in the function's own source with the summary excluded", "label": "why"}
+{"text": "a snapshot of the registry safe to iterate while handlers unsubscribe", "label": "why"}
+{"text": "the number of samples the estimator has seen so far", "label": "why"}
+{"text": "the canonical form later comparisons rely on", "label": "why"}
+{"text": "the subset of rows that survived deduplication", "label": "why"}
+{"text": "the oldest entry still inside the retention window", "label": "why"}
+{"text": "the widest range the sensor can physically report", "label": "why"}
+{"text": "the effective limit after both overrides are applied", "label": "why"}
+{"text": "raises syntaxerror on malformed input", "label": "why"}
+{"text": "raises keyerror when the name was never registered", "label": "why"}
+{"text": "raises if called before initialization completes", "label": "why"}
+{"text": "propagates oserror from the underlying read", "label": "why"}
+{"text": "never raises so it is safe inside a finally block", "label": "why"}
+{"text": "silently returns on a second call", "label": "why"}
+{"text": "blocks until the worker acknowledges the stop request", "label": "why"}
+{"text": "safe to call from any thread", "label": "why"}
+{"text": "gets each record and puts it into the output list", "label": "what"}
+{"text": "defines the variables and then loops over the input", "label": "what"}
+{"text": "reads the values one by one and adds them to the total", "label": "what"}
+{"text": "creates an empty list and fills it with the results", "label": "what"}
+{"text": "checks each element and keeps the ones that match", "label": "what"}
+{"text": "calls the function and prints what it returns", "label": "what"}
+{"text": "takes the string and makes it uppercase", "label": "what"}
+{"text": "goes over the dictionary and collects the keys", "label": "what"}
+{"text": "computes the value and gives it back to the caller", "label": "what"}
+{"text": "runs the loop and increments the index each time", "label": "what"}
+{"text": "the iteration order depends on the hash seed of the process", "label": "why"}
+{"text": "the result depends on the platform rounding mode", "label": "why"}
+{"text": "the layout depends on the compiler version", "label": "why"}
+{"text": "the ordering depends on the locale so it is pinned explicitly", "label": "why"}
+{"text": "so the fallback is deterministic", "label": "why"}
+{"text": "so the output is reproducible across runs", "label": "why"}
+{"text": "so two runs cannot disagree", "label": "why"}
+{"text": "so the comparison stays stable", "label": "why"}
+{"text": "links the record to whichever earlier group first claimed it", "label": "why"}
+{"text": "keeps whichever candidate appeared first in the file", "label": "why"}
+{"text": "prefers the earliest binding when two collide", "label": "why"}
+{"text": "ties are broken by declaration order", "label": "why"}
+{"text": "the score paired with the reasons that drove it", "label": "why"}
+{"text": "each finding together with the evidence behind it", "label": "why"}
+{"text": "the names bound at module scope in declaration order", "label": "why"}
+{"text": "functions whose bodies are identical after renaming", "label": "why"}
+{"text": "entries that share a fingerprint", "label": "why"}
+{"text": "the attributes two methods both touch", "label": "why"}
+{"text": "the exports listed in the module's public interface in order", "label": "why"}
+{"text": "reads or deliberate deletions anywhere in the module", "label": "why"}
+{"text": "full-batch gradient descent on the ridge-regularized logistic loss", "label": "what"}
+{"text": "fraction of the dataset classified correctly", "label": "what"}
+{"text": "sends a get request and parses the json body", "label": "what"}
+{"text": "opens a socket and listens for incoming connections", "label": "what"}
+{"text": "parses the query string into a dictionary of parameters", "label": "what"}
+{"text": "matches the pattern against the input and returns the groups", "label": "what"}
+{"text": "compiles the regular expression once and reuses it", "label": "what"}
+{"text": "splits the path into its directory and file name", "label": "what"}
+{"text": "walks the directory tree and yields each file path", "label": "what"}
+{"text": "hashes the password before storing it", "label": "what"}
+{"text": "verifies the signature against the payload", "label": "what"}
+{"text": "encrypts the message with the given key", "label": "what"}
+{"text": "decrypts the ciphertext back into plain text", "label": "what"}
+{"text": "acquires the lock before modifying the shared counter", "label": "what"}
+{"text": "releases the lock once the critical section finishes", "label": "what"}
+{"text": "spawns a new thread to handle the request", "label": "what"}
+{"text": "schedules the coroutine on the event loop", "label": "what"}
+{"text": "awaits the response before continuing", "label": "what"}
+{"text": "cancels the pending task", "label": "what"}
+{"text": "retries the request up to three times", "label": "what"}
+{"text": "builds the argument parser and registers each flag", "label": "what"}
+{"text": "parses the command line arguments into a namespace", "label": "what"}
+{"text": "prints the usage message and exits", "label": "what"}
+{"text": "reads the environment variable and falls back to a default", "label": "what"}
+{"text": "merges the user config with the default settings", "label": "what"}
+{"text": "validates the schema against the incoming payload", "label": "what"}
+{"text": "serializes the dataclass into a dictionary", "label": "what"}
+{"text": "deserializes the bytes back into an object", "label": "what"}
+{"text": "computes the hash of the file contents", "label": "what"}
+{"text": "compares the two checksums for equality", "label": "what"}
+{"text": "pushes the element onto the heap", "label": "what"}
+{"text": "pops the smallest element off the heap", "label": "what"}
+{"text": "appends the node to the end of the linked list", "label": "what"}
+{"text": "removes the node from the linked list", "label": "what"}
+{"text": "traverses the tree in depth first order", "label": "what"}
+{"text": "visits each node in breadth first order", "label": "what"}
+{"text": "builds an adjacency list from the edge pairs", "label": "what"}
+{"text": "finds the shortest path between the two nodes", "label": "what"}
+{"text": "detects whether the graph contains a cycle", "label": "what"}
+{"text": "topologically sorts the dependency graph", "label": "what"}
+{"text": "partitions the array around the pivot", "label": "what"}
+{"text": "merges the two sorted halves back together", "label": "what"}
+{"text": "binary searches the sorted array for the target", "label": "what"}
+{"text": "shuffles the deck before dealing the cards", "label": "what"}
+{"text": "renders the template with the given context", "label": "what"}
+{"text": "escapes the html before inserting it into the page", "label": "what"}
+{"text": "formats the date according to the given pattern", "label": "what"}
+{"text": "parses the timestamp into a datetime object", "label": "what"}
+{"text": "converts the datetime to the local timezone", "label": "what"}
+{"text": "computes the difference between the two dates", "label": "what"}
+{"text": "opens the database connection and begins a transaction", "label": "what"}
+{"text": "commits the transaction once every statement succeeds", "label": "what"}
+{"text": "rolls back the transaction on failure", "label": "what"}
+{"text": "executes the migration against the schema", "label": "what"}
+{"text": "binds the parameters to the prepared statement", "label": "what"}
+{"text": "closes the cursor when the query finishes", "label": "what"}
+{"text": "mocks the external call for the duration of the test", "label": "what"}
+{"text": "patches the module attribute before running the test", "label": "what"}
+{"text": "asserts that the two values are equal", "label": "what"}
+{"text": "captures the exception raised by the callback", "label": "what"}
+{"text": "records the elapsed time for the benchmark", "label": "what"}
+{"text": "logs the stack trace when the handler fails", "label": "what"}
+{"text": "sockets are closed explicitly because the os limits how many stay open", "label": "why"}
+{"text": "the regex is compiled once because compiling it per call dominated the profile", "label": "why"}
+{"text": "hashed rather than encrypted because the plaintext is never needed again", "label": "why"}
+{"text": "salted per user so a leaked table cannot be reversed with a single rainbow table", "label": "why"}
+{"text": "constant time comparison prevents leaking timing information about the key", "label": "why"}
+{"text": "the lock is reentrant because the same thread may acquire it twice during recursion", "label": "why"}
+{"text": "daemon threads so a hung worker cannot block process exit", "label": "why"}
+{"text": "the event loop is single threaded so callbacks must never block", "label": "why"}
+{"text": "cancellation is cooperative so a task can clean up before stopping", "label": "why"}
+{"text": "capped at three retries so a permanent outage fails fast instead of hanging", "label": "why"}
+{"text": "flags are parsed eagerly so a bad argument is reported before any work starts", "label": "why"}
+{"text": "the default lives in one place so every caller stays consistent if it changes", "label": "why"}
+{"text": "the schema validates at the boundary so downstream code can trust the shape", "label": "why"}
+{"text": "dataclasses serialize this way to stay compatible with the existing api clients", "label": "why"}
+{"text": "the checksum guards against a corrupted download rather than malicious tampering", "label": "why"}
+{"text": "the heap keeps the smallest element accessible in constant time", "label": "why"}
+{"text": "the linked list avoids the cost of shifting elements that an array would require", "label": "why"}
+{"text": "breadth first here because the shortest path matters more than memory", "label": "why"}
+{"text": "topological order is required because a step cannot run before its dependencies", "label": "why"}
+{"text": "the pivot is chosen randomly to avoid worst case behavior on sorted input", "label": "why"}
+{"text": "the merge step needs extra space because it cannot sort in place", "label": "why"}
+{"text": "binary search assumes the array is already sorted", "label": "why"}
+{"text": "the template escapes output by default to prevent cross site scripting", "label": "why"}
+{"text": "timestamps are stored in utc so comparisons never depend on server timezone", "label": "why"}
+{"text": "the transaction wraps every statement so a partial failure leaves nothing committed", "label": "why"}
+{"text": "rollback happens automatically so callers cannot forget to clean up", "label": "why"}
+{"text": "prepared statements avoid sql injection from user supplied values", "label": "why"}
+{"text": "the cursor is closed promptly because the driver limits open cursors per connection", "label": "why"}
+{"text": "external calls are mocked so tests do not depend on network availability", "label": "why"}
+{"text": "the patch is undone after each test so state cannot leak between tests", "label": "why"}
+{"text": "elapsed time is recorded outside the loop so setup cost is not included", "label": "why"}
+{"text": "the stack trace is logged only on failure to keep normal logs quiet", "label": "why"}
+{"text": "the socket timeout matches the load balancer's idle limit", "label": "why"}
+{"text": "buffered writes reduce the number of system calls on the hot path", "label": "why"}
+{"text": "the connection pool is bounded so a burst of requests cannot exhaust file descriptors", "label": "why"}
+{"text": "retried with jitter so clients do not all reconnect at the same instant", "label": "why"}
+{"text": "the cache key includes the version so a schema change cannot serve stale data", "label": "why"}
+{"text": "compression is skipped for small payloads because the overhead outweighs the savings", "label": "why"}
+{"text": "the worker pool size matches the number of cpu cores", "label": "why"}
+{"text": "backpressure is applied so a fast producer cannot overwhelm a slow consumer", "label": "why"}
+{"text": "the session token is rotated to limit the damage from a leaked cookie", "label": "why"}
+{"text": "input is normalized to nfc so visually identical strings compare equal", "label": "why"}
+{"text": "the parser is strict so a malformed file is rejected rather than silently misread", "label": "why"}
+{"text": "batched inserts reduce round trips to the database", "label": "why"}
+{"text": "the index is unique so a duplicate key fails fast instead of corrupting data", "label": "why"}
+{"text": "adds one to the running counter", "label": "what"}
+{"text": "sets the session id to zero", "label": "what"}
+{"text": "creates a new expiry date object", "label": "what"}
+{"text": "creates the user record", "label": "what"}
+{"text": "checks whether the response body is empty", "label": "what"}
+{"text": "sets the response to the default value", "label": "what"}
+{"text": "multiplies x by two", "label": "what"}
+{"text": "assigns the result to the total variable", "label": "what"}
+{"text": "declares a variable to hold the count", "label": "what"}
+{"text": "stores the current timestamp in a variable", "label": "what"}
+{"text": "opens a file handle for the given path", "label": "what"}
+{"text": "closes the file handle after writing", "label": "what"}
+{"text": "returns the computed result of the operation", "label": "what"}
+{"text": "returns whether the input passed validation", "label": "what"}
+{"text": "processes each item in the input list", "label": "what"}
+{"text": "handles the incoming user request", "label": "what"}
+{"text": "instantiates the class with the given arguments", "label": "what"}
+{"text": "calls the helper and stores its return value", "label": "what"}
+{"text": "loops through the array and prints each entry", "label": "what"}
+{"text": "sets the flag to true", "label": "what"}
+{"text": "sets the flag to false", "label": "what"}
+{"text": "increases the attack value by the given amount", "label": "what"}
+{"text": "decreases the health value by the given amount", "label": "what"}
+{"text": "returns the average of the input values", "label": "what"}
+{"text": "returns the total of the input values", "label": "what"}
+{"text": "builds a list of the matching entries", "label": "what"}
+{"text": "builds a dictionary from the input pairs", "label": "what"}
+{"text": "removes duplicate entries from the list", "label": "what"}
+{"text": "checks whether the list is empty", "label": "what"}
+{"text": "returns early when the list is empty", "label": "what"}
+{"text": "converts the input to a string before returning it", "label": "what"}
+{"text": "reads the configuration file into memory", "label": "what"}
+{"text": "writes the updated configuration back to disk", "label": "what"}
+{"text": "computes the product of the two operands", "label": "what"}
+{"text": "computes the difference between the two operands", "label": "what"}
+{"text": "this function performs the requested calculation", "label": "what"}
+{"text": "this method carries out the update operation", "label": "what"}
+{"text": "this class is responsible for managing application state", "label": "what"}
+{"text": "this function is responsible for handling errors", "label": "what"}
+{"text": "the constructor sets up the initial state of the object", "label": "what"}
+{"text": "the destructor releases resources held by the object", "label": "what"}
+{"text": "iterates through the collection and applies the callback", "label": "what"}
+{"text": "the loop body updates the running total each iteration", "label": "what"}
+{"text": "the helper function wraps the underlying api call", "label": "what"}
+{"text": "the wrapper function forwards its arguments to the callee", "label": "what"}
+{"text": "returns a new list containing the transformed elements", "label": "what"}
+{"text": "returns a new object with the merged fields", "label": "what"}
+{"text": "compensates for an edge case caused by an inconsistent api response format", "label": "why"}
+{"text": "doubled here to account for the current inflation-adjusted rate", "label": "why"}
+{"text": "tracks only entries that passed validation, not every attempt", "label": "why"}
+{"text": "works around a known flush bug in this version of the messaging library", "label": "why"}
+{"text": "disabled for this field because the security policy requires real-time reads", "label": "why"}
+{"text": "backs off exponentially so the rate-limited third-party api is never overwhelmed", "label": "why"}
+{"text": "handled separately because the payment api treats empty strings and nulls differently", "label": "why"}
+{"text": "chosen over binary search because it measured faster on this data distribution", "label": "why"}
+{"text": "kept only for one release cycle so downstream consumers have time to migrate", "label": "why"}
+{"text": "left in place so callers on the old interface don't break mid-rollout", "label": "why"}
+{"text": "the annotation names the version this will be removed in, per the deprecation policy", "label": "why"}
+{"text": "disabled in this environment because the sandboxed network has no internet access", "label": "why"}
+{"text": "the extra round trip is intentional so the write is durable before we acknowledge", "label": "why"}
+{"text": "the delay is tuned to the upstream service's documented rate limit", "label": "why"}
+{"text": "the special case exists because the vendor's api rejects an empty payload", "label": "why"}
+{"text": "the fallback only triggers when the primary provider times out", "label": "why"}
+{"text": "the order of these checks matters because the cheaper one should run first", "label": "why"}
+{"text": "guards against a null pointer that only appears on the very first request", "label": "why"}
+{"text": "the retry cap prevents a permanent outage from spinning forever", "label": "why"}
+{"text": "the extra copy avoids a race with a background thread that reads this field", "label": "why"}
+{"text": "the manual unlock is needed because the raii wrapper isn't available in this codepath", "label": "why"}
+{"text": "matches the byte order the wire protocol mandates, not the host's native order", "label": "why"}
+{"text": "the buffer is oversized to leave room for a header the driver prepends", "label": "why"}
+{"text": "skips validation here because the caller already validated further upstream", "label": "why"}
+{"text": "the sleep is a deliberate backoff, not a leftover debugging statement", "label": "why"}
+{"text": "the cast is safe because the range was already checked above", "label": "why"}
+{"text": "the lock order here avoids a deadlock with the other module's lock order", "label": "why"}
+{"text": "reverted to the older algorithm because the new one regressed on small inputs", "label": "why"}
+{"text": "the threshold was picked empirically from production traffic, not a guess", "label": "why"}
+{"text": "the constant matches the value the spec document defines for this field", "label": "why"}

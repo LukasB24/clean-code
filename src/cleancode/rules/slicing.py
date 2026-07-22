@@ -47,7 +47,7 @@ def _ends_annotation_search(parent: ast.AST) -> bool:
 
 
 def _index_features(index: ast.expr) -> tuple[int, list[str]]:
-    """Score one subscript's index expression and describe what drove the score."""
+    """The index's complexity score, with the reasons phrased for the violation message."""
     dimensions = len(index.elts) if isinstance(index, ast.Tuple) else 1
     score = dimensions
     reasons = [f"{dimensions} dimensions"] if dimensions > 1 else []

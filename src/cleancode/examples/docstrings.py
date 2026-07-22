@@ -1,4 +1,4 @@
-"""BAD/GOOD examples for the docstring-noise rules (CM301, CM304)."""
+"""BAD/GOOD examples for the docstring-noise rules (CM301, CM304, CM307)."""
 
 from __future__ import annotations
 
@@ -40,5 +40,22 @@ EXAMPLES: dict[str, Example] = {
             "    return data * factor\n"
         ),
         note="An entry is uninformative when its words never leave the parameter's own name.",
+    ),
+    "CM307": Example(
+        bad=(
+            "def combine(a, b):\n"
+            '    """Adds the two given values together and gives back their total."""\n'
+            "    return a + b\n"
+        ),
+        good=(
+            "def combine(a, b):\n"
+            '    """Kept separate from the operator so currency amounts round per the ledger spec."""\n'
+            "    return a + b\n"
+        ),
+        note=(
+            "The BAD docstring shares no words with the code, so CM301's overlap check "
+            "passes it — the semantic tier catches the synonym paraphrase. One clause of "
+            "real rationale is enough to pass."
+        ),
     ),
 }

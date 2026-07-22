@@ -14,6 +14,97 @@ whether pre- or post-1.0).
 
 ### Added
 
+- Docstring paraphrase detection for issue #28, in two tiers:
+  - `CM301` (`docstring-restates-name`) now also catches a docstring that
+    paraphrases the function body in synonyms rather than restating it
+    verbatim (`"""Adds two numbers and returns the sum."""` over `return a +
+    b`), reusing CM302's operator/keyword-synonym table against the whole
+    body instead of one annotated line. New `body_overlap` option (default
+    `0.6`); why-signal docstrings are exempt, same as CM302.
+  - `CM307` `docstring-semantic-restatement` — a second, semantic tier for
+    the more diffuse paraphrases CM301's operator-anchored check can't reach
+    (loose verb-synonym narration with no strong operator/keyword anchor),
+    bringing the total to 52. A vendored pretrained-embedding backbone
+    (distilled from WordLlama `l2_supercat_256` into a 1.2 MB int8 word
+    table by `tools/distill_backbone.py`) with a logistic classifier head
+    (trained reproducibly by `tools/train_head.py` on the labeled clause
+    corpus in `tools/data/what_why.jsonl`) scores each clause of a
+    docstring/comment as procedural narration vs. rationale, passing
+    composite comments that also carry rationale ("... to maximize L1 cache
+    hits"). Inference is pure numpy — no ML framework anywhere,
+    deterministic outputs, microseconds per comment. Anything CM301/CM302
+    already flag (including CM301's new body-overlap check) is skipped, so
+    the two tiers never double-report the same paraphrase.
+- `numpy>=1.26` as a runtime dependency (for CM307's embedding lookups); the
+  runtime environment remains free of `torch`/`scikit-learn`/any ML
+  framework, now enforced by a test.
+- `NOTICE` and `src/cleancode/semantics/THIRD_PARTY_NOTICES/`: CM307's
+  vendored `embeddings.npz` is a derivative of Llama-2-derived token
+  embeddings (via WordLlama's `l2_supercat_256`), so it ships with the
+  attribution notice, a full copy of the LLAMA 2 Community License
+  Agreement, and the Acceptable Use Policy it incorporates by reference —
+  required by that license, and separate from clean-code's own Apache-2.0
+  license.
+- `tools/train_head.py` now fits the classifier head on an 80/10/10
+  train/val/test split (`cleancode.semantics.training.split_dataset`,
+  deterministic by row position, no seed needed) instead of the full
+  corpus, and `head.json`'s `training` block reports all three accuracies.
+  The previous single `accuracy` figure was training accuracy only —
+  measured on the same 449 examples the head was fit on — which
+  overstated how well the classifier generalizes.
+- `RIDGE_PENALTY` raised from `1e-4` to `1.5e-4` (chosen against the
+  validation split, never test) to close some of that train/test gap: with
+  `1e-4`, train accuracy reached 0.9194 while test sat at 0.7500; at
+  `1.5e-4`, val accuracy is unchanged (0.8444) and test rises to 0.7727,
+  the largest penalty short of pushing issue #28's own held-out acceptance
+  example below CM307's default threshold.
+- `CM307`'s default `threshold` lowered from `0.75` to `0.5`: measured on
+  the labeled corpus's held-out val/test splits, `0.75` missed 40-45% of
+  genuinely procedural clauses (recall 0.60 val / 0.55 test); `0.5` raises
+  recall to 0.80 on both, for a precision cost only on test (0.786 →
+  0.727 — val precision actually improves slightly, 0.800 → 0.842).
+  Deliberate: for a linter meant to flag comments an LLM should rework, a
+  false positive costs a wasted re-check, while a false negative is a
+  paraphrase nobody looks at again.
+- `tools/data/what_why.jsonl` grown from 449 to 556 hand-curated clauses
+  (270 what / 286 why), adding coverage the original corpus was thin on:
+  synonym-heavy narration, noun-led restatements, and domain vocabulary
+  (networking, databases, concurrency, security, serialization) the
+  classifier hadn't seen. New `tools/tune_head.py` grid-searches
+  `RIDGE_PENALTY` and `CM307`'s `threshold` against the validation split
+  only (never test), maximizing recall (ties broken by precision, then a
+  floor rejects any pair leaving too little margin over issue #28's
+  held-out rationale acceptance example's score) — the same recall-first
+  tradeoff the repo owner chose for the `0.5` threshold above.
+  `RIDGE_PENALTY` raised `1.5e-4` → `1e-3` and `CM307`'s default `threshold`
+  lowered `0.5` → `0.3`: val recall reaches `1.0` (from `0.80`) and test
+  recall `0.926` (from `0.80`), while the acceptance example's score (0.198)
+  still clears the new threshold by a safe margin.
+- `tools/data/what_why.jsonl` grown further, 556 → 633 clauses (317 what /
+  316 why), with samples paraphrased from real-world good/bad comment and
+  docstring examples collected from published clean-code sources (Stack
+  Overflow's engineering blog, freeCodeCamp, Jack Franklin, Coding Horror,
+  the `luzkan.github.io` code-smells catalog, PEP 257 discussions) — each
+  reduced to the corpus's terse single-clause style rather than quoted
+  verbatim, to keep the Apache-2.0 dataset free of third-party prose.
+  Covers subtle restatements (a docstring that just narrates a method's own
+  name in different words) alongside strong ones, and rationale patterns
+  the corpus was thin on (workarounds, deprecation/compatibility, retry and
+  caching policy, algorithm-choice trade-offs).
+- `tools/tune_head.py` rewritten from a `RIDGE_PENALTY`/`threshold` grid
+  search to Hyperband (Li et al., 2016): it now also searches
+  `LEARNING_RATE`, treating training iterations as Hyperband's resource
+  budget so cheap partial fits eliminate weak `(learning_rate,
+  ridge_penalty)` configs before spending the full 15,000-iteration budget
+  on the survivors. The winner is refit at the full budget, then `CM307`'s
+  threshold is chosen exactly as before (max validation recall, tie-broken
+  by precision, subject to a precision floor and a margin over issue #28's
+  *two* held-out acceptance examples — the guard now also keeps the
+  procedural one comfortably above threshold, not just the rationale one
+  below it). Search is seeded, so it reproduces its own selection exactly.
+  Result on the grown corpus: `LEARNING_RATE` 1.0 → 3.9987,
+  `RIDGE_PENALTY` 1e-3 → 4.9017e-4, `CM307`'s default `threshold` 0.3 → 0.25.
+  Val recall stays at `1.0`; test recall rises `0.926` → `0.938`.
 - Seven new rules targeting patterns common in freshly-generated Python,
   bringing the total to 51:
   - `ST109` `redundant-else` — a plain two-way `if`/`else` whose `if` branch
@@ -151,6 +242,11 @@ whether pre- or post-1.0).
 
 ### Fixed
 
+- `CM302` no longer double-reports a banner/section-divider comment that
+  CM306 already flags — a banner that happens to share vocabulary with a
+  nearby line (`# --- sweep overrides ---` above a `sweep_override = ...`
+  line) was scoring as a restatement too, so the same comment produced two
+  warnings.
 - Checking a medium project no longer takes double-digit seconds
   (`clean-code check src` on this repo: 13.5s → 0.9s). `DP701`'s
   fingerprinting deep-copied each statement's AST, and the `parent`
@@ -211,7 +307,7 @@ shift before the API is called stable.
 ### Added
 
 - Repository infrastructure for outside contributors: GitHub Actions CI
-  (test matrix across Python 3.11–3.13, `ruff` lint, and a `clean-code`
+  (test matrix across Python 3.11–13, `ruff` lint, and a `clean-code`
   self-check job), `CONTRIBUTING.md`, issue templates (bug report, feature
   request, new-rule proposal), a pull request template, and `SECURITY.md`.
 - `PY901` `bare-except` — flags a bare `except:` that swallows

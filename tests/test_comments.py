@@ -47,7 +47,7 @@ class TestDocstringRestatesName:
                     continue
                 if not in_section:
                     continue
-                if line.strip() and not line.startswith((" ", "\\t")):
+                if line.strip() and not line.startswith((" ", "\t")):
                     in_section = False
                     continue
                 entry = PARAM_ENTRY.match(line)
@@ -198,6 +198,55 @@ class TestDocstringRestatesName:
         '''
         assert check(source, "CM301") == []
 
+    def test_flags_docstring_that_paraphrases_the_body_in_synonyms(self, check):
+        # Zero literal overlap with "paraphrase_body"/"a"/"b" beyond "a"/"b"
+        # themselves, but "adds"/"sum" are synonyms of the `+`/`return`
+        # operators CM302 already maps — this is the same paraphrase pattern
+        # CM302 catches for one annotated line, applied to a whole body.
+        source = '''
+        def paraphrase_body(a, b):
+            """Adds a and b and returns the sum."""
+            return a + b
+        '''
+        violations = check(source, "CM301")
+        assert rule_ids(violations) == ["CM301"]
+        assert "paraphrases the function body" in violations[0].message
+
+    def test_why_signal_exempts_body_paraphrase(self, check):
+        source = '''
+        def compute_running_total(items):
+            """Adds items one at a time instead of using sum(), because
+            the input can be a lazy generator that must only be walked once."""
+            total = 0
+            for item in items:
+                total += item
+            return total
+        '''
+        assert check(source, "CM301") == []
+
+    def test_nested_function_docstring_excluded_from_outer_body_scan(self, check):
+        # Without excluding the nested function's own lines, its docstring's
+        # "if"/"for" would leak unrelated operator-synonym words into
+        # outer's body vocabulary and falsely match outer's own docstring.
+        source = '''
+        def outer(x):
+            """Whether the case fits."""
+            def helper():
+                """Applies only if needed, for safety."""
+                return x
+            return helper()
+        '''
+        assert check(source, "CM301") == []
+
+    def test_body_overlap_threshold_is_configurable(self, check):
+        source = '''
+        def combine_pair(first_value, second_value):
+            """Adds the two inputs together and returns their total."""
+            return first_value + second_value
+        '''
+        assert check(source, "CM301") == []
+        assert rule_ids(check(source, "CM301", body_overlap=0.1)) == ["CM301"]
+
 
 class TestCommentRestatesCode:
     def test_flags_inline_restatement(self, check):
@@ -221,6 +270,18 @@ class TestCommentRestatesCode:
             "flag = compute_flag()  # type: ignore\n"
         )
         assert check(source, "CM302") == []
+
+    def test_banner_comment_is_exempt_even_with_high_word_overlap(self, check):
+        # A section banner is CM306's territory, not a restatement — a
+        # banner that happens to reuse the following line's vocabulary
+        # (here "sweep") must not also fire CM302.
+        source = (
+            'config["learning_rate"] = 0.01\n'
+            "# --- W&B sweep overrides -------------------------------------------------------\n"
+            'config["sweep_override"] = True\n'
+        )
+        assert check(source, "CM302") == []
+        assert rule_ids(check(source, "CM306")) == ["CM306"]
 
     def test_return_restatement(self, check):
         source = "def total_of(items):\n    total = sum(items)\n    return total  # return the total\n"

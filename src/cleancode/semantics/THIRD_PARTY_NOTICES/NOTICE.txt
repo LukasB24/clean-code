@@ -1,0 +1,23 @@
+Llama 2 is licensed under the LLAMA 2 Community License, Copyright (c) Meta
+Platforms, Inc. All Rights Reserved.
+
+This directory is distributed as part of clean-code's `cleancode.semantics`
+package because `embeddings.npz` (in the parent directory) is a derivative
+work of Llama 2 Materials: it is an int8-quantized, PCA-reduced word table
+distilled by `tools/distill_backbone.py` from the token-embedding codebook of
+WordLlama's `l2_supercat_256` model, which is itself trained on a
+concatenation of codebooks including LLaMA 2 70B's (see
+https://huggingface.co/dleemiller/word-llama-l2-supercat). No Llama model
+weights, inference code, or training code are included or redistributed here
+— only a derived, fixed-size table of word vectors, frozen and used solely as
+a static feature lookup for the CM307 docstring/comment classifier. It is not
+used, and must not be used, to train or improve any other large language
+model.
+
+Per Section 1(b)(iii) of the LLAMA 2 Community License Agreement, a copy of
+that Agreement is provided alongside this notice as
+`LLAMA2_COMMUNITY_LICENSE.txt`, and the Acceptable Use Policy it incorporates
+by reference is provided as `LLAMA2_ACCEPTABLE_USE_POLICY.md`. clean-code's
+own license (Apache-2.0, see the repository root `LICENSE` and `NOTICE`
+files) applies to clean-code's own source code; it does not relicense this
+vendored, Llama-derived asset, which remains subject to the terms above.

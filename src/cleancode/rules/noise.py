@@ -34,7 +34,6 @@ def _is_simple_name_assign(statement: ast.stmt) -> str | None:
 
 
 def _used_elsewhere(function: FunctionNode, name: str, skip: tuple[ast.Name, ast.Name]) -> bool:
-    # skip = the pattern's own target/return nodes, not a real second use.
     for node in ast.walk(function):
         if isinstance(node, ast.Name) and node.id == name and node not in skip:
             return True

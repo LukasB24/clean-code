@@ -20,12 +20,13 @@ quick-start, see the [README](../README.md).
 | NM201 | short-name | `min_length=3, allowed=[i,j,k,n,x,y,_,id,ok,fh]` | warning |
 | NM202 | meaningless-name | configurable ban lists | warning |
 | NM203 | cryptic-abbreviation | `known_abbrevs=[cfg,ctx,idx,…]` | info |
-| CM301 | docstring-restates-name | `overlap=0.6, private_overlap=0.35` | warning |
+| CM301 | docstring-restates-name | `overlap=0.6, private_overlap=0.35, body_overlap=0.6` | warning |
 | CM302 | comment-restates-code | `overlap=0.5, min_words=2` | warning |
 | CM303 | comment-density | `max_ratio=0.3, min_code_lines=5` | info |
 | CM304 | boilerplate-param-docs | `min_uninformative=0.5` | warning |
 | CM305 | file-comment-density | `max_ratio=0.2, min_code_lines=30` | warning |
 | CM306 | banner-comment | — | warning |
+| CM307 | docstring-semantic-restatement | `threshold=0.25, min_words=3, max_lines=3` | warning |
 | SL401 | complex-subscript | `max_score=5` | warning |
 | SL402 | chained-subscript | `max_chain=2` | warning |
 | TY501 | uninformative-any | — | warning |
@@ -73,6 +74,36 @@ quick-start, see the [README](../README.md).
   0.6)** — a private name has no external reader to write prose for, only
   its own body, which the reader can just read instead. Dunders are judged
   as public, not private.
+- **CM301 also catches a *paraphrased* body**, not just a verbatim one: a
+  function docstring whose words are mostly synonyms of its body's
+  operators/keywords (`"""Adds two numbers and returns the sum."""` over
+  `return a + b`) is flagged at `body_overlap`, reusing CM302's
+  operator-synonym table (`+` → add/plus/sum/…, `for` → loop/iterate/…)
+  against the *whole* function body rather than one annotated line. A
+  why-signal docstring (because, workaround, instead, ...) is exempt from
+  this check, same as CM302's comments.
+- **CM307 is the semantic second tier behind CM301/CM302** — a vendored
+  pretrained-embedding classifier (pure numpy, no ML framework, deterministic,
+  microseconds per comment) scores each *clause* of a docstring/comment as
+  procedural narration vs. rationale, catching the more diffuse synonym
+  paraphrases that even CM301's operator-anchored body check can't reach
+  (loose narration with no strong operator/keyword anchor). A text is
+  flagged only when every clause is verb-led narration scoring above
+  `threshold`; one rationale clause, noun-led value contract, or
+  unknown-vocabulary clause clears it. The default `threshold` (0.25) favors
+  recall over precision — re-checking a comment that turns out fine costs
+  an LLM fixer little, while a paraphrase this rule never flags gets no
+  second look at all. Anything CM301/CM302 already flag —
+  including CM301's operator-synonym body check — is skipped, so the two
+  rules never double-report the same paraphrase; scope is limited to
+  undecorated function docstrings of at most `max_lines` lines plus
+  standalone comment blocks. The backbone (`embeddings.npz`) is a Llama
+  2-derived asset under its own license, not this project's Apache-2.0 —
+  see `src/cleancode/semantics/THIRD_PARTY_NOTICES/`. Its classifier head
+  is fit on an 80/10/10 train/val/test split of `tools/data/what_why.jsonl`
+  (`tools/train_head.py`); `head.json`'s `training.accuracy` reports all
+  three so the checked-in figure reflects held-out generalization, not
+  just training-set fit.
 - **CM301 also covers class docstrings** (reference words = the class name
   plus its directly-defined method names) and, for docstrings longer than
   two lines, flags one whose *every* non-empty line never leaves the
@@ -154,6 +185,10 @@ quick-start, see the [README](../README.md).
   directive-comment exemptions as CM303/CM305 (TODO/FIXME/NOTE, `noqa`,
   `cleancode:`, ...); a plain narrative comment with no decoration characters
   (`# Step 1: parse the input`) is left to CM302/CM305, not flagged here.
+  The reverse holds too — CM302 exempts anything CM306 would flag, so a
+  banner that happens to reuse a nearby line's vocabulary (`# --- sweep
+  overrides ---` above a `sweep_override = ...` line) isn't also reported
+  as a restatement.
 - **SD801 flags a same-variable type-switch** (`isinstance`/`type()` chain) —
   an Open/Closed Principle smell. Dispatching on Python's own `ast.*` node
   types is exempt, since that's routine AST tooling, not the smell targeted.

@@ -75,13 +75,14 @@
 # known_abbrevs = ["cfg", "ctx", "idx", "db", "fn", "env", "src", "dst", "str", "css", "tmp", "xml", "html", "sql", "std", "cmd", "msg", "pkg", "txt", "sdk", "api", "url", "uri", "gcd", "rgb", "csv", "json", "yml", "js", "ts", "np", "df", "kwargs", "args", "cls", "llm"]
 
 # CM301  docstring-restates-name  [warning]
-#   Flags docstrings that say nothing beyond the signature: a short one (`def get_user_name`: """Gets the user name.""") whose words all come from the function/class name and parameters, or a longer one where every line stays within that same vocabulary plus generic filler nouns. A `_`-prefixed (private) name is judged at the much stricter `private_overlap` — it has no external reader to write prose for, only its own body, which the reader can just read instead.
+#   Flags docstrings that say nothing beyond the signature: a short one (`def get_user_name`: """Gets the user name.""") whose words all come from the function/class name and parameters, or a longer one where every line stays within that same vocabulary plus generic filler nouns. A `_`-prefixed (private) name is judged at the much stricter `private_overlap` — it has no external reader to write prose for, only its own body, which the reader can just read instead. Also flags a function docstring whose words are mostly synonyms of its body's operators/keywords (`"""Adds two numbers and returns the sum."""` over `return a + b`), reusing CM302's operator-synonym table against the whole body instead of one annotated line, at `body_overlap`. Why-signal docstrings are exempt from this check, same as CM302.
 # [tool.cleancode.CM301]
 # overlap = 0.6
 # private_overlap = 0.35
+# body_overlap = 0.6
 
 # CM302  comment-restates-code  [warning]
-#   Flags comments that paraphrase the code line they annotate (`x = x + 1  # increment x by 1`, `for k in range(3):  # iterate three times`). TODO/FIXME/NOTE, tool directives, and comments carrying a causal/justification marker (because, since, workaround, ...) are exempt.
+#   Flags comments that paraphrase the code line they annotate (`x = x + 1  # increment x by 1`, `for k in range(3):  # iterate three times`). TODO/FIXME/NOTE, tool directives, comments carrying a causal/justification marker (because, since, workaround, ...), and banner/section-divider comments (CM306's territory) are exempt.
 # [tool.cleancode.CM302]
 # overlap = 0.5
 # min_words = 2
@@ -106,6 +107,13 @@
 # CM306  banner-comment  [warning]
 #   Flags a decoration-only comment (`# ----------`) or a decoration-framed one (`# ---- Step 1 ----`) — section-divider ceremony that carries no information the code doesn't already show. TODO/FIXME/NOTE and tool directives are exempt, like the other comment rules.
 # [tool.cleancode.CM306]
+
+# CM307  docstring-semantic-restatement  [warning]
+#   Flags docstrings and standalone comments that only *narrate* what the code does, even when reworded with synonyms ("""Adds two numbers and returns the sum.""" over `return a + b`) — paraphrases the lexical rules (CM301/CM302) structurally cannot see. Each clause is scored by a small pretrained-embedding classifier (see `cleancode.semantics`); a text is flagged only when *every* clause reads as procedural description, so mixed comments that also carry rationale ("... to maximize L1 cache hits") always pass. Scope is deliberately narrow: plain (undecorated) function docstrings of at most `max_lines` lines — a class docstring states responsibility and a decorated function's is framework-facing help text — and whole standalone comment blocks. Texts CM301/CM302 already flag (including CM301's operator-synonym body-overlap check), TODO/directive comments, and why-signal carriers are skipped.
+# [tool.cleancode.CM307]
+# threshold = 0.25
+# min_words = 3
+# max_lines = 3
 
 # SL401  complex-subscript  [warning]
 #   Scores each subscript expression (+1 per dimension/step/None/ellipsis/negative index/arithmetic/call, +2 per nested subscript, negative steps count double) and flags scores above the threshold.
