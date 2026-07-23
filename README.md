@@ -70,6 +70,32 @@ Then trigger it directly within your Claude Code CLI or VS Code extension:
 /clean-code [instruction or target_path]
 ```
 
+#### Two tiers: the analyzer plus a judgment pass
+
+Clean code has two kinds of problems, and they need two mechanisms. The CLI
+above is the **mechanical tier** — deterministic, no LLM, no API key — and it
+stays that way. But some things an AST simply can't judge, because they only
+mean anything relative to *what the code was asked to do*: is this abstraction
+necessary, is the solution heavier than the problem, does this comment earn its
+place? Those are the boilerplate-and-over-complication problems that slip past
+any rule set.
+
+So when you generate code, the skill runs a **judgment tier** on top of the
+analyzer:
+
+- **It constrains generation up front** with a minimalism constitution, so
+  unnecessary boilerplate and unearned docstrings are rarely written in the
+  first place.
+- **It runs a Clean-Code Judge** — a rubric-driven review, grounded in your
+  instruction and your tests, that flags what's over-built and hands back
+  concrete `DELETE` / `SIMPLIFY` instructions, the same way the analyzer ships a
+  `fix:` with every violation.
+
+This judgment tier lives entirely in the skill (where an LLM is already in the
+loop); the `cleancode` package and the `clean-code` CLI remain 100%
+deterministic. See `.claude/skills/clean-code/` for the constitution and the
+judge rubric.
+
 ## See it catch something real
 
 Given `checkout.py`, fresh out of an LLM:
