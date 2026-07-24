@@ -12,7 +12,18 @@ whether pre- or post-1.0).
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- The bundled Claude Code skill gained a **judgment tier** on top of the
+  deterministic analyzer, for the clean-code qualities an AST can't see because
+  they only mean anything relative to the problem being solved — unnecessary
+  boilerplate, unearned comments/docstrings, and over-complication. A
+  *Minimalism Constitution* constrains generation up front so bloat is rarely
+  written, and a rubric-driven *Clean-Code Judge* reviews the result (grounded in
+  the instruction and tests) and returns line-cited `DELETE`/`SIMPLIFY` findings.
+  `SKILL.md` is now a five-phase loop (constrain, generate, mechanical floor,
+  judge, revise, report). The `cleancode` package and `clean-code` CLI are
+  unchanged and remain 100% deterministic.
 
 ## [0.2.1] - 2026-07-15
 
