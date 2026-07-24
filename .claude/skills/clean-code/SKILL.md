@@ -42,7 +42,15 @@ time rather than only catching them afterward.
    checking the containing directory when hunting cross-file duplication.
 4. **Optional deep pass:** to also audit for unnecessary boilerplate and
    over-complication, run the Clean-Code Judge (see
-   `references/clean-code-judge.md`) — you'll need the code's intent to do this.
+   `references/clean-code-judge.md`). Unlike the generate path, existing code
+   arrives with no captured instruction and maybe no tests, and the Judge is only
+   as grounded as the intent you hand it — so source that intent first rather than
+   let it guess. Reconstruct the spec from the module's public API and docstrings,
+   the tests that exercise it, and the commit or PR message that introduced it; if
+   it's still unclear, ask the user instead of inventing one. If there are no tests
+   to serve as ground truth, treat the Judge's `DELETE`/`SIMPLIFY` findings as
+   proposals to verify (add a quick test, or confirm the behavior by hand) before
+   applying — never apply them blind.
 
 ## If an `instruction` is provided (generate new code)
 

@@ -66,6 +66,14 @@ line-cited, actionable finding.
    problem? Only raise this when it points at a concrete restructuring, never as
    a vibe.
 
+The weights are a **priority order, not an aggregation rule.** Any single `revise`
+makes the overall verdict `revise`, regardless of which dimension raised it — a
+lowest-weight finding still counts. What the weights govern is *order*: surface
+findings highest-weight first, and when the two-round bound forces a choice about
+what to apply, apply the higher-weight findings first. A necessity finding
+(delete an abstraction) usually subsumes the lower-weight findings sitting inside
+it, so resolving it first avoids churning edits you'd only throw away.
+
 ### Output format (every finding mirrors the analyzer's "fix" contract)
 
 ```
