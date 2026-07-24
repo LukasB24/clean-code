@@ -5,13 +5,12 @@ from __future__ import annotations
 import ast
 import enum
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from cleancode.config import RuleConfig
 
 
-@runtime_checkable
 class Positioned(Protocol):
     """Anything with a source location: an AST node or a rule's own binding record."""
 
@@ -108,17 +107,6 @@ class Comment:
     inline: bool  # shares its line with code (as opposed to a standalone comment line)
 
 
-def enclosing_symbol(node: ast.AST) -> str | None:
-    """Dotted name of the innermost function/class containing ``node``."""
-    parts: list[str] = []
-    current = getattr(node, "parent", None)
-    while current is not None:
-        if isinstance(current, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            parts.append(current.name)
-        current = getattr(current, "parent", None)
-    return ".".join(reversed(parts)) or None
-
-
 @dataclass
 class ParsedFile:
     """One file's parse artifact: everything a rule needs, minus a specific rule's config.
@@ -148,4 +136,10 @@ class FileContext:
 
     def enclosing_symbol(self, node: ast.AST) -> str | None:
         """Dotted name of the innermost function/class containing ``node``."""
-        return enclosing_symbol(node)
+        parts: list[str] = []
+        current = getattr(node, "parent", None)
+        while current is not None:
+            if isinstance(current, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                parts.append(current.name)
+            current = getattr(current, "parent", None)
+        return ".".join(reversed(parts)) or None
